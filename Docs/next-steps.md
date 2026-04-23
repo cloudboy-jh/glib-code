@@ -11,6 +11,10 @@ Last updated: 2026-04-23
 - [x] New logo assets wired (wordmark + icon) with theme-aware masking.
 - [x] Picker now has Theme entry + dedicated Theme dialog.
 - [x] Default theme is `catppuccin-mocha`.
+- [x] Browser tab favicon now uses the glib icon asset.
+- [x] Session sidebar now has persisted resize width.
+- [x] Session sidebar has Home action back to picker.
+- [x] Session sidebar collapse now uses the masked glib icon rail.
 
 ## Component checklist
 
@@ -25,7 +29,10 @@ Last updated: 2026-04-23
 
 ### Session surfaces
 - [x] Sidebar logo integration and collapse behavior.
+- [x] Sidebar resize rail + persisted width.
+- [x] Sidebar Home action back to picker.
 - [x] Empty-state when Session mode has no active session.
+- [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
 - [ ] Tighten parity pass for SessionHeader spacing/control density.
 - [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
 - [ ] Tighten parity pass for Composer geometry and action strip.
@@ -50,3 +57,11 @@ Last updated: 2026-04-23
 - [ ] Diff reader review done against glib-go contract.
 - [x] Build + typecheck passing.
 - [ ] No placeholder-only behavior in primary UI paths.
+
+## Latest notes
+
+- The sidebar was pushed closer to t3 structure, but the current pass still needs another visual correction pass.
+- Main known sidebar gaps right now:
+  - search control still needs stronger shadcn-style definition,
+  - expanded sizing/collapse behavior still needs polish,
+  - icon rail behavior should stay theme-masked and visually consistent.

@@ -1,18 +1,29 @@
 <template>
   <div class="h-screen w-screen overflow-hidden bg-background text-foreground">
     <div class="grid h-full grid-cols-[auto_1fr]">
-      <SessionSidebar
-        :sessions="sessions"
-        :active-id="state.activeSessionId"
-        :collapsed="state.sidebarCollapsed"
-        :logo-wordmark-src="logoWordmarkSrc"
-        :logo-icon-src="logoIconSrc"
+      <div class="relative h-full border-r border-border/60 bg-card" :style="{ width: `${sidebarWidth}px` }">
+        <SessionSidebar
+          :sessions="sessions"
+          :active-id="state.activeSessionId"
+          :collapsed="state.sidebarCollapsed"
+          :logo-wordmark-src="logoWordmarkSrc"
+          :logo-icon-src="logoIconSrc"
         :disabled="!currentProject"
         @select="state.activeSessionId = $event"
         @new="createSession"
+        @go-home="goHome"
         @open-settings="state.settingsOpen = true"
-        @toggle-collapse="state.sidebarCollapsed = !state.sidebarCollapsed"
+        @toggle-collapse="toggleSidebarCollapse"
       />
+
+        <button
+          v-if="!state.sidebarCollapsed"
+          type="button"
+          class="absolute inset-y-0 -right-2 z-10 hidden w-4 cursor-col-resize bg-transparent transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-border md:block"
+          aria-label="Resize sidebar"
+          @mousedown="startSidebarResize"
+        />
+      </div>
 
       <section :class="['grid h-full', currentProject ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
         <SessionHeader
@@ -159,6 +170,11 @@ import logoWordmark from '../../glibcode-wordmark.png';
 
 const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
+const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
+const SIDEBAR_EXPANDED_WIDTH = 288;
+const SIDEBAR_COLLAPSED_WIDTH = 64;
+const SIDEBAR_MIN_WIDTH = 240;
+const SIDEBAR_MAX_WIDTH = 380;
 
 type Session = {
   id: string;
@@ -237,6 +253,7 @@ const state = reactive({
   mode: 'diff' as 'session' | 'diff',
   activeSessionId: '',
   sidebarCollapsed: false,
+  sidebarWidth: SIDEBAR_EXPANDED_WIDTH,
   paletteOpen: false,
   paletteIndex: 0,
   settingsOpen: false,
@@ -296,8 +313,57 @@ const filteredPaletteCommands = computed(() => {
 });
 
 const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n(simulated output)` : 'No commands run yet.'));
+const sidebarWidth = computed(() => (state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
+
+let stopSidebarResize: (() => void) | null = null;
 
 function noop() {}
+
+function clampSidebarWidth(width: number) {
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(width, SIDEBAR_MAX_WIDTH));
+}
+
+function toggleSidebarCollapse() {
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  if (!state.sidebarCollapsed) {
+    state.sidebarWidth = clampSidebarWidth(state.sidebarWidth);
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth));
+  }
+}
+
+function goHome() {
+  currentProject.value = null;
+  state.mode = 'diff';
+  state.activeSessionId = '';
+}
+
+function startSidebarResize(event: MouseEvent) {
+  if (state.sidebarCollapsed) return;
+  event.preventDefault();
+
+  const startX = event.clientX;
+  const startWidth = state.sidebarWidth;
+
+  const onMouseMove = (moveEvent: MouseEvent) => {
+    state.sidebarWidth = clampSidebarWidth(startWidth + (moveEvent.clientX - startX));
+  };
+
+  const onMouseUp = () => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth));
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+    stopSidebarResize = null;
+  };
+
+  stopSidebarResize = () => {
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+    stopSidebarResize = null;
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
 
 function ensureProjectDiffSelection(projectId: string) {
   const project = diffProjects.find((p) => p.id === projectId);
@@ -482,6 +548,13 @@ function onGlobalKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   applyTheme(settings.themePreset);
+  const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+  if (storedSidebarWidth) {
+    const parsedWidth = Number(storedSidebarWidth);
+    if (!Number.isNaN(parsedWidth)) {
+      state.sidebarWidth = clampSidebarWidth(parsedWidth);
+    }
+  }
   window.addEventListener('keydown', onGlobalKeydown);
 });
 
@@ -491,6 +564,7 @@ watch(
 );
 
 onUnmounted(() => {
+  stopSidebarResize?.();
   window.removeEventListener('keydown', onGlobalKeydown);
 });
 </script>
