@@ -5,17 +5,21 @@
         :sessions="sessions"
         :active-id="state.activeSessionId"
         :collapsed="state.sidebarCollapsed"
+        :logo-wordmark-src="logoWordmarkSrc"
+        :logo-icon-src="logoIconSrc"
+        :disabled="!currentProject"
         @select="state.activeSessionId = $event"
         @new="createSession"
         @open-settings="state.settingsOpen = true"
         @toggle-collapse="state.sidebarCollapsed = !state.sidebarCollapsed"
       />
 
-      <section class="grid h-full grid-rows-[54px_1fr]">
+      <section :class="['grid h-full', currentProject ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
         <SessionHeader
-          :title="activeSession?.title ?? 'Untitled session'"
-          :project="activeProject.name"
-          :branch="activeProject.branch"
+          v-if="currentProject"
+          :title="activeSession?.title ?? 'No active session'"
+          :project="currentProject.name"
+          :branch="currentProject.branch"
           :model="settings.defaultModel"
           @switch-mode="toggleMode"
           @open-model="state.settingsOpen = true"
@@ -24,25 +28,55 @@
         />
 
         <main class="min-h-0">
-          <template v-if="state.mode === 'session'">
-            <div class="grid h-full grid-rows-[1fr_auto]">
-              <Timeline :entries="timeline" />
-              <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @trigger="onComposerTrigger" @send="sendPrompt" />
+          <template v-if="!currentProject">
+            <div class="grid h-full place-items-center px-6">
+              <PickerScreen
+                :recents="recents"
+                :logo-src="logoWordmarkSrc"
+                @open-project="state.openProjectDialogOpen = true"
+                @open-clone="state.cloneDialogOpen = true"
+                @open-palette="openCommandPalette"
+                @open-theme="state.themeDialogOpen = true"
+                @open-recent="openRecentProject"
+              />
             </div>
           </template>
 
           <template v-else>
-            <DiffWorkbench
-              :projects="diffProjects"
-              :selected-project-id="state.selectedProjectId"
-              :selected-commit-id="state.selectedCommitId"
-              :selected-file-path="state.selectedFilePath"
-              :diff-style="state.diffStyle"
-              @update:selected-project-id="onDiffProjectChange"
-              @update:selected-commit-id="onDiffCommitChange"
-              @update:selected-file-path="state.selectedFilePath = $event"
-              @update:diff-style="state.diffStyle = $event"
-            />
+            <template v-if="state.mode === 'session'">
+              <template v-if="activeSession">
+                <div class="grid h-full grid-rows-[1fr_auto]">
+                  <Timeline :entries="activeTimeline" />
+                  <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @trigger="onComposerTrigger" @send="sendPrompt" />
+                </div>
+              </template>
+
+              <template v-else>
+                <div class="grid h-full place-items-center p-6">
+                  <div class="max-w-xl rounded-xl border border-border/80 bg-card/55 p-6 text-center">
+                    <h2 class="mb-2 text-lg font-semibold">No session started</h2>
+                    <p class="mb-4 text-sm text-muted-foreground">Review diffs first or start a new session with the agent.</p>
+                    <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="createSession">
+                      Start session
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </template>
+
+            <template v-else>
+              <DiffWorkbench
+                :projects="diffProjects"
+                :selected-project-id="state.selectedProjectId"
+                :selected-commit-id="state.selectedCommitId"
+                :selected-file-path="state.selectedFilePath"
+                :diff-style="state.diffStyle"
+                @update:selected-project-id="onDiffProjectChange"
+                @update:selected-commit-id="onDiffCommitChange"
+                @update:selected-file-path="state.selectedFilePath = $event"
+                @update:diff-style="state.diffStyle = $event"
+              />
+            </template>
           </template>
         </main>
       </section>
@@ -76,20 +110,55 @@
       @run="runTerminal"
       @update:input="forms.terminal = $event"
     />
+
+    <OpenProjectDialog
+      v-if="state.openProjectDialogOpen"
+      :path="picker.openPath"
+      @close="state.openProjectDialogOpen = false"
+      @update:path="picker.openPath = $event"
+      @open="openExistingProject"
+    />
+
+    <ThemeDialog
+      v-if="state.themeDialogOpen"
+      :model-value="settings.themePreset"
+      @close="state.themeDialogOpen = false"
+      @update:model-value="settings.themePreset = $event"
+    />
+
+    <CloneRepoDialog
+      v-if="state.cloneDialogOpen"
+      :url="picker.cloneUrl"
+      :destination="picker.cloneDestination"
+      @close="state.cloneDialogOpen = false"
+      @update:url="picker.cloneUrl = $event"
+      @update:destination="picker.cloneDestination = $event"
+      @clone="cloneRepository"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import CommandPalette from './components/app/CommandPalette.vue';
 import TerminalDrawer from './components/app/TerminalDrawer.vue';
+import DiffWorkbench from './components/diff/DiffWorkbench.vue';
+import CloneRepoDialog from './components/picker/CloneRepoDialog.vue';
+import OpenProjectDialog from './components/picker/OpenProjectDialog.vue';
+import PickerScreen from './components/picker/PickerScreen.vue';
+import ThemeDialog from './components/picker/ThemeDialog.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
 import Composer from './components/session/Composer.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
 import SessionSidebar from './components/session/SessionSidebar.vue';
 import Timeline from './components/session/Timeline.vue';
-import DiffWorkbench from './components/diff/DiffWorkbench.vue';
 import { applyTheme } from './lib/theme';
+import type { ThemePreset } from '@glib-code/shared/theme/presets';
+import logoIcon from '../../glibcode-iconlogo.png';
+import logoWordmark from '../../glibcode-wordmark.png';
+
+const logoIconSrc = logoIcon;
+const logoWordmarkSrc = logoWordmark;
 
 type Session = {
   id: string;
@@ -99,26 +168,35 @@ type Session = {
   status: 'Working' | 'Completed';
 };
 
-const activeProject = reactive({
-  id: 'proj-1',
-  name: 'cloudboy-jh/glib-code',
-  branch: 'main'
+type TimelineEntry = {
+  id: string;
+  kind: string;
+  text: string;
+  time: string;
+  level?: 'info' | 'error';
+};
+
+type DiffFile = { path: string; stats: string; diff: string };
+type DiffCommit = { id: string; label: string; files: DiffFile[] };
+type DiffProject = { id: string; name: string; commits: DiffCommit[] };
+
+const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
+
+const recents = reactive([
+  { id: 'r1', name: 'cloudboy-jh/glib-code', path: 'C:/repos/glib-code', lastOpenedAt: '2h ago' },
+  { id: 'r2', name: 'cloudboy-jh/shipwrkrs', path: 'C:/repos/shipwrkrs', lastOpenedAt: 'Yesterday' }
+]);
+
+const picker = reactive({
+  openPath: '',
+  cloneUrl: '',
+  cloneDestination: 'C:/repos'
 });
 
-const sessions = reactive<Session[]>([
-  { id: 's1', title: 'Refactor auth middleware flow', time: '1m ago', section: 'Now', status: 'Working' },
-  { id: 's2', title: 'Theme selector parity pass', time: '19m ago', section: 'Today', status: 'Working' },
-  { id: 's3', title: 'Command palette keymap cleanup', time: 'Yesterday', section: 'Yesterday', status: 'Completed' },
-  { id: 's4', title: 'Inline diff renderer polish', time: 'Last week', section: 'Older', status: 'Completed' }
-]);
+const sessions = reactive<Session[]>([]);
+const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
 
-const timeline = reactive([
-  { id: 'e1', kind: 'User', text: 'I need settings to match t3 rhythm and spacing.', time: '7:31 PM', level: 'info' as const },
-  { id: 'e2', kind: 'Work log', text: 'Edited SessionSidebar, SessionHeader, and CommandPalette structure.', time: '7:32 PM', level: 'info' as const },
-  { id: 'e3', kind: 'Error', text: 'Timed out waiting for initialize.', time: '7:33 PM', level: 'error' as const }
-]);
-
-const diffProjects = reactive([
+const diffProjects = reactive<DiffProject[]>([
   {
     id: 'proj-1',
     name: 'cloudboy-jh/glib-code',
@@ -130,23 +208,12 @@ const diffProjects = reactive([
           {
             path: 'web/src/components/session/SessionSidebar.vue',
             stats: '+124 -21',
-            diff: `diff --git a/web/src/components/session/SessionSidebar.vue b/web/src/components/session/SessionSidebar.vue\nindex 2e0a11..bf292f 100644\n--- a/web/src/components/session/SessionSidebar.vue\n+++ b/web/src/components/session/SessionSidebar.vue\n@@ -1,6 +1,9 @@\n-<aside class=\"box side\">\n+<aside class=\"border-r border-border/80 bg-card/60\">\n+  <div class=\"flex h-full flex-col p-3\">\n+    <div class=\"mb-3 flex items-center gap-2\">\n+      ...\n+    </div>\n`
+            diff: `diff --git a/web/src/components/session/SessionSidebar.vue b/web/src/components/session/SessionSidebar.vue\nindex 2e0a11..bf292f 100644\n--- a/web/src/components/session/SessionSidebar.vue\n+++ b/web/src/components/session/SessionSidebar.vue\n@@ -1,6 +1,9 @@\n-<aside class="box side">\n+<aside class="border-r border-border/80 bg-card/60">\n+  <div class="flex h-full flex-col p-3">\n+    <div class="mb-3 flex items-center gap-2">\n+      ...\n+    </div>\n`
           },
           {
             path: 'web/src/components/app/CommandPalette.vue',
             stats: '+68 -25',
-            diff: `diff --git a/web/src/components/app/CommandPalette.vue b/web/src/components/app/CommandPalette.vue\nindex c1ebca..1eacdf 100644\n--- a/web/src/components/app/CommandPalette.vue\n+++ b/web/src/components/app/CommandPalette.vue\n@@ -1,6 +1,6 @@\n-<div class=\"modal\">\n+<div class=\"fixed inset-0 z-50 grid place-items-start\">\n ...\n`
-          }
-        ]
-      },
-      {
-        id: 'c2',
-        label: '3dc19aa · settings panel restyle',
-        files: [
-          {
-            path: 'web/src/components/settings/SettingsModal.vue',
-            stats: '+95 -38',
-            diff: `diff --git a/web/src/components/settings/SettingsModal.vue b/web/src/components/settings/SettingsModal.vue\n@@ -1,7 +1,9 @@\n-<div class=\"modal\">\n+<div class=\"fixed inset-0 z-50 grid place-items-center bg-black/60\">\n+  <div class=\"max-w-[760px] rounded-xl border\">\n ...\n`
+            diff: `diff --git a/web/src/components/app/CommandPalette.vue b/web/src/components/app/CommandPalette.vue\nindex c1ebca..1eacdf 100644\n--- a/web/src/components/app/CommandPalette.vue\n+++ b/web/src/components/app/CommandPalette.vue\n@@ -1,6 +1,6 @@\n-<div class="modal">\n+<div class="fixed inset-0 z-50 grid place-items-start">\n ...\n`
           }
         ]
       }
@@ -155,7 +222,7 @@ const diffProjects = reactive([
 ]);
 
 const settings = reactive({
-  themePreset: 'tokyo-night',
+  themePreset: 'catppuccin-mocha' as ThemePreset,
   defaultModel: 'gpt-5.3-codex'
 });
 
@@ -167,13 +234,16 @@ const keybindings = reactive([
 ]);
 
 const state = reactive({
-  mode: 'session' as 'session' | 'diff',
-  activeSessionId: 's1',
+  mode: 'diff' as 'session' | 'diff',
+  activeSessionId: '',
   sidebarCollapsed: false,
   paletteOpen: false,
   paletteIndex: 0,
   settingsOpen: false,
   terminalOpen: false,
+  openProjectDialogOpen: false,
+  themeDialogOpen: false,
+  cloneDialogOpen: false,
   selectedProjectId: 'proj-1',
   selectedCommitId: 'c1',
   selectedFilePath: 'web/src/components/session/SessionSidebar.vue',
@@ -189,12 +259,18 @@ const forms = reactive({
 const paletteCommands = [
   { id: 'mode.diff', label: 'Switch to Diff mode' },
   { id: 'mode.session', label: 'Switch to Session mode' },
+  { id: 'picker.open', label: 'Open project picker' },
   { id: 'settings.open', label: 'Open settings' },
   { id: 'terminal.toggle', label: 'Toggle terminal drawer' },
   { id: 'session.new', label: 'Create new session' }
 ];
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
+
+const activeTimeline = computed(() => {
+  if (!state.activeSessionId) return [];
+  return timelineBySessionId[state.activeSessionId] ?? [];
+});
 
 const commitsForProject = computed(() => {
   const project = diffProjects.find((p) => p.id === state.selectedProjectId);
@@ -207,34 +283,100 @@ const filesForCommit = computed(() => {
 });
 
 const contextLabel = computed(() => {
-  if (state.mode !== 'diff') return '2 files · 1 commit from b8305af';
+  if (state.mode !== 'session') return '';
+  if (!filesForCommit.value.length) return '';
   return `${filesForCommit.value.length} files · ${state.selectedCommitId}`;
 });
 
 const filteredPaletteCommands = computed(() => {
   const q = forms.palette.trim().toLowerCase();
-  if (!q) return paletteCommands;
-  return paletteCommands.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
+  const options = paletteCommands.filter((c) => currentProject.value || c.id === 'picker.open');
+  if (!q) return options;
+  return options.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
 });
 
 const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n(simulated output)` : 'No commands run yet.'));
 
 function noop() {}
 
+function ensureProjectDiffSelection(projectId: string) {
+  const project = diffProjects.find((p) => p.id === projectId);
+  state.selectedProjectId = projectId;
+  state.selectedCommitId = project?.commits[0]?.id ?? '';
+  state.selectedFilePath = project?.commits[0]?.files[0]?.path ?? '';
+}
+
+function openProject(projectName: string, path: string) {
+  const existing = diffProjects.find((p) => p.name === projectName);
+  if (existing) {
+    ensureProjectDiffSelection(existing.id);
+    currentProject.value = { id: existing.id, name: existing.name, branch: 'main', path };
+  } else {
+    const id = `proj-${diffProjects.length + 1}`;
+    diffProjects.unshift({
+      id,
+      name: projectName,
+      commits: []
+    });
+    ensureProjectDiffSelection(id);
+    currentProject.value = { id, name: projectName, branch: 'main', path };
+  }
+
+  if (!recents.find((r) => r.path === path)) {
+    recents.unshift({ id: `r${recents.length + 1}`, name: projectName, path, lastOpenedAt: 'now' });
+  }
+
+  state.mode = 'diff';
+  forms.prompt = '';
+}
+
+function openExistingProject() {
+  const path = picker.openPath.trim();
+  if (!path) return;
+  const projectName = path.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project';
+  openProject(projectName, path);
+  state.openProjectDialogOpen = false;
+}
+
+function openRecentProject(path: string) {
+  const recent = recents.find((r) => r.path === path);
+  openProject(recent?.name ?? 'project', path);
+}
+
+function cloneRepository() {
+  const url = picker.cloneUrl.trim();
+  const destination = picker.cloneDestination.trim();
+  if (!url || !destination) return;
+
+  const rawName = url.replace(/\.git$/i, '').split('/').filter(Boolean).pop() ?? 'repo';
+  openProject(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`);
+  state.cloneDialogOpen = false;
+}
+
+function openCommandPalette() {
+  state.paletteOpen = true;
+  forms.palette = '';
+  state.paletteIndex = 0;
+}
+
 function toggleMode() {
+  if (!currentProject.value) return;
   state.mode = state.mode === 'session' ? 'diff' : 'session';
 }
 
 function createSession() {
+  if (!currentProject.value) return;
   const id = `s${sessions.length + 1}`;
   sessions.unshift({ id, title: 'New session', time: 'now', section: 'Now', status: 'Working' });
+  timelineBySessionId[id] = [];
   state.activeSessionId = id;
   state.mode = 'session';
 }
 
 function sendPrompt() {
-  if (!forms.prompt.trim()) return;
-  timeline.push({ id: `e${timeline.length + 1}`, kind: 'User', text: forms.prompt, time: 'now', level: 'info' });
+  if (!state.activeSessionId || !forms.prompt.trim()) return;
+  const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
+  list.push({ id: `e${list.length + 1}`, kind: 'User', text: forms.prompt, time: 'now', level: 'info' });
   forms.prompt = '';
 }
 
@@ -243,10 +385,7 @@ function onComposerTrigger(kind: '/' | '@' | '#') {
 }
 
 function onDiffProjectChange(projectId: string) {
-  state.selectedProjectId = projectId;
-  const firstCommit = commitsForProject.value[0];
-  state.selectedCommitId = firstCommit?.id ?? '';
-  state.selectedFilePath = firstCommit?.files[0]?.path ?? '';
+  ensureProjectDiffSelection(projectId);
 }
 
 function onDiffCommitChange(commitId: string) {
@@ -261,8 +400,13 @@ function runTerminal() {
 }
 
 function runPalette(id: string) {
-  if (id === 'mode.diff') state.mode = 'diff';
-  if (id === 'mode.session') state.mode = 'session';
+  if (id === 'mode.diff' && currentProject.value) state.mode = 'diff';
+  if (id === 'mode.session' && currentProject.value) state.mode = 'session';
+  if (id === 'picker.open') {
+    currentProject.value = null;
+    state.mode = 'diff';
+    state.activeSessionId = '';
+  }
   if (id === 'settings.open') state.settingsOpen = true;
   if (id === 'terminal.toggle') state.terminalOpen = !state.terminalOpen;
   if (id === 'session.new') createSession();
@@ -303,6 +447,10 @@ function onGlobalKeydown(event: KeyboardEvent) {
     }
     if (state.settingsOpen) {
       state.settingsOpen = false;
+      return;
+    }
+    if (state.themeDialogOpen) {
+      state.themeDialogOpen = false;
       return;
     }
     if (state.terminalOpen) {

@@ -7,7 +7,7 @@ export function getStoredTheme(): ThemePreset {
   if (raw && THEME_PRESET_IDS.includes(raw as ThemePreset)) {
     return raw as ThemePreset;
   }
-  return "tokyo-night";
+  return "catppuccin-mocha";
 }
 
 export function applyTheme(theme: ThemePreset) {

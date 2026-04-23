@@ -2,8 +2,22 @@
   <aside :class="['border-r border-border/80 bg-card/60', collapsed ? 'w-[76px]' : 'w-[320px]']">
     <div class="flex h-full flex-col p-3">
       <div class="mb-3 flex items-center gap-2 px-1">
-        <button class="grid h-8 w-8 place-items-center rounded-md border border-border/80 bg-muted/50 text-xs text-foreground">▢</button>
-        <div v-if="!collapsed" class="truncate text-sm font-semibold">glib-code</div>
+        <div
+          v-if="!collapsed && logoWordmarkSrc"
+          class="logo-wordmark h-8 w-[150px]"
+          :style="{ '--logo-url': `url(${logoWordmarkSrc})` }"
+          role="img"
+          aria-label="glib-code"
+        />
+        <div
+          v-else-if="logoIconSrc"
+          class="logo-icon h-8 w-8"
+          :style="{ '--logo-url': `url(${logoIconSrc})` }"
+          role="img"
+          aria-label="glib-code icon"
+        />
+        <button v-else class="grid h-8 w-8 place-items-center rounded-md border border-border/80 bg-muted/50 text-xs text-foreground">▢</button>
+        <div v-if="!collapsed && !logoWordmarkSrc" class="truncate text-sm font-semibold">glib-code</div>
         <button
           class="ml-auto rounded-md border border-border/80 bg-background/50 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
           @click="$emit('toggleCollapse')"
@@ -14,7 +28,8 @@
 
       <button
         v-if="!collapsed"
-        class="mb-3 flex h-9 items-center gap-2 rounded-md border border-border/80 bg-background/45 px-3 text-left text-sm text-muted-foreground"
+        :disabled="disabled"
+        class="mb-3 flex h-9 items-center gap-2 rounded-md border border-border/80 bg-background/45 px-3 text-left text-sm text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span>⌕</span>
         <span class="flex-1">Search sessions</span>
@@ -31,6 +46,7 @@
             <button
               v-for="s in section.rows"
               :key="s.id"
+              :disabled="disabled"
               :class="[
                 'flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition',
                 s.id === activeId
@@ -49,6 +65,7 @@
 
       <div class="mt-2 border-t border-border/80 pt-3">
         <button
+          :disabled="disabled"
           class="mb-1 flex h-8 w-full items-center justify-center rounded-md border border-border/80 bg-background/45 text-xs font-medium hover:bg-muted/60"
           @click="$emit('new')"
         >
@@ -81,8 +98,11 @@ const props = withDefaults(
     sessions: SessionRow[];
     activeId: string;
     collapsed?: boolean;
+    logoWordmarkSrc?: string;
+    logoIconSrc?: string;
+    disabled?: boolean;
   }>(),
-  { collapsed: false }
+  { collapsed: false, disabled: false }
 );
 
 defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: [] }>();
@@ -94,3 +114,20 @@ const grouped = computed(() => {
     .filter((s) => s.rows.length > 0);
 });
 </script>
+
+<style scoped>
+.logo-wordmark,
+.logo-icon {
+  background-color: hsl(var(--primary));
+  -webkit-mask-image: var(--logo-url);
+  mask-image: var(--logo-url);
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+</style>
