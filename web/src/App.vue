@@ -44,11 +44,14 @@
               <PickerScreen
                 :recents="recents"
                 :logo-src="logoWordmarkSrc"
+                :pending-project="pendingProjectOpen"
                 @open-project="state.openProjectDialogOpen = true"
                 @open-clone="state.cloneDialogOpen = true"
                 @open-palette="openCommandPalette"
                 @open-theme="state.themeDialogOpen = true"
                 @open-recent="openRecentProject"
+                @select-project-mode="finalizeProjectOpen"
+                @cancel-project-mode="closeProjectOpenModeDialog"
               />
             </div>
           </template>
@@ -195,6 +198,7 @@ type TimelineEntry = {
 type DiffFile = { path: string; stats: string; diff: string };
 type DiffCommit = { id: string; label: string; files: DiffFile[] };
 type DiffProject = { id: string; name: string; commits: DiffCommit[] };
+type PendingProjectOpen = { name: string; path: string };
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
 
@@ -208,6 +212,8 @@ const picker = reactive({
   cloneUrl: '',
   cloneDestination: 'C:/repos'
 });
+
+const pendingProjectOpen = ref<PendingProjectOpen | null>(null);
 
 const sessions = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
@@ -337,6 +343,10 @@ function goHome() {
   state.activeSessionId = '';
 }
 
+function closeProjectOpenModeDialog() {
+  pendingProjectOpen.value = null;
+}
+
 function startSidebarResize(event: MouseEvent) {
   if (state.sidebarCollapsed) return;
   event.preventDefault();
@@ -372,7 +382,7 @@ function ensureProjectDiffSelection(projectId: string) {
   state.selectedFilePath = project?.commits[0]?.files[0]?.path ?? '';
 }
 
-function openProject(projectName: string, path: string) {
+function openProject(projectName: string, path: string, mode: 'diff' | 'session') {
   const existing = diffProjects.find((p) => p.name === projectName);
   if (existing) {
     ensureProjectDiffSelection(existing.id);
@@ -392,21 +402,37 @@ function openProject(projectName: string, path: string) {
     recents.unshift({ id: `r${recents.length + 1}`, name: projectName, path, lastOpenedAt: 'now' });
   }
 
-  state.mode = 'diff';
+  state.mode = mode;
   forms.prompt = '';
+}
+
+function queueProjectOpen(projectName: string, path: string) {
+  state.openProjectDialogOpen = false;
+  state.cloneDialogOpen = false;
+  pendingProjectOpen.value = { name: projectName, path };
+}
+
+function finalizeProjectOpen(mode: 'diff' | 'session') {
+  if (!pendingProjectOpen.value) return;
+  openProject(pendingProjectOpen.value.name, pendingProjectOpen.value.path, mode);
+  if (mode === 'session' && !activeSession.value) {
+    createSession();
+  }
+  closeProjectOpenModeDialog();
+  state.openProjectDialogOpen = false;
+  state.cloneDialogOpen = false;
 }
 
 function openExistingProject() {
   const path = picker.openPath.trim();
   if (!path) return;
   const projectName = path.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project';
-  openProject(projectName, path);
-  state.openProjectDialogOpen = false;
+  queueProjectOpen(projectName, path);
 }
 
 function openRecentProject(path: string) {
   const recent = recents.find((r) => r.path === path);
-  openProject(recent?.name ?? 'project', path);
+  queueProjectOpen(recent?.name ?? 'project', path);
 }
 
 function cloneRepository() {
@@ -415,8 +441,7 @@ function cloneRepository() {
   if (!url || !destination) return;
 
   const rawName = url.replace(/\.git$/i, '').split('/').filter(Boolean).pop() ?? 'repo';
-  openProject(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`);
-  state.cloneDialogOpen = false;
+  queueProjectOpen(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`);
 }
 
 function openCommandPalette() {
@@ -517,6 +542,18 @@ function onGlobalKeydown(event: KeyboardEvent) {
     }
     if (state.themeDialogOpen) {
       state.themeDialogOpen = false;
+      return;
+    }
+    if (pendingProjectOpen.value) {
+      closeProjectOpenModeDialog();
+      return;
+    }
+    if (state.cloneDialogOpen) {
+      state.cloneDialogOpen = false;
+      return;
+    }
+    if (state.openProjectDialogOpen) {
+      state.openProjectDialogOpen = false;
       return;
     }
     if (state.terminalOpen) {

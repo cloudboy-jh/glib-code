@@ -10,6 +10,7 @@ Last updated: 2026-04-23
 - [x] Sidebar stays visible while picker is shown.
 - [x] New logo assets wired (wordmark + icon) with theme-aware masking.
 - [x] Picker now has Theme entry + dedicated Theme dialog.
+- [x] Project open flow now routes through an inline picker mode chooser (`Diffs` vs `Session`).
 - [x] Default theme is `catppuccin-mocha`.
 - [x] Browser tab favicon now uses the glib icon asset.
 - [x] Session sidebar now has persisted resize width.
@@ -24,6 +25,8 @@ Last updated: 2026-04-23
 - [x] Clone Repository dialog.
 - [x] Recent list cleaned (no Ctrl-1..Ctrl-9 hints).
 - [x] Theme button under Recent Projects.
+- [x] Inline project mode chooser in picker (`Diffs` / `Session`).
+- [x] Session mode selection now auto-starts a session.
 - [ ] Add keyboard navigation for picker rows (j/k + enter).
 - [ ] Add robust recents states (missing path, no .git, remove/forget).
 
@@ -33,9 +36,9 @@ Last updated: 2026-04-23
 - [x] Sidebar Home action back to picker.
 - [x] Empty-state when Session mode has no active session.
 - [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
-- [ ] Tighten parity pass for SessionHeader spacing/control density.
+- [ ] Refine Composer/chat input against official t3 source scans.
+- [ ] Tighten parity pass for SessionHeader spacing/control density and button styling against official t3 source scans.
 - [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
-- [ ] Tighten parity pass for Composer geometry and action strip.
 
 ### Diff surfaces (glib-go contract)
 - [x] Project picker + commit picker flow.
@@ -61,6 +64,11 @@ Last updated: 2026-04-23
 ## Latest notes
 
 - The sidebar was pushed closer to t3 structure, but the current pass still needs another visual correction pass.
+- Picker mode selection is now inline on the picker surface instead of a separate dialog.
+- Next implementation slice is:
+  - chat input / composer refinements,
+  - then session header buttons,
+  - both using direct official t3 repo source inspection.
 - Main known sidebar gaps right now:
   - search control still needs stronger shadcn-style definition,
   - expanded sizing/collapse behavior still needs polish,
