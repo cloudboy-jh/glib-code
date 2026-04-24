@@ -11,7 +11,7 @@
     <div class="flex items-center gap-1.5">
       <div ref="diffMenuRoot" class="relative inline-flex items-center">
         <button class="header-button header-button-split rounded-r-none pr-2" @click="$emit('diffCurrent')">
-          <GitCompare class="h-3.5 w-3.5" />
+          <GitCompare class="header-icon" />
           <span>Diff</span>
         </button>
         <button
@@ -20,7 +20,7 @@
           aria-label="Open diff actions"
           @click="diffMenuOpen = !diffMenuOpen"
         >
-          <ChevronDown class="h-3.5 w-3.5" />
+          <ChevronDown class="header-icon" />
         </button>
 
         <div
@@ -28,26 +28,22 @@
           class="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[190px] overflow-hidden rounded-lg border border-border/80 bg-card/95 py-1 shadow-lg shadow-black/20"
         >
           <button class="menu-item" @click="onDiffMenuSelect('current')">
-            <GitCompare class="h-3.5 w-3.5" />
+            <GitCompare class="menu-icon" />
             <span>Current session diff</span>
           </button>
           <button class="menu-item" @click="onDiffMenuSelect('commits')">
-            <List class="h-3.5 w-3.5" />
+            <List class="menu-icon" />
             <span>Commits list</span>
           </button>
         </div>
       </div>
 
       <button class="header-button" @click="$emit('openModel')">
-        <Bot class="h-3.5 w-3.5" />
         <span>{{ model }}</span>
       </button>
       <button class="header-button header-button-primary" @click="$emit('gitAction')">
-        <CloudUpload class="h-3.5 w-3.5" />
+        <CloudUpload class="header-icon" />
         <span>Commit + Push</span>
-      </button>
-      <button class="header-button header-button-icon" @click="$emit('menu')">
-        <Ellipsis class="h-4 w-4" />
       </button>
     </div>
   </header>
@@ -55,10 +51,10 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
-import { Bot, ChevronDown, CloudUpload, Ellipsis, GitCompare, List } from 'lucide-vue-next';
+import { ChevronDown, CloudUpload, GitCompare, List } from 'lucide-vue-next';
 
 defineProps<{ title: string; project: string; branch: string; model: string }>();
-const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; menu: [] }>();
+const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: [] }>();
 
 const diffMenuOpen = ref(false);
 const diffMenuRoot = ref<HTMLElement | null>(null);
@@ -118,9 +114,16 @@ onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
   color: hsl(var(--primary-foreground));
 }
 
-.header-button-icon {
-  width: 32px;
-  padding: 0;
+.header-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
+}
+
+.menu-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.2;
 }
 
 .menu-item {

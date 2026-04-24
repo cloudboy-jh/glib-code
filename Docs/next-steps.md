@@ -36,9 +36,11 @@ Last updated: 2026-04-24
 - [x] Sidebar Home action back to picker.
 - [x] Empty-state when Session mode has no active session.
 - [x] Sidebar session list now groups by repo and project/worktree.
+- [x] Sidebar session selection now works from homepage/picker state (no disable lock).
 - [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
 - [x] Refine Composer/chat input against official t3 source scans.
 - [x] SessionHeader now uses iconized controls + split Diff action (`Current session diff` / `Commits list`).
+- [x] SessionHeader model control is text-only and overflow (`...`) action was removed.
 - [ ] Tighten parity pass for SessionHeader spacing/control density and button styling against official t3 source scans.
 - [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
 
@@ -72,6 +74,8 @@ Last updated: 2026-04-24
 - Sidebar wordmark was resized/centered and the alpha chip was removed.
 - Session header now has iconized controls and split Diff behavior with dedicated actions.
 - Sidebar session hierarchy now nests by repo -> project/worktree -> sessions.
+- Sidebar action/header icon set now uses heavier lucide sizing/stroke; Home now uses a real home icon.
+- Session selection from sidebar now rehydrates the related project and opens chat even from homepage.
 - Next implementation slice is timeline rhythm/metadata parity.
 - Main known sidebar gaps right now:
   - search control still needs stronger shadcn-style definition,

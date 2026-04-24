@@ -8,13 +8,12 @@
           :collapsed="state.sidebarCollapsed"
           :logo-wordmark-src="logoWordmarkSrc"
           :logo-icon-src="logoIconSrc"
-        :disabled="!currentProject"
-        @select="state.activeSessionId = $event"
-        @new="createSession"
-        @go-home="goHome"
-        @open-settings="state.settingsOpen = true"
-        @toggle-collapse="toggleSidebarCollapse"
-      />
+          @select="selectSessionFromSidebar"
+          @new="createSession"
+          @go-home="goHome"
+          @open-settings="state.settingsOpen = true"
+          @toggle-collapse="toggleSidebarCollapse"
+        />
 
         <button
           v-if="!state.sidebarCollapsed"
@@ -36,7 +35,6 @@
           @diff-commits="openCommitsListDiff"
           @open-model="state.settingsOpen = true"
           @git-action="noop"
-          @menu="noop"
         />
 
         <main class="min-h-0">
@@ -480,6 +478,7 @@ function openCommitsListDiff() {
 function createSession() {
   if (!currentProject.value) return;
   const normalizedPath = currentProject.value.path.replace(/\\/g, '/');
+  const repoName = currentProject.value.name.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? currentProject.value.name;
   const projectName = normalizedPath.split('/').filter(Boolean).pop() ?? currentProject.value.name;
   const id = `s${sessions.length + 1}`;
   sessions.unshift({
@@ -487,12 +486,29 @@ function createSession() {
     title: 'New session',
     time: 'now',
     status: 'Working',
-    repo: currentProject.value.name,
+    repo: repoName,
     project: projectName,
     projectPath: normalizedPath
   });
   timelineBySessionId[id] = [];
   state.activeSessionId = id;
+  state.mode = 'session';
+}
+
+function selectSessionFromSidebar(sessionId: string) {
+  const session = sessions.find((entry) => entry.id === sessionId);
+  if (!session) return;
+
+  state.activeSessionId = sessionId;
+
+  if (!currentProject.value || currentProject.value.path !== session.projectPath) {
+    const sessionPath = session.projectPath || `C:/repos/${session.project || session.repo || 'project'}`;
+    const recentName = recents.find((recent) => recent.path === sessionPath)?.name;
+    const projectName = recentName || session.repo || session.project || 'project';
+    openProject(projectName, sessionPath, 'session');
+    return;
+  }
+
   state.mode = 'session';
 }
 

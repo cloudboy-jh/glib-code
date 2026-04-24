@@ -35,7 +35,7 @@
         :disabled="disabled"
         class="mt-3 mb-3 flex h-10 items-center gap-2 rounded-xl border border-border/80 bg-background/70 px-3 text-left text-sm text-muted-foreground shadow-sm/5 transition-colors hover:bg-accent/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span class="text-sm">⌕</span>
+        <Search class="sidebar-icon" />
         <span class="flex-1">Search sessions</span>
         <span class="rounded-md border border-border/70 bg-muted/70 px-1.5 py-0.5 text-[11px] text-muted-foreground">⌘K</span>
       </button>
@@ -46,7 +46,7 @@
           :disabled="disabled"
           class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/80 bg-background/70 text-muted-foreground/80 shadow-sm/5 transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span class="text-sm">⌕</span>
+          <Search class="sidebar-icon" />
         </button>
       </div>
 
@@ -76,7 +76,8 @@
               class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground/80 transition-colors hover:bg-accent/45 hover:text-foreground"
               @click="toggleRepo(repo.repo)"
             >
-              <span class="w-3 text-center text-[10px]">{{ isRepoCollapsed(repo.repo) ? '▸' : '▾' }}</span>
+              <ChevronRight v-if="isRepoCollapsed(repo.repo)" class="tree-chevron" />
+              <ChevronDown v-else class="tree-chevron" />
               <span class="truncate">{{ repo.repo }}</span>
             </button>
 
@@ -87,9 +88,12 @@
                   class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
                   @click="toggleProject(project.key)"
                 >
-                  <span class="w-3 text-center text-[10px]">{{ isProjectCollapsed(project.key) ? '▸' : '▾' }}</span>
-                  <span class="truncate">{{ project.name }}</span>
-                  <span class="truncate text-muted-foreground/70">{{ project.path }}</span>
+                  <ChevronRight v-if="isProjectCollapsed(project.key)" class="tree-chevron" />
+                  <ChevronDown v-else class="tree-chevron" />
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate text-foreground/90">{{ project.name }}</div>
+                    <div v-if="project.path" class="truncate text-[10px] text-muted-foreground/70">{{ project.path }}</div>
+                  </div>
                 </button>
 
                 <div v-if="!isProjectCollapsed(project.key)" class="mt-1 space-y-1">
@@ -124,7 +128,7 @@
           ]"
           @click="$emit('goHome')"
         >
-          <span class="text-sm">⌂</span>
+          <House class="sidebar-icon" />
           <span v-if="!collapsed">Home</span>
         </button>
         <button
@@ -136,7 +140,7 @@
           ]"
           @click="$emit('new')"
         >
-          <span class="text-sm">+</span>
+          <Plus class="sidebar-icon" />
           <span v-if="!collapsed">New session</span>
         </button>
         <button
@@ -147,7 +151,7 @@
           ]"
           @click="$emit('openSettings')"
         >
-          <span class="text-sm">⚙</span>
+          <Settings2 class="sidebar-icon" />
           <span v-if="!collapsed">Settings</span>
         </button>
       </div>
@@ -157,6 +161,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { ChevronDown, ChevronRight, House, Plus, Search, Settings2 } from 'lucide-vue-next';
 
 type SessionRow = {
   id: string;
@@ -195,9 +200,9 @@ const grouped = computed(() => {
   >();
 
   for (const session of props.sessions) {
-    const repoName = session.repo || 'Repository';
-    const projectName = session.project || 'Project';
-    const projectPath = session.projectPath || '';
+    const repoName = normalizeRepoLabel(session.repo);
+    const projectName = normalizeProjectLabel(session.project, session.projectPath);
+    const projectPath = normalizeProjectPath(session.projectPath, projectName);
     const projectKey = `${repoName}::${projectPath || projectName}`;
 
     let repoEntry = repoMap.get(repoName);
@@ -239,6 +244,37 @@ function toggleProject(projectKey: string) {
   else next.add(projectKey);
   collapsedProjects.value = next;
 }
+
+function normalizeRepoLabel(repo: string) {
+  const normalized = repo.replace(/\\/g, '/').trim();
+  if (!normalized) return 'Repository';
+  return normalized.split('/').filter(Boolean).pop() ?? normalized;
+}
+
+function normalizeProjectLabel(project: string, projectPath: string) {
+  const fromProject = project.replace(/\\/g, '/').trim();
+  if (fromProject) return fromProject.split('/').filter(Boolean).pop() ?? fromProject;
+
+  const fromPath = projectPath.replace(/\\/g, '/').trim();
+  if (fromPath) return fromPath.split('/').filter(Boolean).pop() ?? fromPath;
+
+  return 'Project';
+}
+
+function normalizeProjectPath(projectPath: string, projectName: string) {
+  const normalized = projectPath.replace(/\\/g, '/').trim();
+  if (!normalized) return '';
+
+  const segments = normalized.split('/').filter(Boolean);
+  if (!segments.length) return '';
+
+  const last = segments[segments.length - 1];
+  const parentSegments = last === projectName ? segments.slice(0, -1) : segments;
+  if (!parentSegments.length) return '';
+
+  if (parentSegments.length <= 2) return parentSegments.join('/');
+  return `…/${parentSegments.slice(-2).join('/')}`;
+}
 </script>
 
 <style scoped>
@@ -255,5 +291,18 @@ function toggleProject(projectKey: string) {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+}
+
+.sidebar-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
+}
+
+.tree-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke-width: 2.3;
 }
 </style>
