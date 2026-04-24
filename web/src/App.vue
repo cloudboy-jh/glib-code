@@ -32,7 +32,8 @@
           :project="currentProject.name"
           :branch="currentProject.branch"
           :model="settings.defaultModel"
-          @switch-mode="toggleMode"
+          @diff-current="openCurrentSessionDiff"
+          @diff-commits="openCommitsListDiff"
           @open-model="state.settingsOpen = true"
           @git-action="noop"
           @menu="noop"
@@ -183,8 +184,10 @@ type Session = {
   id: string;
   title: string;
   time: string;
-  section: 'Now' | 'Today' | 'Yesterday' | 'Older';
   status: 'Working' | 'Completed';
+  repo: string;
+  project: string;
+  projectPath: string;
 };
 
 type TimelineEntry = {
@@ -450,15 +453,44 @@ function openCommandPalette() {
   state.paletteIndex = 0;
 }
 
-function toggleMode() {
+function openCurrentSessionDiff() {
   if (!currentProject.value) return;
-  state.mode = state.mode === 'session' ? 'diff' : 'session';
+  state.mode = 'diff';
+
+  if (!state.selectedCommitId) {
+    const firstCommit = commitsForProject.value[0];
+    state.selectedCommitId = firstCommit?.id ?? '';
+    state.selectedFilePath = firstCommit?.files[0]?.path ?? '';
+    return;
+  }
+
+  if (!state.selectedFilePath) {
+    const selectedCommit = commitsForProject.value.find((c) => c.id === state.selectedCommitId);
+    state.selectedFilePath = selectedCommit?.files[0]?.path ?? '';
+  }
+}
+
+function openCommitsListDiff() {
+  if (!currentProject.value) return;
+  state.mode = 'diff';
+  state.selectedCommitId = '';
+  state.selectedFilePath = '';
 }
 
 function createSession() {
   if (!currentProject.value) return;
+  const normalizedPath = currentProject.value.path.replace(/\\/g, '/');
+  const projectName = normalizedPath.split('/').filter(Boolean).pop() ?? currentProject.value.name;
   const id = `s${sessions.length + 1}`;
-  sessions.unshift({ id, title: 'New session', time: 'now', section: 'Now', status: 'Working' });
+  sessions.unshift({
+    id,
+    title: 'New session',
+    time: 'now',
+    status: 'Working',
+    repo: currentProject.value.name,
+    project: projectName,
+    projectPath: normalizedPath
+  });
   timelineBySessionId[id] = [];
   state.activeSessionId = id;
   state.mode = 'session';

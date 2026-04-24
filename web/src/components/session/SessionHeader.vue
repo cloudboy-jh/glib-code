@@ -9,23 +9,76 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-    <button class="header-button" @click="$emit('switchMode')">
-      Diff
-    </button>
-    <button class="header-button" @click="$emit('openModel')">
-      {{ model }}
-    </button>
-    <button class="header-button header-button-primary" @click="$emit('gitAction')">
-      Commit + Push
-    </button>
-    <button class="header-button header-button-icon" @click="$emit('menu')">⋯</button>
+      <div ref="diffMenuRoot" class="relative inline-flex items-center">
+        <button class="header-button header-button-split rounded-r-none pr-2" @click="$emit('diffCurrent')">
+          <GitCompare class="h-3.5 w-3.5" />
+          <span>Diff</span>
+        </button>
+        <button
+          class="header-button header-button-split rounded-l-none border-l-0 px-2"
+          :aria-expanded="diffMenuOpen"
+          aria-label="Open diff actions"
+          @click="diffMenuOpen = !diffMenuOpen"
+        >
+          <ChevronDown class="h-3.5 w-3.5" />
+        </button>
+
+        <div
+          v-if="diffMenuOpen"
+          class="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[190px] overflow-hidden rounded-lg border border-border/80 bg-card/95 py-1 shadow-lg shadow-black/20"
+        >
+          <button class="menu-item" @click="onDiffMenuSelect('current')">
+            <GitCompare class="h-3.5 w-3.5" />
+            <span>Current session diff</span>
+          </button>
+          <button class="menu-item" @click="onDiffMenuSelect('commits')">
+            <List class="h-3.5 w-3.5" />
+            <span>Commits list</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="header-button" @click="$emit('openModel')">
+        <Bot class="h-3.5 w-3.5" />
+        <span>{{ model }}</span>
+      </button>
+      <button class="header-button header-button-primary" @click="$emit('gitAction')">
+        <CloudUpload class="h-3.5 w-3.5" />
+        <span>Commit + Push</span>
+      </button>
+      <button class="header-button header-button-icon" @click="$emit('menu')">
+        <Ellipsis class="h-4 w-4" />
+      </button>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue';
+import { Bot, ChevronDown, CloudUpload, Ellipsis, GitCompare, List } from 'lucide-vue-next';
+
 defineProps<{ title: string; project: string; branch: string; model: string }>();
-defineEmits<{ switchMode: []; openModel: []; gitAction: []; menu: [] }>();
+const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; menu: [] }>();
+
+const diffMenuOpen = ref(false);
+const diffMenuRoot = ref<HTMLElement | null>(null);
+
+function onDiffMenuSelect(action: 'current' | 'commits') {
+  diffMenuOpen.value = false;
+  if (action === 'current') emit('diffCurrent');
+  else emit('diffCommits');
+}
+
+function onWindowPointerDown(event: MouseEvent) {
+  if (!diffMenuOpen.value) return;
+  const root = diffMenuRoot.value;
+  if (!root) return;
+  if (!(event.target instanceof Node)) return;
+  if (!root.contains(event.target)) diffMenuOpen.value = false;
+}
+
+onMounted(() => window.addEventListener('mousedown', onWindowPointerDown));
+onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
 </script>
 
 <style scoped>
@@ -34,6 +87,7 @@ defineEmits<{ switchMode: []; openModel: []; gitAction: []; menu: [] }>();
   height: 32px;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   border-radius: 8px;
   border: 1px solid hsl(var(--border) / 0.8);
   background: hsl(var(--background) / 0.55);
@@ -47,6 +101,10 @@ defineEmits<{ switchMode: []; openModel: []; gitAction: []; menu: [] }>();
   border-color: hsl(var(--border));
   background: hsl(var(--muted) / 0.75);
   color: hsl(var(--foreground));
+}
+
+.header-button-split {
+  min-width: auto;
 }
 
 .header-button-primary {
@@ -63,6 +121,23 @@ defineEmits<{ switchMode: []; openModel: []; gitAction: []; menu: [] }>();
 .header-button-icon {
   width: 32px;
   padding: 0;
-  font-size: 14px;
+}
+
+.menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: hsl(var(--foreground));
+  background: transparent;
+  border: 0;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.menu-item:hover {
+  background: hsl(var(--accent) / 0.7);
 }
 </style>

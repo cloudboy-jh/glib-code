@@ -35,8 +35,10 @@ Last updated: 2026-04-24
 - [x] Sidebar resize rail + persisted width.
 - [x] Sidebar Home action back to picker.
 - [x] Empty-state when Session mode has no active session.
+- [x] Sidebar session list now groups by repo and project/worktree.
 - [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
 - [x] Refine Composer/chat input against official t3 source scans.
+- [x] SessionHeader now uses iconized controls + split Diff action (`Current session diff` / `Commits list`).
 - [ ] Tighten parity pass for SessionHeader spacing/control density and button styling against official t3 source scans.
 - [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
 
@@ -68,7 +70,9 @@ Last updated: 2026-04-24
 - Composer pass is now in a cleaner one-surface state with command execution wiring and reduced footer noise.
 - Composer context hint now lives in the input placeholder (commit-context-aware) instead of a separate badge/row.
 - Sidebar wordmark was resized/centered and the alpha chip was removed.
-- Next implementation slice is session header controls/parity.
+- Session header now has iconized controls and split Diff behavior with dedicated actions.
+- Sidebar session hierarchy now nests by repo -> project/worktree -> sessions.
+- Next implementation slice is timeline rhythm/metadata parity.
 - Main known sidebar gaps right now:
   - search control still needs stronger shadcn-style definition,
   - expanded sizing/collapse behavior still needs polish,

@@ -1,7 +1,7 @@
 <template>
   <aside class="flex h-full flex-col bg-card/95 text-foreground">
     <div :class="['flex h-full flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
-      <div :class="['relative flex h-9 items-center justify-center']">
+      <div class="relative flex h-9 items-center justify-center">
         <div v-if="!collapsed" class="min-w-0">
           <div class="flex min-w-0 items-center justify-center rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
             <div
@@ -15,21 +15,14 @@
           </div>
         </div>
 
-        <div
-          v-else
-          class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-foreground"
-          aria-label="glib-code"
-        >
+        <div v-else class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-foreground" aria-label="glib-code">
           <div v-if="logoIconSrc" class="logo-icon h-5 w-5" :style="{ '--logo-url': `url(${logoIconSrc})` }" role="img" aria-label="glib-code icon" />
           <span v-else class="text-base font-semibold leading-none">g</span>
         </div>
 
         <button
           type="button"
-          :class="[
-            'inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-            'absolute right-0 h-8 w-8'
-          ]"
+          :class="['inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground', 'absolute right-0 h-8 w-8']"
           @click="$emit('toggleCollapse')"
         >
           {{ collapsed ? '›' : '‹' }}
@@ -58,34 +51,68 @@
       </div>
 
       <div class="min-h-0 flex-1 overflow-auto">
-        <div v-for="section in grouped" :key="section.label" class="mb-3">
-          <div v-if="!collapsed" class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
-            {{ section.label }}
-          </div>
-
+        <template v-if="collapsed">
           <div class="space-y-1">
             <button
-              v-for="s in section.rows"
+              v-for="s in sessions"
               :key="s.id"
               type="button"
               :disabled="disabled"
               :class="[
-                'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                s.id === activeId
-                  ? 'bg-accent text-foreground shadow-sm/5'
-                  : 'text-foreground/92 hover:bg-accent/70'
+                'mx-auto flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                s.id === activeId ? 'bg-accent text-foreground shadow-sm/5' : 'text-foreground/80 hover:bg-accent/70'
               ]"
               @click="$emit('select', s.id)"
             >
-              <span class="h-2 w-2 shrink-0 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
-              <template v-if="!collapsed">
-                <span class="min-w-0 flex-1 truncate text-sm leading-none">{{ s.title }}</span>
-                <span class="shrink-0 text-xs text-muted-foreground/80">{{ s.time }}</span>
-              </template>
-              <span v-else class="h-2 w-2 rounded-full bg-current/70 opacity-80" />
+              <span class="h-2 w-2 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
             </button>
           </div>
-        </div>
+        </template>
+
+        <template v-else>
+          <div v-for="repo in grouped" :key="repo.repo" class="mb-2.5">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground/80 transition-colors hover:bg-accent/45 hover:text-foreground"
+              @click="toggleRepo(repo.repo)"
+            >
+              <span class="w-3 text-center text-[10px]">{{ isRepoCollapsed(repo.repo) ? '▸' : '▾' }}</span>
+              <span class="truncate">{{ repo.repo }}</span>
+            </button>
+
+            <div v-if="!isRepoCollapsed(repo.repo)" class="mt-1 space-y-1.5">
+              <div v-for="project in repo.projects" :key="project.key">
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+                  @click="toggleProject(project.key)"
+                >
+                  <span class="w-3 text-center text-[10px]">{{ isProjectCollapsed(project.key) ? '▸' : '▾' }}</span>
+                  <span class="truncate">{{ project.name }}</span>
+                  <span class="truncate text-muted-foreground/70">{{ project.path }}</span>
+                </button>
+
+                <div v-if="!isProjectCollapsed(project.key)" class="mt-1 space-y-1">
+                  <button
+                    v-for="s in project.rows"
+                    :key="s.id"
+                    type="button"
+                    :disabled="disabled"
+                    :class="[
+                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                      s.id === activeId ? 'bg-accent text-foreground shadow-sm/5' : 'text-foreground/92 hover:bg-accent/70'
+                    ]"
+                    @click="$emit('select', s.id)"
+                  >
+                    <span class="h-2 w-2 shrink-0 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
+                    <span class="min-w-0 flex-1 truncate text-sm leading-none">{{ s.title }}</span>
+                    <span class="shrink-0 text-xs text-muted-foreground/80">{{ s.time }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <div class="mt-2 border-t border-border/70 pt-2">
@@ -93,9 +120,7 @@
           type="button"
           :class="[
             'flex items-center rounded-lg text-sm transition-colors',
-            collapsed
-              ? 'mx-auto mb-0.5 h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground'
-              : 'mb-0.5 h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
+            collapsed ? 'mx-auto mb-0.5 h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground' : 'mb-0.5 h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
           ]"
           @click="$emit('goHome')"
         >
@@ -107,9 +132,7 @@
           :disabled="disabled"
           :class="[
             'flex items-center rounded-lg text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-            collapsed
-              ? 'mx-auto h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground'
-              : 'mb-0.5 h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
+            collapsed ? 'mx-auto h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground' : 'mb-0.5 h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
           ]"
           @click="$emit('new')"
         >
@@ -120,9 +143,7 @@
           type="button"
           :class="[
             'flex items-center rounded-lg text-sm transition-colors',
-            collapsed
-              ? 'mx-auto h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground'
-              : 'h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
+            collapsed ? 'mx-auto h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground' : 'h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
           ]"
           @click="$emit('openSettings')"
         >
@@ -135,14 +156,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 type SessionRow = {
   id: string;
   title: string;
   time: string;
-  section: 'Now' | 'Today' | 'Yesterday' | 'Older';
   status: 'Working' | 'Completed';
+  repo: string;
+  project: string;
+  projectPath: string;
 };
 
 const props = withDefaults(
@@ -159,12 +182,63 @@ const props = withDefaults(
 
 defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: [] }>();
 
+const collapsedRepos = ref<Set<string>>(new Set());
+const collapsedProjects = ref<Set<string>>(new Set());
+
 const grouped = computed(() => {
-  const order: SessionRow['section'][] = ['Now', 'Today', 'Yesterday', 'Older'];
-  return order
-    .map((label) => ({ label, rows: props.sessions.filter((s) => s.section === label) }))
-    .filter((s) => s.rows.length > 0);
+  const repoMap = new Map<
+    string,
+    {
+      repo: string;
+      projects: Array<{ key: string; name: string; path: string; rows: SessionRow[] }>;
+    }
+  >();
+
+  for (const session of props.sessions) {
+    const repoName = session.repo || 'Repository';
+    const projectName = session.project || 'Project';
+    const projectPath = session.projectPath || '';
+    const projectKey = `${repoName}::${projectPath || projectName}`;
+
+    let repoEntry = repoMap.get(repoName);
+    if (!repoEntry) {
+      repoEntry = { repo: repoName, projects: [] };
+      repoMap.set(repoName, repoEntry);
+    }
+
+    let projectEntry = repoEntry.projects.find((project) => project.key === projectKey);
+    if (!projectEntry) {
+      projectEntry = { key: projectKey, name: projectName, path: projectPath, rows: [] };
+      repoEntry.projects.push(projectEntry);
+    }
+
+    projectEntry.rows.push(session);
+  }
+
+  return Array.from(repoMap.values());
 });
+
+function isRepoCollapsed(repo: string) {
+  return collapsedRepos.value.has(repo);
+}
+
+function toggleRepo(repo: string) {
+  const next = new Set(collapsedRepos.value);
+  if (next.has(repo)) next.delete(repo);
+  else next.add(repo);
+  collapsedRepos.value = next;
+}
+
+function isProjectCollapsed(projectKey: string) {
+  return collapsedProjects.value.has(projectKey);
+}
+
+function toggleProject(projectKey: string) {
+  const next = new Set(collapsedProjects.value);
+  if (next.has(projectKey)) next.delete(projectKey);
+  else next.add(projectKey);
+  collapsedProjects.value = next;
+}
 </script>
 
 <style scoped>
