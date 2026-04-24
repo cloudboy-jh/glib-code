@@ -61,7 +61,7 @@
               <template v-if="activeSession">
                 <div class="grid h-full grid-rows-[1fr_auto]">
                   <Timeline :entries="activeTimeline" />
-                  <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @trigger="onComposerTrigger" @send="sendPrompt" />
+                  <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @send="sendPrompt" @execute-command="runComposerCommand" />
                 </div>
               </template>
 
@@ -471,10 +471,6 @@ function sendPrompt() {
   forms.prompt = '';
 }
 
-function onComposerTrigger(kind: '/' | '@' | '#') {
-  forms.prompt = `${forms.prompt}${kind}`;
-}
-
 function onDiffProjectChange(projectId: string) {
   ensureProjectDiffSelection(projectId);
 }
@@ -512,6 +508,51 @@ function updatePaletteQuery(value: string) {
 function updateKeybinding(command: string, key: string) {
   const row = keybindings.find((k) => k.command === command);
   if (row) row.key = key;
+}
+
+function runComposerCommand(command: string) {
+  if (command === 'help') {
+    openCommandPalette();
+    return;
+  }
+
+  if (command === 'models' || command === 'model') {
+    state.settingsOpen = true;
+    return;
+  }
+
+  if (command === 'themes' || command === 'theme') {
+    state.themeDialogOpen = true;
+    return;
+  }
+
+  if (command === 'new' || command === 'clear') {
+    createSession();
+    return;
+  }
+
+  if (command === 'sessions' || command === 'resume' || command === 'continue') {
+    state.mode = 'session';
+    if (!activeSession.value) createSession();
+    return;
+  }
+
+  if (command === 'diff') {
+    if (!currentProject.value) return;
+    state.mode = 'diff';
+    return;
+  }
+
+  if (command === 'session') {
+    if (!currentProject.value) return;
+    state.mode = 'session';
+    if (!activeSession.value) createSession();
+    return;
+  }
+
+  if (command === 'undo' || command === 'redo' || command === 'share' || command === 'init') {
+    openCommandPalette();
+  }
 }
 
 function onGlobalKeydown(event: KeyboardEvent) {

@@ -1,18 +1,17 @@
 <template>
   <aside class="flex h-full flex-col bg-card/95 text-foreground">
     <div :class="['flex h-full flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
-      <div :class="['flex items-center', collapsed ? 'justify-center gap-0' : 'gap-2']">
-        <div v-if="!collapsed" class="min-w-0 flex-1">
-          <div class="flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
+      <div :class="['relative flex h-9 items-center justify-center']">
+        <div v-if="!collapsed" class="min-w-0">
+          <div class="flex min-w-0 items-center justify-center rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
             <div
               v-if="logoWordmarkSrc"
-              class="logo-wordmark h-3.5 w-[96px] shrink-0"
+              class="logo-wordmark h-4 w-[112px] shrink-0"
               :style="{ '--logo-url': `url(${logoWordmarkSrc})` }"
               role="img"
               aria-label="glib-code"
             />
             <div v-else class="truncate text-sm font-medium tracking-tight text-foreground">glib-code</div>
-            <span class="rounded-full bg-muted/70 px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.18em] text-muted-foreground/80">alpha</span>
           </div>
         </div>
 
@@ -29,7 +28,7 @@
           type="button"
           :class="[
             'inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-            collapsed ? 'absolute right-2 top-3 h-8 w-8' : 'ml-auto h-8 w-8'
+            'absolute right-0 h-8 w-8'
           ]"
           @click="$emit('toggleCollapse')"
         >

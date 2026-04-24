@@ -1,6 +1,6 @@
 # Next Steps — UI Parity + Diff Contract
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 
 ## Progress snapshot
 
@@ -36,7 +36,7 @@ Last updated: 2026-04-23
 - [x] Sidebar Home action back to picker.
 - [x] Empty-state when Session mode has no active session.
 - [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
-- [ ] Refine Composer/chat input against official t3 source scans.
+- [x] Refine Composer/chat input against official t3 source scans.
 - [ ] Tighten parity pass for SessionHeader spacing/control density and button styling against official t3 source scans.
 - [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
 
@@ -65,10 +65,10 @@ Last updated: 2026-04-23
 
 - The sidebar was pushed closer to t3 structure, but the current pass still needs another visual correction pass.
 - Picker mode selection is now inline on the picker surface instead of a separate dialog.
-- Next implementation slice is:
-  - chat input / composer refinements,
-  - then session header buttons,
-  - both using direct official t3 repo source inspection.
+- Composer pass is now in a cleaner one-surface state with command execution wiring and reduced footer noise.
+- Composer context hint now lives in the input placeholder (commit-context-aware) instead of a separate badge/row.
+- Sidebar wordmark was resized/centered and the alpha chip was removed.
+- Next implementation slice is session header controls/parity.
 - Main known sidebar gaps right now:
   - search control still needs stronger shadcn-style definition,
   - expanded sizing/collapse behavior still needs polish,
