@@ -4,6 +4,8 @@ import { basename, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { ensureRepoGlibIgnore } from "../lib/paths";
 
+export type RecentPathStatus = "ok" | "missing_path" | "missing_git";
+
 export type OpenProjectResult =
   | { ok: true; project: { id: string; name: string; path: string; branch: string; isGitRepo: true } }
   | { ok: false; needsInit: true };
@@ -22,6 +24,13 @@ async function run(cmd: string[], cwd?: string) {
 
 function hasGit(path: string) {
   return existsSync(join(path, ".git"));
+}
+
+export function inspectRecentPath(path: string): RecentPathStatus {
+  const full = resolve(path);
+  if (!existsSync(full)) return "missing_path";
+  if (!hasGit(full)) return "missing_git";
+  return "ok";
 }
 
 async function currentBranch(path: string) {

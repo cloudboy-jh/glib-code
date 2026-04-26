@@ -1,9 +1,9 @@
 <template>
-  <header class="flex h-[54px] items-center gap-3 border-b border-border/80 px-3 sm:px-4">
+  <header class="flex h-[52px] items-center gap-2.5 border-b border-border/80 px-3 sm:px-4">
     <div class="min-w-0 flex-1">
-      <div class="truncate text-[15px] font-semibold tracking-tight text-foreground">{{ title }}</div>
-      <div class="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-        <span class="rounded-md border border-border/80 bg-background/55 px-1.5 py-0.5">{{ project }}</span>
+      <div class="truncate text-sm font-medium tracking-tight text-foreground">{{ title }}</div>
+      <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
+        <span class="rounded-md border border-border/80 bg-background/55 px-1.5 py-0.5 text-[10px]">{{ project }}</span>
         <span>{{ branch }}</span>
       </div>
     </div>
@@ -80,14 +80,14 @@ onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
 <style scoped>
 .header-button {
   display: inline-flex;
-  height: 32px;
+  height: 30px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   border-radius: 8px;
   border: 1px solid hsl(var(--border) / 0.8);
-  background: hsl(var(--background) / 0.55);
-  padding: 0 10px;
+  background: hsl(var(--background) / 0.5);
+  padding: 0 9px;
   font-size: 12px;
   color: hsl(var(--muted-foreground));
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -106,7 +106,7 @@ onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
 .header-button-primary {
   background: hsl(var(--primary) / 0.9);
   color: hsl(var(--primary-foreground));
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .header-button-primary:hover {
@@ -115,9 +115,9 @@ onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
 }
 
 .header-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.2;
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.1;
 }
 
 .menu-icon {
@@ -131,7 +131,7 @@ onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
   width: 100%;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   font-size: 12px;
   color: hsl(var(--foreground));
   background: transparent;

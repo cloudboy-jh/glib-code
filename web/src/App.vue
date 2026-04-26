@@ -49,6 +49,8 @@
                 @open-palette="openCommandPalette"
                 @open-theme="state.themeDialogOpen = true"
                 @open-recent="openRecentProject"
+                @remove-recent="removeRecentProject"
+                @forget-recent="forgetRecentProject"
                 @select-project-mode="finalizeProjectOpen"
                 @cancel-project-mode="closeProjectOpenModeDialog"
               />
@@ -177,6 +179,7 @@ const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
+const API_BASE = 'http://127.0.0.1:4273/api';
 
 type Session = {
   id: string;
@@ -200,12 +203,14 @@ type DiffFile = { path: string; stats: string; diff: string };
 type DiffCommit = { id: string; label: string; files: DiffFile[] };
 type DiffProject = { id: string; name: string; commits: DiffCommit[] };
 type PendingProjectOpen = { name: string; path: string };
+type RecentStatus = 'ok' | 'missing_path' | 'missing_git';
+type RecentEntry = { id: string; name: string; path: string; lastOpenedAt: string; status: RecentStatus };
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
 
-const recents = reactive([
-  { id: 'r1', name: 'cloudboy-jh/glib-code', path: 'C:/repos/glib-code', lastOpenedAt: '2h ago' },
-  { id: 'r2', name: 'cloudboy-jh/shipwrkrs', path: 'C:/repos/shipwrkrs', lastOpenedAt: 'Yesterday' }
+const recents = reactive<RecentEntry[]>([
+  { id: 'r1', name: 'cloudboy-jh/glib-code', path: 'C:/repos/glib-code', lastOpenedAt: '2h ago', status: 'ok' },
+  { id: 'r2', name: 'cloudboy-jh/shipwrkrs', path: 'C:/repos/shipwrkrs', lastOpenedAt: 'Yesterday', status: 'ok' }
 ]);
 
 const picker = reactive({
@@ -326,6 +331,43 @@ let stopSidebarResize: (() => void) | null = null;
 
 function noop() {}
 
+async function apiGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`);
+  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+}
+
+function replaceRecents(next: RecentEntry[]) {
+  recents.splice(0, recents.length, ...next);
+}
+
+async function hydrateRecents() {
+  const rows = await apiGet<Array<{ id: string; name: string; path: string; lastOpenedAt: string }>>('/projects/recents');
+  const statuses = await apiGet<Array<{ id: string; status: RecentStatus }>>('/projects/recents/status');
+  const statusById = new Map(statuses.map((row) => [row.id, row.status]));
+  replaceRecents(
+    rows.map((row) => ({
+      ...row,
+      status: statusById.get(row.id) ?? 'ok'
+    }))
+  );
+}
+
 function clampSidebarWidth(width: number) {
   return Math.max(SIDEBAR_MIN_WIDTH, Math.min(width, SIDEBAR_MAX_WIDTH));
 }
@@ -399,8 +441,12 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
     currentProject.value = { id, name: projectName, branch: 'main', path };
   }
 
-  if (!recents.find((r) => r.path === path)) {
-    recents.unshift({ id: `r${recents.length + 1}`, name: projectName, path, lastOpenedAt: 'now' });
+  const existingRecent = recents.find((r) => r.path === path);
+  if (!existingRecent) {
+    recents.unshift({ id: `r${recents.length + 1}`, name: projectName, path, lastOpenedAt: 'now', status: 'ok' });
+  } else {
+    existingRecent.status = 'ok';
+    existingRecent.lastOpenedAt = 'now';
   }
 
   state.mode = mode;
@@ -424,16 +470,64 @@ function finalizeProjectOpen(mode: 'diff' | 'session') {
   state.cloneDialogOpen = false;
 }
 
-function openExistingProject() {
-  const path = picker.openPath.trim();
-  if (!path) return;
-  const projectName = path.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project';
-  queueProjectOpen(projectName, path);
+async function resolveProjectOpen(path: string) {
+  const normalizedPath = path.trim();
+  if (!normalizedPath) return { ok: false as const, reason: 'missing_path' as const };
+
+  try {
+    const opened = await apiPost<{ id?: string; name?: string; path?: string; branch?: string; needsInit?: boolean }>('/projects/open', {
+      path: normalizedPath
+    });
+    if (opened.needsInit) return { ok: false as const, reason: 'missing_git' as const };
+    return {
+      ok: true as const,
+      name: opened.name ?? normalizedPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project',
+      path: opened.path ?? normalizedPath
+    };
+  } catch {
+    return { ok: false as const, reason: 'missing_path' as const };
+  }
 }
 
-function openRecentProject(path: string) {
+async function openExistingProject() {
+  const path = picker.openPath.trim();
+  if (!path) return;
+  const opened = await resolveProjectOpen(path);
+  if (!opened.ok) return;
+  queueProjectOpen(opened.name, opened.path);
+  void hydrateRecents();
+}
+
+async function openRecentProject(path: string) {
+  const opened = await resolveProjectOpen(path);
+  if (!opened.ok) {
+    void hydrateRecents();
+    return;
+  }
   const recent = recents.find((r) => r.path === path);
-  queueProjectOpen(recent?.name ?? 'project', path);
+  if (recent) recent.status = 'ok';
+  queueProjectOpen(recent?.name ?? opened.name, opened.path);
+  void hydrateRecents();
+}
+
+async function removeRecentProject(id: string) {
+  try {
+    await apiDelete(`/projects/recents/${id}`);
+    await hydrateRecents();
+  } catch {
+    const index = recents.findIndex((row) => row.id === id);
+    if (index >= 0) recents.splice(index, 1);
+  }
+}
+
+async function forgetRecentProject(id: string) {
+  try {
+    await apiPost(`/projects/recents/${id}/forget`, {});
+    await hydrateRecents();
+  } catch {
+    const index = recents.findIndex((row) => row.id === id);
+    if (index >= 0) recents.splice(index, 1);
+  }
 }
 
 function cloneRepository() {
@@ -681,6 +775,7 @@ onMounted(() => {
       state.sidebarWidth = clampSidebarWidth(parsedWidth);
     }
   }
+  void hydrateRecents().catch(() => undefined);
   window.addEventListener('keydown', onGlobalKeydown);
 });
 

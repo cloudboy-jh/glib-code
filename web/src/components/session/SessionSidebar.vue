@@ -22,7 +22,7 @@
 
         <button
           type="button"
-          :class="['inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground', 'absolute right-0 h-8 w-8']"
+          :class="['inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground', 'absolute right-0 h-8 w-8']"
           @click="$emit('toggleCollapse')"
         >
           {{ collapsed ? '›' : '‹' }}
@@ -33,11 +33,11 @@
         v-if="!collapsed"
         type="button"
         :disabled="disabled"
-        class="mt-3 mb-3 flex h-10 items-center gap-2 rounded-xl border border-border/80 bg-background/70 px-3 text-left text-sm text-muted-foreground shadow-sm/5 transition-colors hover:bg-accent/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        class="mt-3 mb-3 flex h-9 items-center gap-2 rounded-lg border border-border/80 bg-background/70 px-2.5 text-left text-xs text-muted-foreground shadow-sm/5 transition-colors hover:bg-accent/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Search class="sidebar-icon" />
         <span class="flex-1">Search sessions</span>
-        <span class="rounded-md border border-border/70 bg-muted/70 px-1.5 py-0.5 text-[11px] text-muted-foreground">⌘K</span>
+        <span class="rounded-md border border-border/70 bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">⌘K</span>
       </button>
 
       <div v-else class="mt-3 mb-3 flex justify-center">
@@ -73,7 +73,7 @@
           <div v-for="repo in grouped" :key="repo.repo" class="mb-2.5">
             <button
               type="button"
-              class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground/80 transition-colors hover:bg-accent/45 hover:text-foreground"
+              class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80 transition-colors hover:bg-accent/45 hover:text-foreground"
               @click="toggleRepo(repo.repo)"
             >
               <ChevronRight v-if="isRepoCollapsed(repo.repo)" class="tree-chevron" />
@@ -85,7 +85,7 @@
               <div v-for="project in repo.projects" :key="project.key">
                 <button
                   type="button"
-                  class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+                  class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
                   @click="toggleProject(project.key)"
                 >
                   <ChevronRight v-if="isProjectCollapsed(project.key)" class="tree-chevron" />
@@ -103,14 +103,14 @@
                     type="button"
                     :disabled="disabled"
                     :class="[
-                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                      'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                       s.id === activeId ? 'bg-accent text-foreground shadow-sm/5' : 'text-foreground/92 hover:bg-accent/70'
                     ]"
                     @click="$emit('select', s.id)"
                   >
                     <span class="h-2 w-2 shrink-0 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
-                    <span class="min-w-0 flex-1 truncate text-sm leading-none">{{ s.title }}</span>
-                    <span class="shrink-0 text-xs text-muted-foreground/80">{{ s.time }}</span>
+                    <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
+                    <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
                   </button>
                 </div>
               </div>

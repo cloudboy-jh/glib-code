@@ -1,9 +1,19 @@
 import { Hono } from "hono";
 import { createProject, forgetProject, initProject, openProject } from "../services/projects";
 import { getRecents, putRecent, removeRecent, registerProject, setCurrentProject } from "../services/state";
+import { inspectRecentPath } from "../services/projects";
 
 export const projectsRoutes = new Hono()
   .get("/recents", async (c) => c.json(await getRecents()))
+  .get("/recents/status", async (c) => {
+    const recents = await getRecents();
+    return c.json(
+      recents.map((recent) => ({
+        id: recent.id,
+        status: inspectRecentPath(recent.path)
+      }))
+    );
+  })
   .post("/open", async (c) => {
     const body = await c.req.json().catch(() => null) as { path?: string } | null;
     if (!body?.path) return c.json({ ok: false, message: "path required" }, 400);

@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto w-full max-w-3xl px-6">
+  <div class="mx-auto w-full max-w-3xl px-6" tabindex="0" @keydown="onPickerKeydown">
     <div class="mb-9 text-center">
       <div
         v-if="logoSrc"
@@ -46,15 +46,15 @@
       </div>
 
       <div class="space-y-1">
-        <button class="picker-row" @click="$emit('openProject')">
+        <button :class="['picker-row', pickerIndex === 0 ? 'picker-row-active' : '']" @click="emit('openProject')">
           <span class="picker-row-left"><FolderOpen class="h-4 w-4" /><span>Open Project</span></span>
           <span class="picker-kbd">Ctrl+O</span>
         </button>
-        <button class="picker-row" @click="$emit('openClone')">
+        <button :class="['picker-row', pickerIndex === 1 ? 'picker-row-active' : '']" @click="emit('openClone')">
           <span class="picker-row-left"><GitBranch class="h-4 w-4" /><span>Clone Repository</span></span>
           <span class="picker-kbd">Ctrl+Shift+O</span>
         </button>
-        <button class="picker-row" @click="$emit('openPalette')">
+        <button :class="['picker-row', pickerIndex === 2 ? 'picker-row-active' : '']" @click="emit('openPalette')">
           <span class="picker-row-left"><Command class="h-4 w-4" /><span>Open Command Palette</span></span>
           <span class="picker-kbd">Ctrl+K</span>
         </button>
@@ -67,7 +67,14 @@
         <div class="h-px flex-1 bg-border/80" />
       </div>
 
-      <RecentList :recents="recents" @open="$emit('openRecent', $event)" />
+      <RecentList
+        :recents="recents"
+        :active-index="pickerIndex"
+        :active-offset="3"
+        @open="emit('openRecent', $event)"
+        @remove="emit('removeRecent', $event)"
+        @forget="emit('forgetRecent', $event)"
+      />
     </section>
 
     <section class="mt-8">
@@ -76,7 +83,7 @@
         <div class="h-px flex-1 bg-border/80" />
       </div>
 
-      <button class="picker-row" @click="$emit('openTheme')">
+      <button :class="['picker-row', pickerIndex === lastPickerIndex ? 'picker-row-active' : '']" @click="emit('openTheme')">
         <span class="picker-row-left"><Palette class="h-4 w-4" /><span>Theme</span></span>
         <span class="picker-kbd">Customize</span>
       </button>
@@ -86,23 +93,72 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import { Command, FolderOpen, GitBranch, Palette } from 'lucide-vue-next';
 import RecentList from './RecentList.vue';
 
-defineProps<{
-  recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string }>;
+const props = defineProps<{
+  recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
   logoSrc?: string;
   pendingProject?: { name: string; path: string } | null;
 }>();
-defineEmits<{
+const emit = defineEmits<{
   openProject: [];
   openClone: [];
   openPalette: [];
   openRecent: [path: string];
+  removeRecent: [id: string];
+  forgetRecent: [id: string];
   openTheme: [];
   selectProjectMode: [mode: 'diff' | 'session'];
   cancelProjectMode: [];
 }>();
+
+const pickerIndex = ref(0);
+const totalPickerRows = computed(() => 4 + props.recents.length);
+const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
+
+watch(totalPickerRows, (count) => {
+  if (pickerIndex.value >= count) pickerIndex.value = Math.max(count - 1, 0);
+});
+
+watch(
+  () => props.pendingProject,
+  (next) => {
+    if (!next) pickerIndex.value = 0;
+  }
+);
+
+function runPickerSelection(index: number) {
+  if (index === 0) emit('openProject');
+  else if (index === 1) emit('openClone');
+  else if (index === 2) emit('openPalette');
+  else if (index <= 2 + props.recents.length) {
+    const recent = props.recents[index - 3];
+    if (recent && recent.status === 'ok') emit('openRecent', recent.path);
+  } else emit('openTheme');
+}
+
+function onPickerKeydown(event: KeyboardEvent) {
+  if (props.pendingProject) return;
+
+  if (event.key === 'j' || event.key === 'J' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    pickerIndex.value = Math.min(pickerIndex.value + 1, lastPickerIndex.value);
+    return;
+  }
+
+  if (event.key === 'k' || event.key === 'K' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    pickerIndex.value = Math.max(pickerIndex.value - 1, 0);
+    return;
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    runPickerSelection(pickerIndex.value);
+  }
+}
 </script>
 
 <style scoped>
@@ -136,6 +192,11 @@ defineEmits<{
 .picker-row:hover {
   border-color: hsl(var(--border));
   background: hsl(var(--muted) / 0.55);
+}
+
+.picker-row-active {
+  border-color: hsl(var(--border));
+  background: hsl(var(--muted) / 0.7);
 }
 
 .picker-row-left {
