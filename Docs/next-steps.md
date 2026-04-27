@@ -1,83 +1,54 @@
-# Next Steps — UI Parity + Diff Contract
+# Next Steps — Gittrix-First Backend Integration
 
-Last updated: 2026-04-24
+Last updated: 2026-04-26
 
-## Progress snapshot
+Current docs describe a fuller system than what the code currently ships. The immediate plan is to stop polishing mock UI behavior and wire the real backend path around Gittrix.
 
-- [x] Diff surface uses `@pierre/diffs` renderer.
-- [x] Picker-first onboarding is in place (open/clone/recent).
-- [x] Session composer is gated until a real session exists.
-- [x] Sidebar stays visible while picker is shown.
-- [x] New logo assets wired (wordmark + icon) with theme-aware masking.
-- [x] Picker now has Theme entry + dedicated Theme dialog.
-- [x] Project open flow now routes through an inline picker mode chooser (`Diffs` vs `Session`).
-- [x] Default theme is `catppuccin-mocha`.
-- [x] Browser tab favicon now uses the glib icon asset.
-- [x] Session sidebar now has persisted resize width.
-- [x] Session sidebar has Home action back to picker.
-- [x] Session sidebar collapse now uses the masked glib icon rail.
+## Current reality snapshot (from code)
 
-## Component checklist
+- Frontend shell/components exist, but `web/src/App.vue` still carries mock recents/sessions/diff payloads.
+- Diff endpoints are partially real (`/api/diff/sources|items|files|hunks|pack`), but `branch-compare` is still `501`.
+- Agent and session APIs are stubbed (`/api/agent/*` and most `/api/sessions/*` return `501`/placeholder).
+- Settings/keybindings/recents persistence is real and local-file-backed.
 
-### Picker / onboarding
-- [x] Centered picker surface with Get Started + Recent Projects.
-- [x] Open Project dialog.
-- [x] Clone Repository dialog.
-- [x] Recent list cleaned (no Ctrl-1..Ctrl-9 hints).
-- [x] Theme button under Recent Projects.
-- [x] Inline project mode chooser in picker (`Diffs` / `Session`).
-- [x] Session mode selection now auto-starts a session.
-- [ ] Add keyboard navigation for picker rows (j/k + enter).
-- [ ] Add robust recents states (missing path, no .git, remove/forget).
+## Primary objective
 
-### Session surfaces
-- [x] Sidebar logo integration and collapse behavior.
-- [x] Sidebar resize rail + persisted width.
-- [x] Sidebar Home action back to picker.
-- [x] Empty-state when Session mode has no active session.
-- [x] Sidebar session list now groups by repo and project/worktree.
-- [x] Sidebar session selection now works from homepage/picker state (no disable lock).
-- [ ] Tighten sidebar parity pass for shadcn/t3 sizing, collapse behavior, and search control.
-- [x] Refine Composer/chat input against official t3 source scans.
-- [x] SessionHeader now uses iconized controls + split Diff action (`Current session diff` / `Commits list`).
-- [x] SessionHeader model control is text-only and overflow (`...`) action was removed.
-- [ ] Tighten parity pass for SessionHeader spacing/control density and button styling against official t3 source scans.
-- [ ] Tighten parity pass for Timeline card rhythm + metadata tone.
+Adopt `gittrix` as glib's primary backend for model ephemeral storage routing:
 
-### Diff surfaces (glib-go contract)
-- [x] Project picker + commit picker flow.
-- [x] File list + split/unified display toggle.
-- [x] Unified reader via `@pierre/diffs`.
-- [ ] Replace mock diff payloads with repo-backed data.
-- [ ] Add explicit file/hunk selection state for attach-to-agent flow.
+- Agent writes only to ephemeral session repos.
+- Durable repo changes happen only through a human promotion action.
+- Promotion creates one clean synthetic commit on durable.
 
-### Overlays / settings / keyboard
-- [x] Command palette toggle (`Ctrl/Cmd+K`).
-- [x] Terminal toggle (`Ctrl/Cmd+J`).
-- [x] Escape closes top-most overlay (palette/settings/theme/terminal).
-- [ ] Focus trap + focus return parity across all dialogs.
-- [ ] Polish Settings modal to match target rhythm exactly.
+## Execution order
 
-## Acceptance gate
+### 1) Backend contract freeze for Gittrix
+- [ ] Define glib↔gittrix mapping for session lifecycle (`start`, `list`, `diff`, `log`, `promote`).
+- [ ] Define API error contract for promotion conflicts and stale baseline.
+- [ ] Define session identity model (`glibSessionId` ↔ `gittrixSessionId`).
 
-- [ ] Screenshot parity review done for non-diff surfaces.
-- [ ] Diff reader review done against glib-go contract.
-- [x] Build + typecheck passing.
-- [ ] No placeholder-only behavior in primary UI paths.
+### 2) Backend integration slice (no UI polish work until this lands)
+- [ ] Add a `gittrix` service adapter in `server/src/services` and isolate all durable writes behind it.
+- [ ] Replace stubbed `/api/agent/*` routes with real turn orchestration in ephemeral workspaces.
+- [ ] Replace stubbed `/api/sessions/*` routes with gittrix-backed session listing/read/fork/delete semantics.
+- [ ] Add `/api/git/promote` (or equivalent) as a human-only promotion endpoint.
 
-## Latest notes
+### 3) Frontend data-plane switch from mock to real
+- [ ] Remove mock session/diff/recents data from `App.vue`; hydrate from API on boot.
+- [ ] Wire Diff selection → Session composer context using real `/api/diff/pack` output.
+- [ ] Show promotion CTA/state in Session header and session timeline.
 
-- The sidebar was pushed closer to t3 structure, but the current pass still needs another visual correction pass.
-- Picker mode selection is now inline on the picker surface instead of a separate dialog.
-- Composer pass is now in a cleaner one-surface state with command execution wiring and reduced footer noise.
-- Composer context hint now lives in the input placeholder (commit-context-aware) instead of a separate badge/row.
-- Sidebar wordmark was resized/centered and the alpha chip was removed.
-- Session header now has iconized controls and split Diff behavior with dedicated actions.
-- Sidebar session hierarchy now nests by repo -> project/worktree -> sessions.
-- Sidebar action/header icon set now uses heavier lucide sizing/stroke; Home now uses a real home icon.
-- Session selection from sidebar now rehydrates the related project and opens chat even from homepage.
-- Next implementation slice is timeline rhythm/metadata parity.
-- Main known sidebar gaps right now:
-  - search control still needs stronger shadcn-style definition,
-  - expanded sizing/collapse behavior still needs polish,
-  - icon rail behavior should stay theme-masked and visually consistent.
+### 4) Conflict + promotion UX hardening
+- [ ] Surface baseline conflict errors with explicit “rebase/review/retry promote” states.
+- [ ] Block any UI path that implies direct durable write from agent turns.
+- [ ] Add promotion result summary card (files promoted, commit sha, skipped/conflicted files).
+
+### 5) Acceptance gate for the Gittrix milestone
+- [ ] End-to-end: start session → agent edits ephemeral → human promote → one durable commit.
+- [ ] Verify no agent path can commit directly to durable branch.
+- [ ] Verify stale durable baseline is detected before promote.
+- [ ] Build + typecheck pass for `server`, `web`, and `shared`.
+
+## Tracking docs
+
+- Frontend execution checklist: `Docs/frontend-checklist.md`
+- Backend execution checklist: `Docs/backend-checklist.md`
