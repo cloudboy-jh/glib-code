@@ -58,3 +58,6 @@ This checklist is intentionally backend-coupled: frontend work here is about exp
 - [ ] User can select diff context, send prompt, stream response, and promote from UI.
 - [ ] Promotion status and conflict handling are visible without opening devtools.
 - [ ] App remains usable when promote is rejected due to baseline conflict.
+
+
+## All Modal interactions and content and layouts need to be adjusted. 

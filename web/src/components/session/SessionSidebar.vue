@@ -1,12 +1,12 @@
 <template>
-  <aside class="flex h-full flex-col bg-card/95 text-foreground">
-    <div :class="['flex h-full flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
+  <aside class="flex h-full min-h-0 flex-col bg-card/95 text-foreground">
+    <div :class="['flex h-full min-h-0 flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
       <div class="relative flex h-9 items-center justify-center">
         <div v-if="!collapsed" class="min-w-0">
           <div class="flex min-w-0 items-center justify-center rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
             <div
               v-if="logoWordmarkSrc"
-              class="logo-wordmark h-4 w-[112px] shrink-0"
+              class="logo-wordmark h-5 w-[146px] shrink-0"
               :style="{ '--logo-url': `url(${logoWordmarkSrc})` }"
               role="img"
               aria-label="glib-code"
@@ -50,7 +50,7 @@
         </button>
       </div>
 
-      <div class="min-h-0 flex-1 overflow-auto">
+      <div :class="sessions.length ? 'min-h-0 flex-1 overflow-auto' : 'min-h-0 overflow-auto'">
         <template v-if="collapsed">
           <div class="space-y-1">
             <button
@@ -119,7 +119,7 @@
         </template>
       </div>
 
-      <div class="mt-2 border-t border-border/70 pt-2">
+      <div :class="[sessions.length ? 'mt-auto' : 'mt-3', 'shrink-0 border-t border-border/70 pt-2']">
         <button
           type="button"
           :class="[

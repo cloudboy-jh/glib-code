@@ -11,34 +11,6 @@
       <p class="mt-2 text-xs font-medium tracking-[0.01em] text-muted-foreground">Review changes first. Start sessions with context.</p>
     </div>
 
-    <template v-if="pendingProject">
-      <section class="mb-8">
-        <div class="mb-4 text-center">
-          <div class="text-sm font-semibold text-foreground">{{ pendingProject.name }}</div>
-          <div class="mt-1 text-xs text-muted-foreground">Choose where to land for this project.</div>
-        </div>
-
-        <div class="grid gap-3 md:grid-cols-2">
-          <button class="mode-card" @click="$emit('selectProjectMode', 'diff')">
-            <span class="mode-card-icon mode-card-icon-primary"><GitBranch class="h-5 w-5" /></span>
-            <span class="mode-card-title">Diffs</span>
-            <span class="mode-card-text">Review changes first and enter the diff workbench.</span>
-          </button>
-
-          <button class="mode-card" @click="$emit('selectProjectMode', 'session')">
-            <span class="mode-card-icon mode-card-glyph">&gt;_</span>
-            <span class="mode-card-title">Session</span>
-            <span class="mode-card-text">Jump straight into the session surface and start working.</span>
-          </button>
-        </div>
-
-        <div class="mt-4 flex justify-center">
-          <button class="picker-inline-button" @click="$emit('cancelProjectMode')">Cancel</button>
-        </div>
-      </section>
-    </template>
-
-    <template v-else>
     <section class="mb-8">
       <div class="mb-3 flex items-center gap-3">
         <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Get Started</span>
@@ -71,9 +43,15 @@
         :recents="recents"
         :active-index="pickerIndex"
         :active-offset="3"
+        :pending-path="pendingProjectPath"
+        :pending-name="pendingProjectName"
+        :pending-mode="pendingMode"
         @open="emit('openRecent', $event)"
         @remove="emit('removeRecent', $event)"
         @forget="emit('forgetRecent', $event)"
+        @select-mode="emit('selectProjectMode', $event)"
+        @set-mode="pendingMode = $event"
+        @cancel-mode="emit('cancelProjectMode')"
       />
     </section>
 
@@ -88,7 +66,6 @@
         <span class="picker-kbd">Customize</span>
       </button>
     </section>
-    </template>
   </div>
 </template>
 
@@ -100,7 +77,8 @@ import RecentList from './RecentList.vue';
 const props = defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
   logoSrc?: string;
-  pendingProject?: { name: string; path: string } | null;
+  pendingProjectPath?: string | null;
+  pendingProjectName?: string;
 }>();
 const emit = defineEmits<{
   openProject: [];
@@ -115,6 +93,7 @@ const emit = defineEmits<{
 }>();
 
 const pickerIndex = ref(0);
+const pendingMode = ref<'diff' | 'session'>('diff');
 const totalPickerRows = computed(() => 4 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
 
@@ -123,9 +102,12 @@ watch(totalPickerRows, (count) => {
 });
 
 watch(
-  () => props.pendingProject,
+  () => props.pendingProjectPath,
   (next) => {
-    if (!next) pickerIndex.value = 0;
+    if (!next) {
+      pickerIndex.value = 0;
+      pendingMode.value = 'diff';
+    }
   }
 );
 
@@ -140,7 +122,33 @@ function runPickerSelection(index: number) {
 }
 
 function onPickerKeydown(event: KeyboardEvent) {
-  if (props.pendingProject) return;
+  if (props.pendingProjectPath) {
+    if (event.key === 'ArrowLeft' || event.key === 'h' || event.key === 'H') {
+      event.preventDefault();
+      pendingMode.value = 'diff';
+      return;
+    }
+
+    if (event.key === 'ArrowRight' || event.key === 'l' || event.key === 'L') {
+      event.preventDefault();
+      pendingMode.value = 'session';
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      emit('selectProjectMode', pendingMode.value);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      emit('cancelProjectMode');
+      return;
+    }
+
+    return;
+  }
 
   if (event.key === 'j' || event.key === 'J' || event.key === 'ArrowDown') {
     event.preventDefault();
@@ -209,78 +217,5 @@ function onPickerKeydown(event: KeyboardEvent) {
 .picker-kbd {
   font-size: 12px;
   color: hsl(var(--muted-foreground));
-}
-
-.mode-card {
-  display: flex;
-  min-height: 168px;
-  width: 100%;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  border-radius: 12px;
-  border: 1px solid hsl(var(--border) / 0.8);
-  background: hsl(var(--background) / 0.55);
-  padding: 18px;
-  text-align: left;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.mode-card:hover {
-  border-color: hsl(var(--border));
-  background: hsl(var(--muted) / 0.7);
-}
-
-.mode-card-icon {
-  display: inline-flex;
-  height: 36px;
-  width: 36px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: hsl(var(--muted));
-  color: hsl(var(--foreground));
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.mode-card-glyph {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  letter-spacing: -0.03em;
-}
-
-.mode-card-icon-primary {
-  background: hsl(var(--primary) / 0.14);
-  color: hsl(var(--primary));
-}
-
-.mode-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-.mode-card-text {
-  font-size: 14px;
-  line-height: 1.5;
-  color: hsl(var(--muted-foreground));
-}
-
-.picker-inline-button {
-  display: inline-flex;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  padding: 0 12px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-
-.picker-inline-button:hover {
-  background: hsl(var(--muted) / 0.7);
-  color: hsl(var(--foreground));
 }
 </style>

@@ -43,7 +43,8 @@
               <PickerScreen
                 :recents="recents"
                 :logo-src="logoWordmarkSrc"
-                :pending-project="pendingProjectOpen"
+                :pending-project-path="pendingProjectOpen?.path ?? null"
+                :pending-project-name="pendingProjectOpen?.name ?? ''"
                 @open-project="state.openProjectDialogOpen = true"
                 @open-clone="state.cloneDialogOpen = true"
                 @open-palette="openCommandPalette"
@@ -81,14 +82,8 @@
 
             <template v-else>
               <DiffWorkbench
-                :projects="diffProjects"
-                :selected-project-id="state.selectedProjectId"
-                :selected-commit-id="state.selectedCommitId"
-                :selected-file-path="state.selectedFilePath"
+                :current-project="currentProject"
                 :diff-style="state.diffStyle"
-                @update:selected-project-id="onDiffProjectChange"
-                @update:selected-commit-id="onDiffCommitChange"
-                @update:selected-file-path="state.selectedFilePath = $event"
                 @update:diff-style="state.diffStyle = $event"
               />
             </template>
@@ -199,19 +194,13 @@ type TimelineEntry = {
   level?: 'info' | 'error';
 };
 
-type DiffFile = { path: string; stats: string; diff: string };
-type DiffCommit = { id: string; label: string; files: DiffFile[] };
-type DiffProject = { id: string; name: string; commits: DiffCommit[] };
 type PendingProjectOpen = { name: string; path: string };
 type RecentStatus = 'ok' | 'missing_path' | 'missing_git';
 type RecentEntry = { id: string; name: string; path: string; lastOpenedAt: string; status: RecentStatus };
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
 
-const recents = reactive<RecentEntry[]>([
-  { id: 'r1', name: 'cloudboy-jh/glib-code', path: 'C:/repos/glib-code', lastOpenedAt: '2h ago', status: 'ok' },
-  { id: 'r2', name: 'cloudboy-jh/shipwrkrs', path: 'C:/repos/shipwrkrs', lastOpenedAt: 'Yesterday', status: 'ok' }
-]);
+const recents = reactive<RecentEntry[]>([]);
 
 const picker = reactive({
   openPath: '',
@@ -223,31 +212,6 @@ const pendingProjectOpen = ref<PendingProjectOpen | null>(null);
 
 const sessions = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
-
-const diffProjects = reactive<DiffProject[]>([
-  {
-    id: 'proj-1',
-    name: 'cloudboy-jh/glib-code',
-    commits: [
-      {
-        id: 'c1',
-        label: 'b8305af · parity baseline sync',
-        files: [
-          {
-            path: 'web/src/components/session/SessionSidebar.vue',
-            stats: '+124 -21',
-            diff: `diff --git a/web/src/components/session/SessionSidebar.vue b/web/src/components/session/SessionSidebar.vue\nindex 2e0a11..bf292f 100644\n--- a/web/src/components/session/SessionSidebar.vue\n+++ b/web/src/components/session/SessionSidebar.vue\n@@ -1,6 +1,9 @@\n-<aside class="box side">\n+<aside class="border-r border-border/80 bg-card/60">\n+  <div class="flex h-full flex-col p-3">\n+    <div class="mb-3 flex items-center gap-2">\n+      ...\n+    </div>\n`
-          },
-          {
-            path: 'web/src/components/app/CommandPalette.vue',
-            stats: '+68 -25',
-            diff: `diff --git a/web/src/components/app/CommandPalette.vue b/web/src/components/app/CommandPalette.vue\nindex c1ebca..1eacdf 100644\n--- a/web/src/components/app/CommandPalette.vue\n+++ b/web/src/components/app/CommandPalette.vue\n@@ -1,6 +1,6 @@\n-<div class="modal">\n+<div class="fixed inset-0 z-50 grid place-items-start">\n ...\n`
-          }
-        ]
-      }
-    ]
-  }
-]);
 
 const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
@@ -273,9 +237,6 @@ const state = reactive({
   openProjectDialogOpen: false,
   themeDialogOpen: false,
   cloneDialogOpen: false,
-  selectedProjectId: 'proj-1',
-  selectedCommitId: 'c1',
-  selectedFilePath: 'web/src/components/session/SessionSidebar.vue',
   diffStyle: 'split' as 'split' | 'unified'
 });
 
@@ -301,20 +262,10 @@ const activeTimeline = computed(() => {
   return timelineBySessionId[state.activeSessionId] ?? [];
 });
 
-const commitsForProject = computed(() => {
-  const project = diffProjects.find((p) => p.id === state.selectedProjectId);
-  return project?.commits ?? [];
-});
-
-const filesForCommit = computed(() => {
-  const commit = commitsForProject.value.find((c) => c.id === state.selectedCommitId);
-  return commit?.files ?? [];
-});
-
 const contextLabel = computed(() => {
   if (state.mode !== 'session') return '';
-  if (!filesForCommit.value.length) return '';
-  return `${filesForCommit.value.length} files · ${state.selectedCommitId}`;
+  if (!currentProject.value) return '';
+  return currentProject.value.name;
 });
 
 const filteredPaletteCommands = computed(() => {
@@ -418,28 +369,9 @@ function startSidebarResize(event: MouseEvent) {
   window.addEventListener('mouseup', onMouseUp);
 }
 
-function ensureProjectDiffSelection(projectId: string) {
-  const project = diffProjects.find((p) => p.id === projectId);
-  state.selectedProjectId = projectId;
-  state.selectedCommitId = project?.commits[0]?.id ?? '';
-  state.selectedFilePath = project?.commits[0]?.files[0]?.path ?? '';
-}
-
 function openProject(projectName: string, path: string, mode: 'diff' | 'session') {
-  const existing = diffProjects.find((p) => p.name === projectName);
-  if (existing) {
-    ensureProjectDiffSelection(existing.id);
-    currentProject.value = { id: existing.id, name: existing.name, branch: 'main', path };
-  } else {
-    const id = `proj-${diffProjects.length + 1}`;
-    diffProjects.unshift({
-      id,
-      name: projectName,
-      commits: []
-    });
-    ensureProjectDiffSelection(id);
-    currentProject.value = { id, name: projectName, branch: 'main', path };
-  }
+  const id = currentProject.value?.path === path ? currentProject.value.id : `proj-${Date.now()}`;
+  currentProject.value = { id, name: projectName, branch: 'main', path };
 
   const existingRecent = recents.find((r) => r.path === path);
   if (!existingRecent) {
@@ -457,6 +389,11 @@ function queueProjectOpen(projectName: string, path: string) {
   state.openProjectDialogOpen = false;
   state.cloneDialogOpen = false;
   pendingProjectOpen.value = { name: projectName, path };
+
+  const existingRecent = recents.find((r) => r.path === path);
+  if (!existingRecent) {
+    recents.unshift({ id: `pending-${Date.now()}`, name: projectName, path, lastOpenedAt: 'now', status: 'ok' });
+  }
 }
 
 function finalizeProjectOpen(mode: 'diff' | 'session') {
@@ -485,6 +422,13 @@ async function resolveProjectOpen(path: string) {
       path: opened.path ?? normalizedPath
     };
   } catch {
+    if (import.meta.env.DEV) {
+      return {
+        ok: true as const,
+        name: normalizedPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project',
+        path: normalizedPath
+      };
+    }
     return { ok: false as const, reason: 'missing_path' as const };
   }
 }
@@ -548,25 +492,11 @@ function openCommandPalette() {
 function openCurrentSessionDiff() {
   if (!currentProject.value) return;
   state.mode = 'diff';
-
-  if (!state.selectedCommitId) {
-    const firstCommit = commitsForProject.value[0];
-    state.selectedCommitId = firstCommit?.id ?? '';
-    state.selectedFilePath = firstCommit?.files[0]?.path ?? '';
-    return;
-  }
-
-  if (!state.selectedFilePath) {
-    const selectedCommit = commitsForProject.value.find((c) => c.id === state.selectedCommitId);
-    state.selectedFilePath = selectedCommit?.files[0]?.path ?? '';
-  }
 }
 
 function openCommitsListDiff() {
   if (!currentProject.value) return;
   state.mode = 'diff';
-  state.selectedCommitId = '';
-  state.selectedFilePath = '';
 }
 
 function createSession() {
@@ -611,16 +541,6 @@ function sendPrompt() {
   const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
   list.push({ id: `e${list.length + 1}`, kind: 'User', text: forms.prompt, time: 'now', level: 'info' });
   forms.prompt = '';
-}
-
-function onDiffProjectChange(projectId: string) {
-  ensureProjectDiffSelection(projectId);
-}
-
-function onDiffCommitChange(commitId: string) {
-  state.selectedCommitId = commitId;
-  const selectedCommit = commitsForProject.value.find((c) => c.id === commitId);
-  state.selectedFilePath = selectedCommit?.files[0]?.path ?? '';
 }
 
 function runTerminal() {

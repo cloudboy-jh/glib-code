@@ -44,16 +44,10 @@ Install:
 bun install
 ```
 
-Run backend (terminal 1):
+Run full dev stack (single terminal):
 
 ```bash
-bun run dev:server
-```
-
-Run frontend (terminal 2):
-
-```bash
-bun run dev:web
+bun run dev
 ```
 
 Open the app at the Vite URL shown in terminal (usually `http://localhost:5173`).
@@ -61,7 +55,7 @@ Open the app at the Vite URL shown in terminal (usually `http://localhost:5173`)
 ## Scripts
 
 ```bash
-bun run dev         # server dev (same as dev:server)
+bun run dev         # server + web with colored prefixed logs
 bun run dev:server  # backend on :4273
 bun run dev:web     # frontend via Vite
 bun run build       # build shared + server + web + desktop

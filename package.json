@@ -8,7 +8,7 @@
     "shared"
   ],
   "scripts": {
-    "dev": "bun run --cwd server dev",
+    "dev": "bun run scripts/dev.ts",
     "dev:server": "bun run --cwd server dev",
     "dev:web": "bun run --cwd web dev",
     "build": "bun run --cwd shared build && bun run --cwd server build && bun run --cwd web build && bun run --cwd desktop build",
