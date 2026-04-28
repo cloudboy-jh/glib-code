@@ -84,8 +84,11 @@
               <DiffWorkbench
                 :current-project="currentProject"
                 :diff-style="state.diffStyle"
+                :theme-type="diffThemeType"
+                :theme-preset="settings.themePreset"
                 @update:diff-style="state.diffStyle = $event"
                 @open-projects="goHome"
+                @start-session-from-diff="startSessionFromDiff"
               />
             </template>
           </template>
@@ -164,6 +167,7 @@ import SessionHeader from './components/session/SessionHeader.vue';
 import SessionSidebar from './components/session/SessionSidebar.vue';
 import Timeline from './components/session/Timeline.vue';
 import { applyTheme } from './lib/theme';
+import { THEME_PRESETS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import logoIcon from '../../glibcode-iconlogo.png';
 import logoWordmark from '../../glibcode-wordmark.png';
@@ -213,6 +217,7 @@ const pendingProjectOpen = ref<PendingProjectOpen | null>(null);
 
 const sessions = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
+const sessionContextById = reactive<Record<string, string>>({});
 
 const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
@@ -266,7 +271,15 @@ const activeTimeline = computed(() => {
 const contextLabel = computed(() => {
   if (state.mode !== 'session') return '';
   if (!currentProject.value) return '';
+  const sessionContext = state.activeSessionId ? sessionContextById[state.activeSessionId] : '';
+  if (sessionContext) return sessionContext;
   return currentProject.value.name;
+});
+
+const diffThemeType = computed<'dark' | 'light'>(() => {
+  const background = THEME_PRESETS[settings.themePreset].background;
+  const lightness = Number(background.split(' ')[2]?.replace('%', '') ?? '0');
+  return lightness <= 50 ? 'dark' : 'light';
 });
 
 const filteredPaletteCommands = computed(() => {
@@ -500,7 +513,7 @@ function openCommitsListDiff() {
   state.mode = 'diff';
 }
 
-function createSession() {
+function createSession(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
   if (!currentProject.value) return;
   const normalizedPath = currentProject.value.path.replace(/\\/g, '/');
   const repoName = currentProject.value.name.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? currentProject.value.name;
@@ -508,16 +521,39 @@ function createSession() {
   const id = `s${sessions.length + 1}`;
   sessions.unshift({
     id,
-    title: 'New session',
+    title: options?.title ?? 'New session',
     time: 'now',
     status: 'Working',
     repo: repoName,
     project: projectName,
     projectPath: normalizedPath
   });
-  timelineBySessionId[id] = [];
+  timelineBySessionId[id] = options?.initialEntries ?? [];
+  sessionContextById[id] = options?.context ?? '';
   state.activeSessionId = id;
   state.mode = 'session';
+}
+
+async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }) {
+  if (!currentProject.value) return;
+  const packBody: Record<string, unknown> = { source: payload.source === 'commit' ? 'commits' : 'uncommitted' };
+  if (payload.source === 'commit' && payload.ref) packBody.ref = payload.ref;
+  if (payload.file) packBody.file = payload.file;
+  const packed = await apiPost<{ diff: string }>('/diff/pack', packBody);
+  const context = payload.source === 'commit' && payload.ref
+    ? `commit ${payload.ref.slice(0, 7)}`
+    : 'working tree changes';
+  createSession({
+    title: `Session from ${context}`,
+    context,
+    initialEntries: [{
+      id: 'e1',
+      kind: 'Context',
+      text: packed.diff?.trim() || 'No diff context available.',
+      time: 'now',
+      level: 'info'
+    }]
+  });
 }
 
 function selectSessionFromSidebar(sessionId: string) {

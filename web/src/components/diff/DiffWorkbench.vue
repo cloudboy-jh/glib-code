@@ -3,20 +3,21 @@
     <template v-if="state.phase === 'history'">
       <div class="grid h-full place-items-center">
         <div class="w-full max-w-[720px]">
-          <div class="mb-3 flex items-center justify-center gap-2">
-            <button
-              class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[11px] font-medium text-primary hover:bg-primary/18"
-              @click="$emit('openProjects')"
-            >
-              <CornerDownLeft class="h-3.5 w-3.5" />
-              <span>Projects</span>
-            </button>
-          </div>
           <div class="mb-6 flex justify-center">
             <div class="diff-wordmark h-24 w-[340px]" :style="{ '--diff-wordmark-url': `url(${diffsWordmarkSrc})` }" role="img" aria-label="Diffs" />
           </div>
 
           <div class="rounded-xl border border-primary/60 bg-card/80 p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <button
+                class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[11px] font-medium text-primary hover:bg-primary/18"
+                @click="$emit('openProjects')"
+              >
+                <CornerDownLeft class="h-3.5 w-3.5" />
+                <span>Projects</span>
+              </button>
+              <div class="text-[11px] text-muted-foreground">{{ currentProject.name }}</div>
+            </div>
             <div class="mb-2 flex items-center gap-2 text-primary">
               <GitCommitHorizontal class="h-4 w-4" />
               <span class="text-3xl font-semibold tracking-tight">Commit History</span>
@@ -82,6 +83,12 @@
 
           <span class="ml-auto" />
           <button
+            class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18"
+            @click="emitStartSessionFromDiff"
+          >
+            Start session from diff
+          </button>
+          <button
             class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="currentFileIndex <= 0"
             @click="selectPreviousFile"
@@ -124,7 +131,7 @@
           <span class="truncate">{{ state.selectedFilePath || 'No file selected' }}</span>
         </div>
 
-        <DiffView :patch="state.patch" :diff-style="diffStyle" />
+        <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
       </section>
     </template>
   </section>
@@ -137,7 +144,7 @@ import DiffView from '../shared/DiffView.vue';
 import diffsWordmark from '../../../../diffs-glibiconmain.png';
 
 const API_BASE = 'http://127.0.0.1:4273/api';
-const MAX_PATCH_LINES = 2200;
+const MAX_PATCH_LINES = 12000;
 const diffsWordmarkSrc = diffsWordmark;
 
 type DiffItem = { id: string; ref: string; title: string; shortRef: string };
@@ -153,11 +160,17 @@ const props = withDefaults(
   defineProps<{
     currentProject: { id: string; name: string; branch: string; path: string };
     diffStyle?: 'split' | 'unified';
+    themeType?: 'dark' | 'light';
+    themePreset?: 'tokyo-night' | 'catppuccin-mocha' | 'gruvbox-dark' | 'nord';
   }>(),
-  { diffStyle: 'split' }
+  { diffStyle: 'split', themeType: 'dark', themePreset: 'catppuccin-mocha' }
 );
 
-defineEmits<{ 'update:diffStyle': [value: 'split' | 'unified']; openProjects: [] }>();
+const emit = defineEmits<{
+  'update:diffStyle': [value: 'split' | 'unified'];
+  openProjects: [];
+  startSessionFromDiff: [payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }];
+}>();
 
 const state = reactive({
   phase: 'history' as 'history' | 'open',
@@ -265,6 +278,15 @@ async function selectPreviousFile() {
 async function selectNextFile() {
   if (currentFileIndex.value < 0 || currentFileIndex.value >= state.files.length - 1) return;
   await selectFile(state.files[currentFileIndex.value + 1].path);
+}
+
+function emitStartSessionFromDiff() {
+  const payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string } = {
+    source: state.openSource
+  };
+  if (state.openSource === 'commit' && state.selectedCommitRef) payload.ref = state.selectedCommitRef;
+  if (state.selectedFilePath) payload.file = state.selectedFilePath;
+  emit('startSessionFromDiff', payload);
 }
 
 async function resetForProject() {
