@@ -50,7 +50,7 @@
         </button>
       </div>
 
-      <div :class="sessions.length ? 'min-h-0 flex-1 overflow-auto' : 'min-h-0 overflow-auto'">
+      <div class="min-h-0 flex-1 overflow-auto">
         <template v-if="collapsed">
           <div class="space-y-1">
             <button
@@ -70,6 +70,7 @@
         </template>
 
         <template v-else>
+          <div v-if="grouped.length === 0" class="px-2 py-1 text-xs text-muted-foreground/75">No sessions yet</div>
           <div v-for="repo in grouped" :key="repo.repo" class="mb-2.5">
             <button
               type="button"
@@ -119,7 +120,7 @@
         </template>
       </div>
 
-      <div :class="[sessions.length ? 'mt-auto' : 'mt-3', 'shrink-0 border-t border-border/70 pt-2']">
+      <div class="mt-auto shrink-0 border-t border-border/70 pt-2">
         <button
           type="button"
           :class="[

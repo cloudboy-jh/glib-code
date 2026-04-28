@@ -85,6 +85,7 @@
                 :current-project="currentProject"
                 :diff-style="state.diffStyle"
                 @update:diff-style="state.diffStyle = $event"
+                @open-projects="goHome"
               />
             </template>
           </template>

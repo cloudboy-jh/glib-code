@@ -3,6 +3,15 @@
     <template v-if="state.phase === 'history'">
       <div class="grid h-full place-items-center">
         <div class="w-full max-w-[720px]">
+          <div class="mb-3 flex items-center justify-center gap-2">
+            <button
+              class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[11px] font-medium text-primary hover:bg-primary/18"
+              @click="$emit('openProjects')"
+            >
+              <CornerDownLeft class="h-3.5 w-3.5" />
+              <span>Projects</span>
+            </button>
+          </div>
           <div class="mb-6 flex justify-center">
             <div class="diff-wordmark h-24 w-[340px]" :style="{ '--diff-wordmark-url': `url(${diffsWordmarkSrc})` }" role="img" aria-label="Diffs" />
           </div>
@@ -148,7 +157,7 @@ const props = withDefaults(
   { diffStyle: 'split' }
 );
 
-defineEmits<{ 'update:diffStyle': [value: 'split' | 'unified'] }>();
+defineEmits<{ 'update:diffStyle': [value: 'split' | 'unified']; openProjects: [] }>();
 
 const state = reactive({
   phase: 'history' as 'history' | 'open',
