@@ -1,63 +1,43 @@
-# Backend Checklist — Gittrix as Primary Storage Router
+# Backend Checklist
 
-Last updated: 2026-04-26
+Last updated: 2026-04-29
 
-Goal: glib backend uses Gittrix for ephemeral agent workspaces and human-gated promotion into durable repos.
+## Core route completion
 
-## A) Contract + boundaries
+- [ ] Implement `/api/agent/*` route group (currently all 501).
+- [ ] Implement `/api/sessions/*` route group beyond placeholder list/not-found.
+- [ ] Implement `/api/term` WebSocket transport.
+- [ ] Implement `/api/attachments` upload/read/delete routes.
+- [ ] Implement git mutation routes under `/api/git` (stage/commit/push/etc).
+- [ ] Implement `/api/diff/branch-compare`.
 
-- [ ] Freeze glib↔gittrix boundary in one service (`server/src/services/gittrix.ts` or equivalent).
-- [ ] Define typed response/error schema for `start/list/diff/log/promote` operations.
-- [ ] Define durable-write policy: only promotion route can mutate durable repo.
-- [ ] Define baseline conflict payload shape for frontend rendering.
+## Agent runtime
 
-## B) Session lifecycle integration
+- [ ] Add robust `opencode` process manager.
+- [ ] Add SSE event fanout for active session streams.
+- [ ] Normalize and validate event payloads against shared contracts.
+- [ ] Add clean abort/timeout handling per turn.
 
-- [ ] Implement session start against Gittrix (`task title`, `repo path`, `base ref`).
-- [ ] Persist session mapping (`glibSessionId` ↔ `gittrixSessionId`) in session metadata.
-- [ ] Implement session list/read using Gittrix as source of truth.
-- [ ] Implement session delete/evict path with clear lifecycle semantics.
-- [ ] Implement session diff/log passthrough APIs for UI inspection.
+## Session persistence
 
-## C) Agent execution path (ephemeral-only)
+- [ ] Store session metadata and timeline events in repo-local `.glib/`.
+- [ ] Implement list/read/fork/delete semantics.
+- [ ] Ensure project switching does not cross-contaminate session data.
 
-- [ ] Ensure opencode subprocess runs with cwd at Gittrix ephemeral workspace.
-- [ ] Prevent agent routes from calling direct durable git mutations.
-- [ ] Keep transcript write path (`.glib/sessions/*.jsonl`) while workspace storage is Gittrix-managed.
-- [ ] Ensure abort/cleanup correctly handles active ephemeral workspace turns.
+## State and safety
 
-## D) Promotion flow (human-only)
+- [ ] Move current project state to a client/session scoped model (not single process-global value).
+- [ ] Harden FS read/tree for large repos and binary files.
+- [ ] Add consistent error envelopes for route failures.
 
-- [ ] Add promotion endpoint (`POST /api/git/promote` or `/api/sessions/:id/promote`).
-- [ ] Require explicit human action context (never auto-promote after turn end).
-- [ ] Validate baseline before promote; return deterministic conflict details on mismatch.
-- [ ] Support file-scoped promote and full-session promote.
-- [ ] Return durable commit sha + promoted file stats on success.
+## Readiness/auth
 
-## E) Existing route upgrades (current stubs)
+- [ ] Keep readiness checks fast and cached while preserving actionable errors.
+- [ ] Either implement auth endpoints or mark them explicitly local-only in API contract.
 
-- [ ] Replace `/api/agent/sessions` stubbed handlers (`501`) with real implementation.
-- [ ] Replace `/api/sessions/*` placeholder handlers with real backing store behavior.
-- [ ] Implement `/api/diff/branch-compare` instead of `501`.
-- [ ] Ensure `/api/repo/*` resolves against active durable repo while session work happens ephemerally.
+## Definition of done (backend)
 
-## F) Persistence + migration
-
-- [ ] Keep existing local config files (`recents.json`, `settings.json`, `keybindings.json`) unchanged.
-- [ ] Add migration path for any pre-Gittrix session metadata if format changed.
-- [ ] Document on-disk ownership split: glib metadata vs Gittrix workspace/session state.
-- [ ] Ensure `.glib/` remains gitignored and contains no accidental durable patch artifacts.
-
-## G) Observability + failure handling
-
-- [ ] Structured logs include `glibSessionId`, `gittrixSessionId`, and promote attempt id.
-- [ ] Emit clear error classes for: missing session, stale baseline, promote conflict, gittrix unavailable.
-- [ ] Add health/readiness checks for Gittrix availability/version.
-- [ ] Return actionable error messages to frontend without leaking stack traces.
-
-## H) Done criteria for backend Gittrix milestone
-
-- [ ] End-to-end local flow succeeds: start session → agent edits ephemeral → promote → one durable commit.
-- [ ] Verified: no backend route allows agent-originated direct durable write.
-- [ ] Verified: stale baseline blocks promote with explicit conflict payload.
-- [ ] Build/typecheck pass for server/shared, with route schema types aligned to frontend usage.
+- [ ] Agent routes run real turns with streaming.
+- [ ] Sessions persist and replay across server restarts.
+- [ ] Git and diff route surface matches what frontend advertises.
+- [ ] Typecheck + build pass (`bun run --cwd server check`, `bun run --cwd server build`).

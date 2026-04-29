@@ -1,54 +1,36 @@
-# Next Steps — Gittrix-First Backend Integration
+# Next Steps
 
-Last updated: 2026-04-26
+Last updated: 2026-04-29
 
-Current docs describe a fuller system than what the code currently ships. The immediate plan is to stop polishing mock UI behavior and wire the real backend path around Gittrix.
+## Immediate priority order
 
-## Current reality snapshot (from code)
+1. Complete backend agent/session routes so frontend can stop simulating chat state.
+2. Wire frontend session/timeline to real API + SSE stream.
+3. Finish git mutation + terminal + attachments routes to unblock full in-app workflow.
 
-- Frontend shell/components exist, but `web/src/App.vue` still carries mock recents/sessions/diff payloads.
-- Diff endpoints are partially real (`/api/diff/sources|items|files|hunks|pack`), but `branch-compare` is still `501`.
-- Agent and session APIs are stubbed (`/api/agent/*` and most `/api/sessions/*` return `501`/placeholder).
-- Settings/keybindings/recents persistence is real and local-file-backed.
+## Execution sequence
 
-## Primary objective
+### 1) Backend runtime slice
 
-Adopt `gittrix` as glib's primary backend for model ephemeral storage routing:
+- Implement `/api/agent/sessions`, `send`, `stream`, `abort`, `delete`.
+- Implement durable session storage under `.glib/`.
+- Implement `/api/sessions` list/read/fork/delete/patch.
 
-- Agent writes only to ephemeral session repos.
-- Durable repo changes happen only through a human promotion action.
-- Promotion creates one clean synthetic commit on durable.
+### 2) Frontend data-plane switch
 
-## Execution order
+- Replace mock session/timeline state with API-backed data.
+- Consume SSE stream and reduce events into timeline.
+- Keep diff context handoff as first-class composer input.
 
-### 1) Backend contract freeze for Gittrix
-- [ ] Define glib↔gittrix mapping for session lifecycle (`start`, `list`, `diff`, `log`, `promote`).
-- [ ] Define API error contract for promotion conflicts and stale baseline.
-- [ ] Define session identity model (`glibSessionId` ↔ `gittrixSessionId`).
+### 3) Remaining API parity
 
-### 2) Backend integration slice (no UI polish work until this lands)
-- [ ] Add a `gittrix` service adapter in `server/src/services` and isolate all durable writes behind it.
-- [ ] Replace stubbed `/api/agent/*` routes with real turn orchestration in ephemeral workspaces.
-- [ ] Replace stubbed `/api/sessions/*` routes with gittrix-backed session listing/read/fork/delete semantics.
-- [ ] Add `/api/git/promote` (or equivalent) as a human-only promotion endpoint.
+- Implement `/api/git` mutations.
+- Implement `/api/term` WebSocket.
+- Implement `/api/attachments`.
+- Implement `/api/diff/branch-compare`.
 
-### 3) Frontend data-plane switch from mock to real
-- [ ] Remove mock session/diff/recents data from `App.vue`; hydrate from API on boot.
-- [ ] Wire Diff selection → Session composer context using real `/api/diff/pack` output.
-- [ ] Show promotion CTA/state in Session header and session timeline.
+### 4) Reliability pass
 
-### 4) Conflict + promotion UX hardening
-- [ ] Surface baseline conflict errors with explicit “rebase/review/retry promote” states.
-- [ ] Block any UI path that implies direct durable write from agent turns.
-- [ ] Add promotion result summary card (files promoted, commit sha, skipped/conflicted files).
-
-### 5) Acceptance gate for the Gittrix milestone
-- [ ] End-to-end: start session → agent edits ephemeral → human promote → one durable commit.
-- [ ] Verify no agent path can commit directly to durable branch.
-- [ ] Verify stale durable baseline is detected before promote.
-- [ ] Build + typecheck pass for `server`, `web`, and `shared`.
-
-## Tracking docs
-
-- Frontend execution checklist: `Docs/frontend-checklist.md`
-- Backend execution checklist: `Docs/backend-checklist.md`
+- Standardize error payloads.
+- Add integration-level route tests for core workflows.
+- Validate behavior across both hosts (dev web + Electron shell).

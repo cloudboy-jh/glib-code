@@ -1,63 +1,42 @@
-# Frontend Checklist — Gittrix Integration Track
+# Frontend Checklist
 
-Last updated: 2026-04-26
+Last updated: 2026-04-29
 
-This checklist is intentionally backend-coupled: frontend work here is about exposing and enforcing the Gittrix model (ephemeral agent work, human promotion gate), not cosmetic parity passes.
+## API wiring cleanup
 
-## A) Current baseline cleanup
+- [ ] Replace hardcoded `API_BASE` with env-driven config.
+- [ ] Remove remaining local/mock session data in `App.vue`.
+- [ ] Hydrate sessions from `/api/sessions` when backend routes are implemented.
+- [ ] Handle backend 404/501 states with explicit UI fallbacks (not silent failures).
 
-- [ ] Remove hardcoded `API_BASE` and mock app data in `web/src/App.vue`.
-- [ ] Load recents from `/api/projects/recents` on app boot.
-- [ ] Load current project from `/api/repo/current` (or explicit “no project” state).
-- [ ] Load sessions from `/api/sessions?projectId=...` instead of local reactive mocks.
-- [ ] Load diff sources/items/files/hunks from `/api/diff/*` end-to-end.
+## Diff → session context flow
 
-## B) Diff → context flow (real data only)
+- [ ] Expand diff selection from file-level to hunk-level context selection.
+- [ ] Support multi-select aggregation before creating context packet.
+- [ ] Keep context summary visible in composer before send.
+- [ ] Preserve selected context when switching between Diff and Session mode.
 
-- [ ] Keep drill-down selection state for source/item/file/hunk in client state.
-- [ ] Build context packet only via `/api/diff/pack` (no client-side diff assembly).
-- [ ] Attach packed context to composer before send.
-- [ ] Persist context block into timeline entries after send.
-- [ ] Support clear/remove context from composer before send.
+## Session and streaming
 
-## C) Session + streaming wiring
+- [ ] Create sessions via `/api/agent/sessions`.
+- [ ] Send prompts via `/api/agent/sessions/:id/send`.
+- [ ] Stream events via `/api/agent/sessions/:id/stream`.
+- [ ] Reduce streamed events into timeline entries.
+- [ ] Implement abort action using `DELETE /api/agent/sessions/:id/turn`.
 
-- [ ] Create session from `/api/agent/sessions` and store returned session id.
-- [ ] Send prompt via `/api/agent/sessions/:id/send`.
-- [ ] Open `EventSource` to `/api/agent/sessions/:id/stream`.
-- [ ] Reduce SSE `AgentEvent` stream into timeline UI state.
-- [ ] Handle abort action via `DELETE /api/agent/sessions/:id/turn`.
+## Terminal and attachments
 
-## D) Gittrix-specific UX contract
+- [ ] Replace simulated terminal output with `/api/term` WS flow.
+- [ ] Wire image/file uploads to `/api/attachments` endpoints once implemented.
 
-- [ ] Show explicit session storage mode badge: `Ephemeral (Gittrix)`.
-- [ ] Show “pending promote” state when ephemeral branch diverges.
-- [ ] Add a Promotion action in Session header (human-only).
-- [ ] Block/hide any “agent commit to durable” affordance.
-- [ ] Show promotion conflict/error states from backend payloads.
-- [ ] Show promotion success summary with durable commit sha.
+## UX integrity
 
-## E) Robustness + edge states
+- [ ] Keep picker keyboard controls working with all dialog states.
+- [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
+- [ ] Ensure command palette actions are disabled when backend capability is missing.
 
-- [ ] Empty state when project has zero sessions.
-- [ ] Empty state when session has zero turns.
-- [ ] Retry affordance for failed stream connection.
-- [ ] Recover gracefully when a session referenced by UI was evicted.
-- [ ] Preserve selected diff context when switching `Diff ↔ Session` mode.
+## Definition of done (frontend)
 
-## F) Keyboard/focus quality gates
-
-- [ ] `cmd/ctrl+k` opens command palette from all primary surfaces.
-- [ ] `cmd/ctrl+j` toggles terminal drawer without breaking composer focus.
-- [ ] `esc` closes top-most overlay first.
-- [ ] Dialog focus trap + focus return implemented for picker/settings/theme.
-
-## G) Done criteria for frontend Gittrix milestone
-
-- [ ] No mock recents/sessions/diff data remains in app shell.
-- [ ] User can select diff context, send prompt, stream response, and promote from UI.
-- [ ] Promotion status and conflict handling are visible without opening devtools.
-- [ ] App remains usable when promote is rejected due to baseline conflict.
-
-
-## All Modal interactions and content and layouts need to be adjusted. 
+- [ ] No critical workflow depends on mock-only data paths.
+- [ ] Diff review -> context attach -> prompt send -> streamed timeline works end-to-end.
+- [ ] Build and typecheck pass (`bun run --cwd web check`, `bun run --cwd web build`).

@@ -6,35 +6,25 @@
 
 Review-first AI coding workspace.
 
-Most agent tools make you prompt first and review later. glib-code flips that: browse git context first, then prompt with grounded context.
+## What exists right now
 
-## What it is
+- Monorepo with `server`, `web`, `desktop`, `shared`
+- Real project picker/open/init/create + recents persistence
+- Real diff API for uncommitted + commit history sources
+- Real settings + keybindings + readiness + health endpoints
+- Vue shell for diff/session workflows
 
-- Diff-first workflow for AI coding
-- Session/chat workspace for agent turns
-- Local-first Bun + Hono backend
-- Vue frontend with keyboard-first UX
-- Planned Gittrix-backed ephemeral session routing with human-only promote
+## Not finished yet
 
-## Current status
+- Agent runtime (`/api/agent/*` still 501)
+- Session persistence API (`/api/sessions/*` mostly placeholders)
+- Git mutation routes (most `/api/git/*` still 501)
+- Terminal WS and attachments routes
 
-Early alpha.
-
-Working now:
-- Project open/create + recents persistence
-- Core diff routes (`sources`, `items`, `files`, `hunks`, `pack`)
-- Settings + keybindings persistence
-- Main UI shell (picker, diff/session surfaces, command palette/settings/terminal UI)
-
-In progress / planned:
-- Full agent runtime + SSE stream
-- Session persistence + lifecycle routes
-- Promotion-gated durable writes via Gittrix
-- Branch compare, attachments, terminal WS backend
-
-## Quick start (dev)
+## Quick start
 
 Requirements:
+
 - Bun 1.x
 - Git
 
@@ -44,33 +34,23 @@ Install:
 bun install
 ```
 
-Run full dev stack (single terminal):
+Run dev stack:
 
 ```bash
 bun run dev
 ```
 
-Open the app at the Vite URL shown in terminal (usually `http://localhost:5173`).
+- API server: `http://127.0.0.1:4273`
+- Web app: `http://127.0.0.1:5173`
 
 ## Scripts
 
 ```bash
-bun run dev         # server + web with colored prefixed logs
-bun run dev:server  # backend on :4273
-bun run dev:web     # frontend via Vite
+bun run dev         # run server + web with prefixed logs
+bun run dev:server  # backend only (:4273)
+bun run dev:web     # frontend only (vite)
 bun run build       # build shared + server + web + desktop
 bun run check       # typecheck all workspaces
-```
-
-## Repo layout
-
-```txt
-glib-code/
-├── server/   # Bun + Hono API
-├── web/      # Vue + Vite frontend
-├── desktop/  # Electron wrapper
-├── shared/   # shared types/schemas/theme tokens
-└── Docs/     # product + architecture + implementation plans
 ```
 
 ## Docs
@@ -79,10 +59,8 @@ glib-code/
 - `Docs/Frontend.md`
 - `Docs/Backend.md`
 - `Docs/Agent.md`
+- `Docs/Onboarding.md`
 - `Docs/next-steps.md`
 - `Docs/frontend-checklist.md`
 - `Docs/backend-checklist.md`
-
-## Roadmap direction
-
-Primary backend direction is Gittrix integration for ephemeral model workspaces and human-gated promotion into durable repos.
+- `Docs/T3_UI_PARITY_CHECKLIST.md`
