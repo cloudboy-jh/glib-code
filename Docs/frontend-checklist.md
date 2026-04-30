@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## API wiring cleanup
 
@@ -8,6 +8,13 @@ Last updated: 2026-04-29
 - [ ] Remove remaining local/mock session data in `App.vue`.
 - [ ] Hydrate sessions from `/api/sessions` when backend routes are implemented.
 - [ ] Handle backend 404/501 states with explicit UI fallbacks (not silent failures).
+
+## Provider/model capability UX
+
+- [x] Consume dynamic provider/model capabilities from `/api/providers`.
+- [x] Replace static settings model input with provider-scoped selectors.
+- [ ] Surface opencode auth/capability failures with explicit UI messages.
+- [ ] Add project-level provider/model override UX + effective state labels.
 
 ## Diff → session context flow
 
@@ -34,6 +41,11 @@ Last updated: 2026-04-29
 - [ ] Keep picker keyboard controls working with all dialog states.
 - [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
+
+## Picker home controls
+
+- [x] Add home controls for Theme, GitTrix settings, and Model access.
+- [ ] Keep behavior parity between home quick controls and Settings modal.
 
 ## Definition of done (frontend)
 

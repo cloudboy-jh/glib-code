@@ -1,11 +1,11 @@
 # Backend Checklist
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Core route completion
 
-- [ ] Implement `/api/agent/*` route group (currently all 501).
-- [ ] Implement `/api/sessions/*` route group beyond placeholder list/not-found.
+- [x] Implement `/api/agent/*` route group (create/send/stream/abort/delete).
+- [x] Implement `/api/sessions/*` route group (list/read/fork/delete/patch).
 - [ ] Implement `/api/term` WebSocket transport.
 - [ ] Implement `/api/attachments` upload/read/delete routes.
 - [ ] Implement git mutation routes under `/api/git` (stage/commit/push/etc).
@@ -13,16 +13,24 @@ Last updated: 2026-04-29
 
 ## Agent runtime
 
-- [ ] Add robust `opencode` process manager.
-- [ ] Add SSE event fanout for active session streams.
+- [x] Add `opencode` subprocess manager.
+- [x] Add SSE event fanout for active session streams.
 - [ ] Normalize and validate event payloads against shared contracts.
 - [ ] Add clean abort/timeout handling per turn.
 
 ## Session persistence
 
-- [ ] Store session metadata and timeline events in repo-local `.glib/`.
+- [x] Store session metadata and timeline events in repo-local `.glib/`.
 - [ ] Implement list/read/fork/delete semantics.
 - [ ] Ensure project switching does not cross-contaminate session data.
+
+## Provider/model authority
+
+- [x] Use opencode discovery as source of truth for provider/model availability.
+- [x] Expose discovery-backed `/api/providers`.
+- [x] Validate provider/model defaults and project overrides against discovered capabilities.
+- [x] Validate session create/send against discovered capabilities.
+- [x] Remove backend static provider/model catalogs and backend key-write ownership.
 
 ## State and safety
 
@@ -37,7 +45,7 @@ Last updated: 2026-04-29
 
 ## Definition of done (backend)
 
-- [ ] Agent routes run real turns with streaming.
+- [x] Agent routes run real turns with streaming.
 - [ ] Sessions persist and replay across server restarts.
 - [ ] Git and diff route surface matches what frontend advertises.
 - [ ] Typecheck + build pass (`bun run --cwd server check`, `bun run --cwd server build`).

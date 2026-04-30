@@ -1,6 +1,6 @@
 # UI Parity / Consistency Checklist
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 This is now a practical checklist for current `web/` implementation quality, not a source-locked mirror document.
 
@@ -28,6 +28,9 @@ This is now a practical checklist for current `web/` implementation quality, not
 - [ ] Empty session and empty timeline states are distinct and intentional.
 - [ ] Composer command interactions work with keyboard only.
 - [ ] Command palette actions respect current mode/project availability.
+- [ ] Provider/model selectors reflect backend capability state exactly.
+- [ ] Unavailable providers/models are never selectable.
+- [ ] Provider/model error states are explicit and actionable.
 
 ## Overlay behavior
 

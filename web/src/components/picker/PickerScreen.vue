@@ -57,21 +57,28 @@
 
     <section class="mt-8">
       <div class="mb-3 flex items-center gap-3">
-        <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Appearance</span>
+        <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Home Controls</span>
         <div class="h-px flex-1 bg-border/80" />
       </div>
 
-      <button :class="['picker-row', pickerIndex === lastPickerIndex ? 'picker-row-active' : '']" @click="emit('openTheme')">
-        <span class="picker-row-left"><Palette class="h-4 w-4" /><span>Theme</span></span>
-        <span class="picker-kbd">Customize</span>
-      </button>
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <button class="picker-row !justify-start" @click="emit('openTheme')">
+          <span class="picker-row-left"><Palette class="h-4 w-4" /><span>Theme</span></span>
+        </button>
+        <button class="picker-row !justify-start" @click="emit('openGittrix')">
+          <span class="picker-row-left"><SlidersHorizontal class="h-4 w-4" /><span>GitTrix</span></span>
+        </button>
+        <button class="picker-row !justify-start" @click="emit('openModel')">
+          <span class="picker-row-left"><Bot class="h-4 w-4" /><span>Model</span></span>
+        </button>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Command, FolderOpen, GitBranch, Palette } from 'lucide-vue-next';
+import { Bot, Command, FolderOpen, GitBranch, Palette, SlidersHorizontal } from 'lucide-vue-next';
 import RecentList from './RecentList.vue';
 
 const props = defineProps<{
@@ -88,13 +95,15 @@ const emit = defineEmits<{
   removeRecent: [id: string];
   forgetRecent: [id: string];
   openTheme: [];
+  openGittrix: [];
+  openModel: [];
   selectProjectMode: [mode: 'diff' | 'session'];
   cancelProjectMode: [];
 }>();
 
 const pickerIndex = ref(0);
 const pendingMode = ref<'diff' | 'session'>('diff');
-const totalPickerRows = computed(() => 4 + props.recents.length);
+const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
 
 watch(totalPickerRows, (count) => {
@@ -118,7 +127,7 @@ function runPickerSelection(index: number) {
   else if (index <= 2 + props.recents.length) {
     const recent = props.recents[index - 3];
     if (recent && recent.status === 'ok') emit('openRecent', recent.path);
-  } else emit('openTheme');
+  }
 }
 
 function onPickerKeydown(event: KeyboardEvent) {

@@ -25,10 +25,33 @@
 
         <section class="space-y-6 p-4">
           <template v-if="tab === 'General'">
-            <div>
+            <div class="space-y-4">
               <p class="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Model defaults</p>
-              <label class="mb-1 block text-xs text-muted-foreground">Default model</label>
-              <UiInput :model-value="settings.defaultModel" @update:model-value="$emit('update:model', $event)" />
+              <div>
+                <label class="mb-1 block text-xs text-muted-foreground">Default provider</label>
+                <select
+                  class="h-9 w-full rounded-md border border-border/70 bg-background px-2 text-sm"
+                  :value="settings.defaultProvider"
+                  @change="$emit('update:provider', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="provider in providers" :key="provider.id" :value="provider.id" :disabled="!provider.hasAuth">
+                    {{ provider.id }}{{ provider.hasAuth ? '' : ' (not authenticated)' }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="mb-1 block text-xs text-muted-foreground">Default model</label>
+                <select
+                  class="h-9 w-full rounded-md border border-border/70 bg-background px-2 text-sm"
+                  :value="settings.defaultModel"
+                  @change="$emit('update:model', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="modelId in activeModelIds" :key="modelId" :value="modelId">{{ modelId }}</option>
+                </select>
+              </div>
+
+              <p v-if="!activeProvider?.hasAuth" class="text-xs text-amber-400">Provider not authenticated in opencode.</p>
             </div>
           </template>
 
@@ -52,14 +75,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import UiInput from '../ui/input.vue';
+import { computed, ref } from 'vue';
 import ThemePicker from './ThemePicker.vue';
 import KeybindingsEditor from './KeybindingsEditor.vue';
 
-defineProps<{ settings: { themePreset: string; defaultModel: string }; keybindings: Array<{ command: string; key: string }> }>();
-defineEmits<{ close: []; 'update:theme': [value: string]; 'update:model': [value: string]; 'update:keybinding': [command: string, key: string] }>();
+const props = defineProps<{
+  settings: { themePreset: string; defaultProvider: string; defaultModel: string };
+  keybindings: Array<{ command: string; key: string }>;
+  providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
+}>();
+defineEmits<{
+  close: [];
+  'update:theme': [value: string];
+  'update:provider': [value: string];
+  'update:model': [value: string];
+  'update:keybinding': [command: string, key: string];
+}>();
 
 const tabs = ['General', 'Appearance', 'Keybindings'] as const;
 const tab = ref<(typeof tabs)[number]>('General');
+
+const activeProvider = computed(() => props.providers.find((provider) => provider.id === props.settings.defaultProvider));
+const activeModelIds = computed(() => activeProvider.value?.modelIds ?? []);
 </script>

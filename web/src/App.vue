@@ -49,6 +49,8 @@
                 @open-clone="state.cloneDialogOpen = true"
                 @open-palette="openCommandPalette"
                 @open-theme="state.themeDialogOpen = true"
+                @open-gittrix="state.settingsOpen = true"
+                @open-model="state.settingsOpen = true"
                 @open-recent="openRecentProject"
                 @remove-recent="removeRecentProject"
                 @forget-recent="forgetRecentProject"
@@ -117,8 +119,10 @@
       v-if="state.settingsOpen"
       :settings="settings"
       :keybindings="keybindings"
+      :providers="providerCapabilities.providers"
       @close="state.settingsOpen = false"
       @update:theme="settings.themePreset = $event"
+      @update:provider="updateDefaultProvider"
       @update:model="settings.defaultModel = $event"
       @update:keybinding="updateKeybinding"
     />
@@ -236,6 +240,7 @@ type TimelineEntry = {
 type PendingProjectOpen = { name: string; path: string };
 type RecentStatus = 'ok' | 'missing_path' | 'missing_git';
 type RecentEntry = { id: string; name: string; path: string; lastOpenedAt: string; status: RecentStatus };
+type ProviderCapability = { id: string; hasAuth: boolean; modelIds: string[] };
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
 
@@ -257,7 +262,14 @@ const activeSessionIdByProject = reactive<Record<string, string>>({});
 
 const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
+  defaultProvider: 'codex',
   defaultModel: 'gpt-5.3-codex'
+});
+
+const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: ProviderCapability[] }>({
+  ok: false,
+  error: undefined,
+  providers: []
 });
 
 const keybindings = reactive([
@@ -363,6 +375,16 @@ async function apiDelete(path: string): Promise<void> {
   if (!response.ok) throw new Error(`request failed: ${response.status}`);
 }
 
+async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
 function replaceRecents(next: RecentEntry[]) {
   recents.splice(0, recents.length, ...next);
 }
@@ -377,6 +399,15 @@ async function hydrateRecents() {
       status: statusById.get(row.id) ?? 'ok'
     }))
   );
+}
+
+async function hydrateProviders() {
+  const providers = await apiGet<{ ok: boolean; error?: string; defaultProvider: string; defaultModel: string; providers: ProviderCapability[] }>('/providers');
+  providerCapabilities.ok = providers.ok;
+  providerCapabilities.error = providers.error;
+  providerCapabilities.providers = providers.providers;
+  settings.defaultProvider = providers.defaultProvider;
+  settings.defaultModel = providers.defaultModel;
 }
 
 function clampSidebarWidth(width: number) {
@@ -720,6 +751,37 @@ function updateKeybinding(command: string, key: string) {
   if (row) row.key = key;
 }
 
+async function updateDefaultProvider(providerId: string) {
+  const provider = providerCapabilities.providers.find((item) => item.id === providerId);
+  if (!provider || !provider.hasAuth) return;
+  const nextModel = provider.modelIds[0] ?? settings.defaultModel;
+  const saved = await apiPatch<{ defaultProvider: string; defaultModel: string }>('/providers/defaults', {
+    defaultProvider: providerId,
+    defaultModel: nextModel
+  });
+  settings.defaultProvider = saved.defaultProvider;
+  settings.defaultModel = saved.defaultModel;
+}
+
+watch(
+  () => settings.defaultModel,
+  async (nextModel, prevModel) => {
+    if (!nextModel || !settings.defaultProvider) return;
+    if (nextModel === prevModel) return;
+    const provider = providerCapabilities.providers.find((item) => item.id === settings.defaultProvider);
+    if (!provider) return;
+    if (provider.modelIds.length > 0 && !provider.modelIds.includes(nextModel)) return;
+    try {
+      await apiPatch('/providers/defaults', {
+        defaultProvider: settings.defaultProvider,
+        defaultModel: nextModel
+      });
+    } catch {
+      // keep UI responsive, next hydrate will reconcile
+    }
+  }
+);
+
 function runComposerCommand(command: string) {
   if (command === 'help') {
     openCommandPalette();
@@ -845,6 +907,7 @@ onMounted(() => {
     }
   }
   void hydrateRecents().catch(() => undefined);
+  void hydrateProviders().catch(() => undefined);
   window.addEventListener('keydown', onGlobalKeydown);
 });
 

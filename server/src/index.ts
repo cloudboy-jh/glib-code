@@ -15,6 +15,7 @@ import { keybindingsRoutes } from "./routes/keybindings";
 import { attachmentsRoutes } from "./routes/attachments";
 import { termRoutes } from "./routes/term";
 import { bootState } from "./services/state";
+import { providersRoutes } from "./routes/providers";
 
 const app = new Hono();
 
@@ -35,6 +36,7 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/keybindings", keybindingsRoutes);
 app.route("/api/attachments", attachmentsRoutes);
 app.route("/api/term", termRoutes);
+app.route("/api/providers", providersRoutes);
 
 export type AppType = typeof app;
 

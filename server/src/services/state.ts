@@ -13,6 +13,7 @@ export type ProjectEntry = {
 export type Settings = {
   themePreset: string;
   timestampFormat: "24-hour" | "12-hour" | "locale";
+  defaultProvider: string;
   defaultModel: string;
   confirmDestroy: boolean;
   telemetryOptIn: boolean;
@@ -20,14 +21,30 @@ export type Settings = {
   maxImageAttachmentMb: number;
 };
 
+export type ProvidersState = {
+  defaultProvider: string;
+  defaultModel: string;
+};
+
+export type ProjectOverride = {
+  provider?: string;
+  model?: string;
+};
+
 const DEFAULT_SETTINGS: Settings = {
   themePreset: "tokyo-night",
   timestampFormat: "24-hour",
+  defaultProvider: "codex",
   defaultModel: "claude-opus-4.7",
   confirmDestroy: true,
   telemetryOptIn: false,
   opencodeBinaryPath: "",
   maxImageAttachmentMb: 10
+};
+
+const DEFAULT_PROVIDERS_STATE: ProvidersState = {
+  defaultProvider: "codex",
+  defaultModel: "gpt-5-codex"
 };
 
 const DEFAULT_KEYBINDINGS = {
@@ -43,11 +60,13 @@ const DEFAULT_KEYBINDINGS = {
 type Store = {
   currentProjectId: string | null;
   projectsById: Map<string, { id: string; name: string; path: string; branch: string; isGitRepo: true }>;
+  projectOverrides: Map<string, ProjectOverride>;
 };
 
 const store: Store = {
   currentProjectId: null,
-  projectsById: new Map()
+  projectsById: new Map(),
+  projectOverrides: new Map()
 };
 
 function cfg(name: string) {
@@ -114,6 +133,25 @@ export async function resetSettings() {
   return DEFAULT_SETTINGS;
 }
 
+export async function getProvidersState() {
+  const loaded = await readJson<Partial<ProvidersState>>(cfg("providers.json"), {});
+  return {
+    defaultProvider: loaded.defaultProvider ?? DEFAULT_PROVIDERS_STATE.defaultProvider,
+    defaultModel: loaded.defaultModel ?? DEFAULT_PROVIDERS_STATE.defaultModel
+  } as ProvidersState;
+}
+
+export async function patchProviderDefaults(partial: { defaultProvider?: string; defaultModel?: string }) {
+  const current = await getProvidersState();
+  const next: ProvidersState = {
+    ...current,
+    defaultProvider: partial.defaultProvider ?? current.defaultProvider,
+    defaultModel: partial.defaultModel ?? current.defaultModel
+  };
+  await writeAtomic(cfg("providers.json"), next);
+  return next;
+}
+
 export async function getKeybindings() {
   return readJson(cfg("keybindings.json"), DEFAULT_KEYBINDINGS);
 }
@@ -142,4 +180,14 @@ export function registerProject(project: { id: string; name: string; path: strin
 
 export function getProjectById(id: string) {
   return store.projectsById.get(id) ?? null;
+}
+
+export function setProjectOverride(projectId: string, override: ProjectOverride) {
+  const next = { ...(store.projectOverrides.get(projectId) ?? {}), ...override };
+  store.projectOverrides.set(projectId, next);
+  return next;
+}
+
+export function getProjectOverride(projectId: string) {
+  return store.projectOverrides.get(projectId) ?? null;
 }

@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Server entry
 
@@ -21,7 +21,8 @@ Last updated: 2026-04-29
   - `/api/settings`
   - `/api/keybindings`
   - `/api/attachments`
-  - `/api/term`
+- `/api/term`
+  - `/api/providers`
 
 ## Implemented routes
 
@@ -35,6 +36,19 @@ Last updated: 2026-04-29
   - `gh --version`
 - 30s in-memory cache.
 - Uses shared schema type `ReadinessReport` from `shared/src/schemas/readiness.ts`.
+- Provider readiness is derived from shared opencode capability discovery.
+
+### Providers
+
+- `GET /api/providers`
+- `PATCH /api/providers/defaults`
+
+Behavior:
+
+- Backed by opencode capability discovery service (`opencode auth list` + model discovery).
+- Returns dynamic provider/model availability and current backend-selected defaults.
+- No static provider/model catalog in backend.
+- No backend key-write endpoints; auth is opencode-owned.
 
 ### Health
 
@@ -127,8 +141,8 @@ Stored in config dir `keybindings.json`.
 
 ## Placeholder route groups (not implemented yet)
 
-- `/api/agent/*` -> all 501
-- `/api/sessions/*` -> empty list + mostly 501
+- `/api/agent/*` -> implemented create/send/stream/abort/delete with subprocess + SSE
+- `/api/sessions/*` -> implemented list/read/fork/delete/patch on repo-local `.glib/sessions`
 - `/api/attachments/*` -> all 501
 - `/api/term` -> 501
 
@@ -229,7 +243,8 @@ Surface sinks:
 
 ## Gaps to close
 
-- Replace 501 routes with real agent/session/git mutation/terminal/attachments flows.
+- Wire GitTrixService boundary for session.write/promote/evict.
+- Replace remaining 501 routes with real git mutation/terminal/attachments flows.
 - Move current-project state from in-memory global to client/session-aware storage.
 - Make diff sources consistent: if `branches`/`prs` are advertised, they need implementation.
 

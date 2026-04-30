@@ -1,6 +1,6 @@
 # Onboarding and First-Run Flow (Current)
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## What exists today
 
@@ -37,10 +37,16 @@ Endpoint:
 Checks:
 
 - `git`
-- `opencode` + configured providers
+- `opencode` + authenticated providers (source of truth for provider/model availability)
 - `gh` (optional for future PR integrations)
 
 This is the canonical dependency health report for startup UX.
+
+Provider/model capability endpoint:
+
+- `GET /api/providers`
+
+If providers/models are unavailable there, UI provider/model controls must reflect that and block session creation/send.
 
 ## Auth state
 

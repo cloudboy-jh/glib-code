@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { ReadinessReport } from "@glib-code/shared/schemas/readiness";
+import { getOpencodeCapabilities } from "../services/opencode-capabilities";
 
 type Cached = {
   at: number;
@@ -36,8 +37,11 @@ export const readinessRoutes = new Hono().get("/", async (c) => {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  const capabilities = await getOpencodeCapabilities();
+  const readyProviders = capabilities.providers.filter((p) => p.hasAuth).map((p) => p.id);
+
   const value: ReadinessReport = {
-    ok: git.ok && opencodeVersion.ok && providers.length > 0,
+    ok: git.ok && opencodeVersion.ok && providers.length > 0 && readyProviders.length > 0,
     checks: {
       git: {
         ok: git.ok,

@@ -1,13 +1,13 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## App shell
 
 - Entry: `web/src/App.vue`
 - Framework: Vue 3 composition API
 - Styling: Tailwind + shared theme tokens
-- API target: hardcoded `http://127.0.0.1:4273/api`
+- API target: currently hardcoded `http://127.0.0.1:4273/api` (still needs env switch)
 
 Primary surfaces:
 
@@ -18,6 +18,12 @@ Primary surfaces:
 - Settings modal
 - Theme dialog
 - Terminal drawer (UI-only simulation)
+
+Home surface controls in Picker now include:
+
+- Theme quick control
+- GitTrix/settings quick control
+- Model/settings quick control
 
 ## Data split (real vs mock)
 
@@ -33,6 +39,11 @@ Still local/mock in frontend state:
 - Composer send behavior (no backend streaming yet)
 - Terminal output text
 - Some project/session transitions are still UI-driven fallbacks
+
+Now API-backed in settings plane:
+
+- Provider/model capability list via `/api/providers` (opencode-discovered)
+- Default provider/model updates via `/api/providers/defaults`
 
 ## Picker flow
 
@@ -101,3 +112,4 @@ Current state:
 - Replace local send simulation with `/api/agent/sessions/:id/send` + SSE stream.
 - Remove hardcoded API base and use env/config.
 - Wire real terminal WS when backend `/api/term` is implemented.
+- Add project-level provider/model override UX with effective-state display.

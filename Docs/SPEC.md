@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 glib-code is a local-first AI coding workspace centered on this loop:
 
@@ -17,7 +17,7 @@ glib-code is a local-first AI coding workspace centered on this loop:
 ## Reality check
 
 - The backend/API and picker/diff/settings/keybindings flows are real.
-- Agent runtime, session persistence, terminal WS, and attachments are still placeholder routes.
+- GitTrix promote/write boundary, terminal WS, and attachments are still incomplete.
 - Some frontend views still use local reactive mock data around session timelines.
 
 ## Stack
@@ -46,6 +46,12 @@ Hono server (server/)
 ```
 
 GitTrix is orthogonal to product surface. Self-host, desktop, and hosted all keep GitTrix between glib and filesystem/git; the surface only changes which adapters are configured. glib does not wire backend-specific adapter internals directly.
+
+## Provider/model authority
+
+- opencode is the source of truth for provider auth + model availability.
+- glib does not maintain an independent static provider/model catalog.
+- backend stores only defaults/overrides/session snapshots and validates those selections against opencode-discovered capabilities.
 
 ## Monorepo layout
 
@@ -98,7 +104,8 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes `@gi
 2. Land current-project ownership model beyond process-local memory.
 3. Implement session lifecycle API routes in `server/`.
 4. Implement opencode subprocess spawn, streaming (`--format json`), and event normalization.
-5. Persist session timeline/events under glib state storage.
+5. Keep `/api/providers` discovery-backed from opencode and validate defaults/overrides/session create/send against that capability state.
+6. Persist session timeline/events under glib state storage.
 6. Wire `@gittrix/core` into `server/` — instantiate `GitTrix` with `adapter-local` for durable + ephemeral on first run, configurable per surface.
 7. Map glib session ↔ gittrix session — the `glibSessionId ↔ gittrixSessionId` table, what survives a glib restart, what doesn’t.
 8. Route the agent’s writes through `session.write()` — opencode write/edit tool calls land in ephemeral, not durable. InlineDiff reads `session.diff()`.

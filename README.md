@@ -12,14 +12,20 @@ Review-first AI coding workspace.
 - Real project picker/open/init/create + recents persistence
 - Real diff API for uncommitted + commit history sources
 - Real settings + keybindings + readiness + health endpoints
+- Provider/model capability API backed by opencode discovery (`/api/providers`)
 - Vue shell for diff/session workflows
 
 ## Not finished yet
 
-- Agent runtime (`/api/agent/*` still 501)
-- Session persistence API (`/api/sessions/*` mostly placeholders)
+- GitTrix service boundary wiring (`session.write/promote/evict`)
 - Git mutation routes (most `/api/git/*` still 501)
 - Terminal WS and attachments routes
+
+## Runtime authority boundary
+
+- opencode owns provider/model/auth truth.
+- glib backend stores selection state (defaults/overrides/session snapshot) and validates against opencode capabilities.
+- glib frontend renders capability state from backend; it does not hardcode provider/model catalogs.
 
 ## Quick start
 

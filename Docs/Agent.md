@@ -1,18 +1,12 @@
 # Agent Integration Status
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Current truth
 
-- All server agent routes are stubs right now:
-  - `POST /api/agent/sessions`
-  - `POST /api/agent/sessions/:id/send`
-  - `GET /api/agent/sessions/:id/stream`
-  - `DELETE /api/agent/sessions/:id/turn`
-  - `DELETE /api/agent/sessions/:id`
-- They return `501 not implemented`.
-
-So there is no real runtime process orchestration, no SSE event stream, and no persisted turn log yet.
+- Server agent routes now exist for create/send/stream/abort/delete.
+- Runtime spawns opencode subprocess turns and emits normalized events to SSE.
+- Session events are persisted under repo-local `.glib/sessions`.
 
 ## What already exists in shared contracts
 
@@ -34,10 +28,14 @@ When implemented, agent flow should be:
 5. Emit normalized events over SSE
 6. Persist events under repo-local `.glib/` session storage
 
+## Provider/model authority
+
+- Provider/model availability and auth status are opencode-owned.
+- Session create and send validate against opencode-discovered capabilities.
+- Session stores provider/model snapshot at creation; send re-validates current availability.
+
 ## Blocking gaps
 
-- Session lifecycle endpoints are mostly placeholders (`/api/sessions`).
 - Attachments endpoints are placeholders (`/api/attachments`).
 - Terminal transport is placeholder (`/api/term`).
-
-Until those land, the session UI remains mostly a shell around local state.
+- GitTrix `session.write/promote/evict` service boundary wiring still needs landing.
