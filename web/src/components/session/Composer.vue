@@ -1,5 +1,5 @@
 <template>
-  <div class="px-3 pb-3 pt-1.5 sm:px-5 sm:pt-2">
+  <div class="shrink-0 px-3 pb-3 pt-1.5 sm:px-5 sm:pt-2">
     <div class="mx-auto w-full max-w-5xl rounded-[22px] border border-border/80 bg-card/90 p-2.5 shadow-sm shadow-black/10 sm:p-3">
       <ComposerInput
         ref="composerInputRef"

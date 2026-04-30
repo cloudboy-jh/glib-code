@@ -124,7 +124,6 @@ function getOptions(): BaseDiffOptions {
   return {
     diffStyle: props.diffStyle,
     diffIndicators: 'bars',
-    hunkSeparators: 'line-info-basic',
     lineDiffType: 'word-alt',
     maxLineDiffLength: 2000,
     expandUnchanged: true,

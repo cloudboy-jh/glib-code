@@ -24,7 +24,7 @@
         />
       </div>
 
-      <section :class="['grid h-full', currentProject ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
+      <section :class="['grid h-full min-h-0 min-w-0', currentProject ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
         <SessionHeader
           v-if="currentProject"
           :title="activeSession?.title ?? 'No active session'"
@@ -37,7 +37,7 @@
           @git-action="noop"
         />
 
-        <main class="min-h-0">
+        <main class="min-h-0 min-w-0 overflow-hidden">
           <template v-if="!currentProject">
             <div class="grid h-full place-items-center px-6">
               <PickerScreen
@@ -61,7 +61,14 @@
           <template v-else>
             <template v-if="state.mode === 'session'">
               <template v-if="activeSession">
-                <div class="grid h-full grid-rows-[1fr_auto]">
+                <div class="grid h-full min-h-0 min-w-0 grid-rows-[auto_1fr_auto] overflow-hidden">
+                  <SessionContextCapsule
+                    v-if="activeContextBundle"
+                    :summary="activeContextSummary"
+                    @view="state.contextViewerOpen = true"
+                    @remove="removeActiveContext"
+                    @back-to-diffs="state.mode = 'diff'"
+                  />
                   <Timeline :entries="activeTimeline" />
                   <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @send="sendPrompt" @execute-command="runComposerCommand" />
                 </div>
@@ -149,6 +156,20 @@
       @update:destination="picker.cloneDestination = $event"
       @clone="cloneRepository"
     />
+
+    <div
+      v-if="state.contextViewerOpen && activeContextBundle"
+      class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6"
+      @click.self="state.contextViewerOpen = false"
+    >
+      <div class="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+        <div class="flex items-center justify-between border-b border-border/70 px-4 py-3">
+          <div class="text-sm font-medium">Context payload · {{ activeContextSummary }}</div>
+          <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.contextViewerOpen = false">Close</button>
+        </div>
+        <pre class="max-h-[75vh] overflow-auto p-4 text-xs leading-6 text-foreground/95">{{ activeContextBundle.payload }}</pre>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -163,6 +184,7 @@ import PickerScreen from './components/picker/PickerScreen.vue';
 import ThemeDialog from './components/picker/ThemeDialog.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
 import Composer from './components/session/Composer.vue';
+import SessionContextCapsule from './components/session/SessionContextCapsule.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
 import SessionSidebar from './components/session/SessionSidebar.vue';
 import Timeline from './components/session/Timeline.vue';
@@ -189,6 +211,18 @@ type Session = {
   repo: string;
   project: string;
   projectPath: string;
+};
+
+type ContextBundle = {
+  id: string;
+  sessionId: string;
+  projectPath: string;
+  sourceType: 'commit' | 'uncommitted' | 'selection';
+  sourceRef?: string;
+  selectedFile?: string;
+  fileCount: number;
+  charCount: number;
+  payload: string;
 };
 
 type TimelineEntry = {
@@ -218,6 +252,8 @@ const pendingProjectOpen = ref<PendingProjectOpen | null>(null);
 const sessions = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
 const sessionContextById = reactive<Record<string, string>>({});
+const contextBundleBySessionId = reactive<Record<string, ContextBundle | undefined>>({});
+const activeSessionIdByProject = reactive<Record<string, string>>({});
 
 const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
@@ -243,7 +279,8 @@ const state = reactive({
   openProjectDialogOpen: false,
   themeDialogOpen: false,
   cloneDialogOpen: false,
-  diffStyle: 'split' as 'split' | 'unified'
+  diffStyle: 'split' as 'split' | 'unified',
+  contextViewerOpen: false
 });
 
 const forms = reactive({
@@ -262,6 +299,15 @@ const paletteCommands = [
 ];
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
+const activeContextBundle = computed(() => (state.activeSessionId ? contextBundleBySessionId[state.activeSessionId] : undefined));
+const activeContextSummary = computed(() => {
+  const ctx = activeContextBundle.value;
+  if (!ctx) return '';
+  const source = ctx.sourceType === 'commit' && ctx.sourceRef ? `commit ${ctx.sourceRef.slice(0, 7)}` : ctx.sourceType === 'uncommitted' ? 'working tree' : 'selection';
+  const fileMeta = `${ctx.fileCount} file${ctx.fileCount === 1 ? '' : 's'}`;
+  const sizeMeta = `${Math.max(1, Math.round(ctx.charCount / 1000))}k chars`;
+  return `${source} · ${fileMeta} · ${sizeMeta}`;
+});
 
 const activeTimeline = computed(() => {
   if (!state.activeSessionId) return [];
@@ -384,8 +430,9 @@ function startSidebarResize(event: MouseEvent) {
 }
 
 function openProject(projectName: string, path: string, mode: 'diff' | 'session') {
-  const id = currentProject.value?.path === path ? currentProject.value.id : `proj-${Date.now()}`;
-  currentProject.value = { id, name: projectName, branch: 'main', path };
+  const normalizedPath = path.replace(/\\/g, '/');
+  const id = normalizedPath;
+  currentProject.value = { id, name: projectName, branch: 'main', path: normalizedPath };
 
   const existingRecent = recents.find((r) => r.path === path);
   if (!existingRecent) {
@@ -396,6 +443,7 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
   }
 
   state.mode = mode;
+  state.activeSessionId = activeSessionIdByProject[id] ?? '';
   forms.prompt = '';
 }
 
@@ -413,7 +461,7 @@ function queueProjectOpen(projectName: string, path: string) {
 function finalizeProjectOpen(mode: 'diff' | 'session') {
   if (!pendingProjectOpen.value) return;
   openProject(pendingProjectOpen.value.name, pendingProjectOpen.value.path, mode);
-  if (mode === 'session' && !activeSession.value) {
+  if (mode === 'session' && !state.activeSessionId) {
     createSession();
   }
   closeProjectOpenModeDialog();
@@ -531,7 +579,9 @@ function createSession(options?: { title?: string; context?: string; initialEntr
   timelineBySessionId[id] = options?.initialEntries ?? [];
   sessionContextById[id] = options?.context ?? '';
   state.activeSessionId = id;
+  activeSessionIdByProject[currentProject.value.id] = id;
   state.mode = 'session';
+  persistSessionState();
 }
 
 async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }) {
@@ -543,17 +593,33 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
   const context = payload.source === 'commit' && payload.ref
     ? `commit ${payload.ref.slice(0, 7)}`
     : 'working tree changes';
+  const diff = packed.diff?.trim() || 'No diff context available.';
   createSession({
     title: `Session from ${context}`,
     context,
     initialEntries: [{
       id: 'e1',
-      kind: 'Context',
-      text: packed.diff?.trim() || 'No diff context available.',
+      kind: 'System',
+      text: `Context attached: ${context} · ${payload.file ? 1 : 'selected'} file scope`,
       time: 'now',
       level: 'info'
     }]
   });
+
+  if (state.activeSessionId && currentProject.value) {
+    contextBundleBySessionId[state.activeSessionId] = {
+      id: `ctx-${Date.now()}`,
+      sessionId: state.activeSessionId,
+      projectPath: currentProject.value.path,
+      sourceType: payload.source,
+      sourceRef: payload.ref,
+      selectedFile: payload.file,
+      fileCount: payload.file ? 1 : Math.max(1, (diff.match(/^diff --git /gm) ?? []).length),
+      charCount: diff.length,
+      payload: diff
+    };
+  }
+  persistSessionState();
 }
 
 function selectSessionFromSidebar(sessionId: string) {
@@ -561,9 +627,11 @@ function selectSessionFromSidebar(sessionId: string) {
   if (!session) return;
 
   state.activeSessionId = sessionId;
+  if (currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
 
   if (!currentProject.value || currentProject.value.path !== session.projectPath) {
     const sessionPath = session.projectPath || `C:/repos/${session.project || session.repo || 'project'}`;
+    activeSessionIdByProject[sessionPath.replace(/\\/g, '/')] = sessionId;
     const recentName = recents.find((recent) => recent.path === sessionPath)?.name;
     const projectName = recentName || session.repo || session.project || 'project';
     openProject(projectName, sessionPath, 'session');
@@ -571,6 +639,7 @@ function selectSessionFromSidebar(sessionId: string) {
   }
 
   state.mode = 'session';
+  persistSessionState();
 }
 
 function sendPrompt() {
@@ -578,6 +647,48 @@ function sendPrompt() {
   const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
   list.push({ id: `e${list.length + 1}`, kind: 'User', text: forms.prompt, time: 'now', level: 'info' });
   forms.prompt = '';
+  persistSessionState();
+}
+
+function removeActiveContext() {
+  if (!state.activeSessionId) return;
+  if (!contextBundleBySessionId[state.activeSessionId]) return;
+  contextBundleBySessionId[state.activeSessionId] = undefined;
+  const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
+  list.push({ id: `e${list.length + 1}`, kind: 'System', text: 'Context removed from session.', time: 'now', level: 'info' });
+  persistSessionState();
+}
+
+function persistSessionState() {
+  const snapshot = {
+    sessions: JSON.parse(JSON.stringify(sessions)) as Session[],
+    timelineBySessionId: JSON.parse(JSON.stringify(timelineBySessionId)) as Record<string, TimelineEntry[]>,
+    sessionContextById: JSON.parse(JSON.stringify(sessionContextById)) as Record<string, string>,
+    contextBundleBySessionId: JSON.parse(JSON.stringify(contextBundleBySessionId)) as Record<string, ContextBundle | undefined>,
+    activeSessionIdByProject: JSON.parse(JSON.stringify(activeSessionIdByProject)) as Record<string, string>
+  };
+  localStorage.setItem('glib-session-state-v1', JSON.stringify(snapshot));
+}
+
+function hydrateSessionState() {
+  const raw = localStorage.getItem('glib-session-state-v1');
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw) as {
+      sessions?: Session[];
+      timelineBySessionId?: Record<string, TimelineEntry[]>;
+      sessionContextById?: Record<string, string>;
+      contextBundleBySessionId?: Record<string, ContextBundle | undefined>;
+      activeSessionIdByProject?: Record<string, string>;
+    };
+    if (Array.isArray(parsed.sessions)) sessions.splice(0, sessions.length, ...parsed.sessions);
+    Object.assign(timelineBySessionId, parsed.timelineBySessionId ?? {});
+    Object.assign(sessionContextById, parsed.sessionContextById ?? {});
+    Object.assign(contextBundleBySessionId, parsed.contextBundleBySessionId ?? {});
+    Object.assign(activeSessionIdByProject, parsed.activeSessionIdByProject ?? {});
+  } catch {
+    // ignore bad local state
+  }
 }
 
 function runTerminal() {
@@ -724,6 +835,7 @@ function onGlobalKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  hydrateSessionState();
   applyTheme(settings.themePreset);
   const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
   if (storedSidebarWidth) {

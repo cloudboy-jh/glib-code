@@ -95,13 +95,38 @@
           >
             Prev
           </button>
-          <select
-            :value="state.selectedFilePath"
-            class="h-7 max-w-[420px] rounded border border-border/70 bg-background/70 px-2 text-[11px]"
-            @change="selectFile(($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="file in state.files" :key="file.path" :value="file.path">{{ file.path }}</option>
-          </select>
+          <div ref="fileMenuRef" class="relative">
+            <button
+              type="button"
+              class="inline-flex h-7 w-[260px] max-w-[420px] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[11px] text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              :title="state.selectedFilePath || 'No file selected'"
+              @click="fileMenuOpen = !fileMenuOpen"
+            >
+              <span class="min-w-0 flex-1 truncate text-left">{{ state.selectedFilePath || 'No file selected' }}</span>
+              <ChevronDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+
+            <div
+              v-if="fileMenuOpen"
+              class="absolute right-0 top-[calc(100%+6px)] z-30 w-[360px] max-w-[60vw] overflow-hidden rounded-md border border-border/80 bg-card/95 shadow-lg shadow-black/30"
+            >
+              <div class="max-h-[280px] overflow-auto p-1">
+                <button
+                  v-for="file in state.files"
+                  :key="file.path"
+                  type="button"
+                  :class="[
+                    'block w-full truncate rounded px-2 py-1.5 text-left text-[11px]',
+                    file.path === state.selectedFilePath ? 'bg-primary/20 text-primary' : 'text-foreground hover:bg-muted/70'
+                  ]"
+                  :title="file.path"
+                  @click="selectFileFromMenu(file.path)"
+                >
+                  {{ file.path }}
+                </button>
+              </div>
+            </div>
+          </div>
           <button
             class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="currentFileIndex < 0 || currentFileIndex >= state.files.length - 1"
@@ -138,8 +163,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, watch } from 'vue';
-import { CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { ChevronDown, CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-next';
 import DiffView from '../shared/DiffView.vue';
 import diffsWordmark from '../../../../diffs-glibiconmain.png';
 
@@ -182,6 +207,19 @@ const state = reactive({
   selectedFilePath: '',
   patch: ''
 });
+
+const fileMenuOpen = ref(false);
+const fileMenuRef = ref<HTMLElement | null>(null);
+
+function onDocPointerDown(event: PointerEvent) {
+  const target = event.target as Node | null;
+  if (!target) return;
+  if (!fileMenuRef.value?.contains(target)) fileMenuOpen.value = false;
+}
+
+function onDocKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape') fileMenuOpen.value = false;
+}
 
 const visibleStart = computed(() => {
   const rows = 7;
@@ -270,6 +308,11 @@ async function selectFile(path: string) {
   await loadFilesAndPatch();
 }
 
+async function selectFileFromMenu(path: string) {
+  fileMenuOpen.value = false;
+  await selectFile(path);
+}
+
 async function selectPreviousFile() {
   if (currentFileIndex.value <= 0) return;
   await selectFile(state.files[currentFileIndex.value - 1].path);
@@ -304,7 +347,15 @@ watch(() => props.currentProject.path, () => {
 });
 
 onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown);
+  document.addEventListener('keydown', onDocKeyDown);
+
   void resetForProject();
+});
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown);
+  document.removeEventListener('keydown', onDocKeyDown);
 });
 </script>
 

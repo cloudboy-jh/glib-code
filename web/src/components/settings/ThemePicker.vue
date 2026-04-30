@@ -3,7 +3,7 @@
     <label class="mb-1 block text-xs text-muted-foreground">Theme preset</label>
     <select
       :value="modelValue"
-      class="h-9 w-full rounded-md border border-input/80 bg-card/80 px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      class="ui-select h-9 w-full rounded-md border border-input/80 bg-card/80 px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option>tokyo-night</option>
