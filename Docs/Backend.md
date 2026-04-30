@@ -132,6 +132,93 @@ Stored in config dir `keybindings.json`.
 - `/api/attachments/*` -> all 501
 - `/api/term` -> 501
 
+## GitTrix-backed session routes (target wiring)
+
+All session routes are typed Hono RPC. The `/api/sessions/:id/write` endpoint is internal-only and not exposed to renderer clients.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/sessions` | Create a new session. Body: `{ task, durableRef, ephemeralAdapter? }`. Calls `gittrix.startSession()`. Returns `{ glibSessionId, gittrixSessionId, workingDirRef }`. |
+| `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
+| `GET` | `/api/sessions/:id` | Get session detail. Returns metadata + current `session.diff()` summary. |
+| `GET` | `/api/sessions/:id/diff` | Full diff for the session in the format `@pierre/diffs` consumes. Backed by `session.diff()`. |
+| `POST` | `/api/sessions/:id/promote` | Promote selected hunks/files to durable. Body: `{ selector: { hunks?, files? }, strategy: 'branch' \| 'commit' \| 'pr', branchName?, commitMessage?, prTitle?, prBody? }`. Returns `{ sha, branch?, prUrl? }` or structured conflict payload. |
+| `POST` | `/api/sessions/:id/evict` | Force-evict a session without promoting. Calls `session.evict()`. |
+| `POST` | `/api/sessions/:id/write` | Internal route used by opencode tool-result handler for write/edit events. Body: `{ path, content }`. Routes to `session.write()`. |
+
+## GitTrixService
+
+Add `server/services/gittrix.ts` as the single owner of the `GitTrix` instance and session mapping layer. Route handlers do not instantiate `GitTrix` directly.
+
+Responsibilities:
+
+- Create and hold singleton `GitTrix` instance.
+- Configure adapters by surface/runtime mode.
+- Maintain `glibSessionId <-> gittrixSessionId` mapping.
+- Expose service API: `startSession`, `getSession`, `listSessions`, `diff`, `write`, `promote`, `evict`.
+
+Session metadata table (same state backend as other glib state; SQLite for self-host/desktop, D1 for hosted):
+
+```txt
+sessions:
+  glib_session_id        primary key
+  gittrix_session_id     foreign reference
+  project_id
+  task                   text from creation
+  durable_ref            adapter + path
+  ephemeral_adapter      name
+  baseline_sha           captured at session start
+  created_at
+  last_active
+  status                 active | promoted | evicted | conflicted
+```
+
+## Surface -> adapter wiring defaults
+
+- Self-host
+  - durable: `adapter-local` pointed at local repo
+  - ephemeral: `adapter-local` tmp path under `~/.glib/sessions/<id>/`
+- Desktop (Electron)
+  - Same adapter story as self-host; Electron only changes packaging/host process.
+- Hosted (glibcode.com), bridge mode
+  - durable + ephemeral both proxied to desktop adapter over WebSocket.
+  - Hosted glib never directly touches user filesystem.
+  - Latency expectation: `100ms+` per `session.write` round-trip; batch writes where opencode permits.
+- Hosted, glib cloud mode
+  - durable: `adapter-github` (or `adapter-codestorage` once available)
+  - ephemeral: GitTrix-managed cloud ephemeral adapter (`adapter-cloudflare` per GitTrix spec)
+  - glib does not wire Cloudflare adapter internals directly; it consumes GitTrix library contracts.
+  - opencode runs in Durable Object; writes persist through Cloudflare-backed ephemeral storage via GitTrix; promote updates durable GitHub target.
+
+## opencode subprocess integration point
+
+When a `tool_use` event arrives for write/edit tools, subprocess handling calls `gittrixService.write(sessionId, path, content)` instead of writing directly to disk. This is the promote-gate safety boundary.
+
+Read/bash/other tool operations remain unchanged and operate in the ephemeral working directory exposed by the active GitTrix session.
+
+## Eviction daemon + telemetry
+
+Eviction daemon:
+
+- Hono cron route: `POST /api/internal/evict`
+- Runs every N minutes
+- Calls `gittrix.evictExpired()` and adapter-specific `evict(beforeTimestamp)` for adapters without native TTL
+- Native-TTL adapters own their eviction behavior
+
+Telemetry events forwarded from GitTrix event surface:
+
+- `session.start`
+- `session.write`
+- `session.commit`
+- `session.promote`
+- `session.evict`
+- `error`
+
+Surface sinks:
+
+- self-host/desktop: local logs
+- hosted: configured analytics/observability backend
+
 ## Persistence
 
 - Config root:
@@ -145,3 +232,9 @@ Stored in config dir `keybindings.json`.
 - Replace 501 routes with real agent/session/git mutation/terminal/attachments flows.
 - Move current-project state from in-memory global to client/session-aware storage.
 - Make diff sources consistent: if `branches`/`prs` are advertised, they need implementation.
+
+## Out of scope (v1)
+
+- glib-side conflict resolution UI (surface conflict payload, user resolves in terminal, re-promote)
+- Multi-session-per-project simultaneously (one active session per project per user in v1)
+- Cross-adapter promote chains (direct ephemeral -> durable only)
