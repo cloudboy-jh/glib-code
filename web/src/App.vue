@@ -11,7 +11,7 @@
           @select="selectSessionFromSidebar"
           @new="createSession"
           @go-home="goHome"
-          @open-settings="state.settingsOpen = true"
+          @open-settings="openSettings('Models')"
           @toggle-collapse="toggleSidebarCollapse"
         />
 
@@ -33,7 +33,7 @@
           :model="settings.defaultModel"
           @diff-current="openCurrentSessionDiff"
           @diff-commits="openCommitsListDiff"
-          @open-model="state.settingsOpen = true"
+          @open-model="openSettings('Models')"
           @git-action="noop"
         />
 
@@ -45,12 +45,13 @@
                 :logo-src="logoWordmarkSrc"
                 :pending-project-path="pendingProjectOpen?.path ?? null"
                 :pending-project-name="pendingProjectOpen?.name ?? ''"
+                :default-open-mode="settings.defaultOpenMode"
                 @open-project="state.openProjectDialogOpen = true"
                 @open-clone="state.cloneDialogOpen = true"
                 @open-palette="openCommandPalette"
                 @open-theme="state.themeDialogOpen = true"
-                @open-gittrix="state.settingsOpen = true"
-                @open-model="state.settingsOpen = true"
+                @open-gittrix="openSettings('Git')"
+                @open-model="openSettings('Models')"
                 @open-recent="openRecentProject"
                 @remove-recent="removeRecentProject"
                 @forget-recent="forgetRecentProject"
@@ -120,11 +121,15 @@
       :settings="settings"
       :keybindings="keybindings"
       :providers="providerCapabilities.providers"
+      :default-open-mode="settings.defaultOpenMode"
+      :initial-tab="state.settingsTab"
       @close="state.settingsOpen = false"
       @update:theme="settings.themePreset = $event"
       @update:provider="updateDefaultProvider"
       @update:model="settings.defaultModel = $event"
       @update:keybinding="updateKeybinding"
+      @update:open-mode="settings.defaultOpenMode = $event"
+      @open-gittrix="openGitTrixFromSettings"
     />
 
     <TerminalDrawer
@@ -263,7 +268,8 @@ const activeSessionIdByProject = reactive<Record<string, string>>({});
 const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
   defaultProvider: 'codex',
-  defaultModel: 'gpt-5.3-codex'
+  defaultModel: 'gpt-5.3-codex',
+  defaultOpenMode: 'diff' as 'diff' | 'session'
 });
 
 const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: ProviderCapability[] }>({
@@ -287,6 +293,7 @@ const state = reactive({
   paletteOpen: false,
   paletteIndex: 0,
   settingsOpen: false,
+  settingsTab: 'Models' as 'Models' | 'Git' | 'Appearance' | 'Keybindings',
   terminalOpen: false,
   openProjectDialogOpen: false,
   themeDialogOpen: false,
@@ -353,6 +360,20 @@ const sidebarWidth = computed(() => (state.sidebarCollapsed ? SIDEBAR_COLLAPSED_
 let stopSidebarResize: (() => void) | null = null;
 
 function noop() {}
+
+function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {
+  state.settingsTab = tab;
+  state.settingsOpen = true;
+}
+
+function openGitTrixFromSettings() {
+  state.settingsOpen = false;
+  if (currentProject.value) {
+    state.mode = 'diff';
+    return;
+  }
+  state.openProjectDialogOpen = true;
+}
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
@@ -735,7 +756,7 @@ function runPalette(id: string) {
     state.mode = 'diff';
     state.activeSessionId = '';
   }
-  if (id === 'settings.open') state.settingsOpen = true;
+  if (id === 'settings.open') openSettings('Models');
   if (id === 'terminal.toggle') state.terminalOpen = !state.terminalOpen;
   if (id === 'session.new') createSession();
   state.paletteOpen = false;
@@ -789,7 +810,7 @@ function runComposerCommand(command: string) {
   }
 
   if (command === 'models' || command === 'model') {
-    state.settingsOpen = true;
+    openSettings('Models');
     return;
   }
 

@@ -86,6 +86,7 @@ const props = defineProps<{
   logoSrc?: string;
   pendingProjectPath?: string | null;
   pendingProjectName?: string;
+  defaultOpenMode?: 'diff' | 'session';
 }>();
 const emit = defineEmits<{
   openProject: [];
@@ -102,7 +103,7 @@ const emit = defineEmits<{
 }>();
 
 const pickerIndex = ref(0);
-const pendingMode = ref<'diff' | 'session'>('diff');
+const pendingMode = ref<'diff' | 'session'>(props.defaultOpenMode ?? 'diff');
 const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
 
@@ -115,7 +116,7 @@ watch(
   (next) => {
     if (!next) {
       pickerIndex.value = 0;
-      pendingMode.value = 'diff';
+      pendingMode.value = props.defaultOpenMode ?? 'diff';
     }
   }
 );

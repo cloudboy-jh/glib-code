@@ -29,14 +29,21 @@ async function run(cmd: string[]) {
 
 function parseAuthProviders(raw: string) {
   const providers = new Set<string>();
-  for (const line of raw.split("\n")) {
-    const value = line.trim();
-    if (!value) continue;
-    const token = value.split(/\s+/)[0]?.trim().toLowerCase();
-    if (!token) continue;
-    providers.add(token.replace(/[^a-z0-9_-]/g, ""));
+
+  for (const rawLine of raw.split("\n")) {
+    const line = stripAnsi(rawLine).trim();
+    if (!line) continue;
+    if (!line.includes("●")) continue;
+    if (line.toLowerCase().includes("credentials")) continue;
+
+    const afterBullet = line.split("●")[1]?.trim();
+    if (!afterBullet) continue;
+    const label = afterBullet.split(/\s{2,}/)[0]?.trim();
+    if (!label) continue;
+    providers.add(normalizeProviderId(label));
   }
-  return [...providers];
+
+  return [...providers].filter(Boolean);
 }
 
 function parseModelList(raw: string) {
@@ -79,26 +86,44 @@ function parseModelList(raw: string) {
 }
 
 async function discoverFresh(): Promise<OpencodeCapabilities> {
+  const modelResult = await run(["opencode", "models"]);
+  if (!modelResult.ok) {
+    return { ok: false, providers: [], error: modelResult.err || "failed to query opencode models" };
+  }
+
+  const modelMap = parseModelList(modelResult.out);
+  const discoveredProviderIds = [...modelMap.keys()];
+
   const auth = await run(["opencode", "auth", "list"]);
   if (!auth.ok) {
     return { ok: false, providers: [], error: auth.err || "failed to query opencode auth" };
   }
 
-  const providerIds = parseAuthProviders(auth.out);
-  if (!providerIds.length) {
+  const authedProviderIds = new Set(parseAuthProviders(auth.out));
+  if (!authedProviderIds.size) {
     return { ok: false, providers: [], error: "no authenticated opencode providers" };
   }
 
-  const modelResult = await run(["opencode", "models", "list", "--json"]);
-  const modelMap = modelResult.ok ? parseModelList(modelResult.out) : new Map<string, Set<string>>();
-
-  const providers: ProviderCapability[] = providerIds.map((id) => ({
+  const providers: ProviderCapability[] = discoveredProviderIds.map((id) => ({
     id,
-    hasAuth: true,
+    hasAuth: authedProviderIds.has(id),
     modelIds: [...(modelMap.get(id)?.values() ?? [])]
-  }));
+  })).filter((provider) => provider.hasAuth);
 
   return { ok: true, providers };
+}
+
+function normalizeProviderId(value: string) {
+  const compact = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (compact === "moonshotai") return "moonshotai";
+  if (compact === "zai") return "zai";
+  if (compact === "openai") return "openai";
+  if (compact === "anthropic") return "anthropic";
+  return compact;
+}
+
+function stripAnsi(value: string) {
+  return value.replace(/\u001b\[[0-9;]*m/g, "");
 }
 
 export async function getOpencodeCapabilities(force = false) {

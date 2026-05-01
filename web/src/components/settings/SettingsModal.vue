@@ -1,100 +1,192 @@
 <template>
-  <div class="fixed inset-0 z-50 grid place-items-center bg-black/60" @click.self="$emit('close')">
-    <div class="w-full max-w-[760px] rounded-xl border border-border/90 bg-card/95 shadow-2xl shadow-black/45">
-      <div class="flex h-12 items-center border-b border-border/80 px-4">
-        <h3 class="text-sm font-semibold">Settings</h3>
-        <button class="ml-auto h-8 rounded-md border border-border/80 bg-background/55 px-3 text-xs text-muted-foreground hover:text-foreground" @click="$emit('close')">
-          Close
-        </button>
-      </div>
-
-      <div class="grid grid-cols-[170px_1fr]">
-        <nav class="border-r border-border/80 p-2">
-          <button
-            v-for="t in tabs"
-            :key="t"
-            :class="[
-              'mb-1 h-9 w-full rounded-md border px-3 text-left text-xs font-medium',
-              tab === t ? 'border-border bg-muted/80 text-foreground' : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55'
-            ]"
-            @click="tab = t"
-          >
-            {{ t }}
-          </button>
-        </nav>
-
-        <section class="space-y-6 p-4">
-          <template v-if="tab === 'General'">
-            <div class="space-y-4">
-              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Model defaults</p>
-              <div>
-                <label class="mb-1 block text-xs text-muted-foreground">Default provider</label>
-                <select
-                  class="h-9 w-full rounded-md border border-border/70 bg-background px-2 text-sm"
-                  :value="settings.defaultProvider"
-                  @change="$emit('update:provider', ($event.target as HTMLSelectElement).value)"
-                >
-                  <option v-for="provider in providers" :key="provider.id" :value="provider.id" :disabled="!provider.hasAuth">
-                    {{ provider.id }}{{ provider.hasAuth ? '' : ' (not authenticated)' }}
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label class="mb-1 block text-xs text-muted-foreground">Default model</label>
-                <select
-                  class="h-9 w-full rounded-md border border-border/70 bg-background px-2 text-sm"
-                  :value="settings.defaultModel"
-                  @change="$emit('update:model', ($event.target as HTMLSelectElement).value)"
-                >
-                  <option v-for="modelId in activeModelIds" :key="modelId" :value="modelId">{{ modelId }}</option>
-                </select>
-              </div>
-
-              <p v-if="!activeProvider?.hasAuth" class="text-xs text-amber-400">Provider not authenticated in opencode.</p>
-            </div>
-          </template>
-
-          <template v-else-if="tab === 'Appearance'">
-            <div>
-              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Theme</p>
-              <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
-            </div>
-          </template>
-
-          <template v-else>
-            <div>
-              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Keyboard shortcuts</p>
-              <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
-            </div>
-          </template>
-        </section>
-      </div>
+  <UiDialog size="xl" :show-close-button="false" @close="$emit('close')">
+    <div class="flex h-14 items-center border-b border-border/80 px-5">
+      <h3 class="text-base font-semibold tracking-[0.01em]">Settings</h3>
+      <UiButton variant="outline" size="sm" class="ml-auto" @click="$emit('close')">Close</UiButton>
     </div>
-  </div>
+
+    <div class="grid grid-cols-[180px_1fr]">
+      <nav class="border-r border-border/80 p-3">
+        <button
+          v-for="t in tabs"
+          :key="t"
+          :class="[
+            'mb-1 h-10 w-full rounded-md border px-3 text-left text-sm font-medium transition-colors',
+            tab === t ? 'border-border bg-muted/80 text-foreground' : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55'
+          ]"
+          @click="tab = t"
+        >
+          {{ t }}
+        </button>
+      </nav>
+
+      <section class="space-y-6 p-5">
+        <template v-if="tab === 'Models'">
+          <div class="space-y-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Model setup</p>
+              <p class="mt-1 text-xs text-muted-foreground">Pick a provider first, then choose a model. This mirrors opencode provider/model capability state.</p>
+            </div>
+
+            <div>
+              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Providers</label>
+              <div class="space-y-1 rounded-lg border border-border/70 bg-background/40 p-2">
+                <button
+                  v-for="provider in providers"
+                  :key="provider.id"
+                  type="button"
+                  :disabled="!provider.hasAuth"
+                  :class="[
+                    'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+                    settings.defaultProvider === provider.id
+                      ? 'border-border bg-muted/80 text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
+                  ]"
+                  @click="$emit('update:provider', provider.id)"
+                >
+                  <span class="truncate">{{ provider.id }}</span>
+                  <span class="text-[11px] text-muted-foreground">{{ provider.modelIds.length }} models</span>
+                </button>
+                <p v-if="providers.length === 0" class="px-2 py-3 text-xs text-amber-400">No providers discovered. Run <span class="font-mono">opencode auth list</span>.</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Models for {{ activeProvider?.id ?? 'selected provider' }}</label>
+              <div class="max-h-[220px] space-y-1 overflow-auto rounded-lg border border-border/70 bg-background/40 p-2">
+                <button
+                  v-for="modelId in activeModelIds"
+                  :key="modelId"
+                  type="button"
+                  :class="[
+                    'flex h-10 w-full items-center rounded-md border px-3 text-left text-sm transition-colors',
+                    settings.defaultModel === modelId
+                      ? 'border-border bg-muted/80 text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
+                  ]"
+                  @click="$emit('update:model', modelId)"
+                >
+                  <span class="truncate">{{ modelId }}</span>
+                </button>
+                <p v-if="!activeProvider?.hasAuth" class="px-2 py-3 text-xs text-amber-400">Provider is not authenticated in opencode.</p>
+                <p v-else-if="activeModelIds.length === 0" class="px-2 py-3 text-xs text-amber-400">No models returned for this provider.</p>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
+              <p>
+                Providers: <span class="text-foreground">{{ providers.length }}</span> · Authenticated:
+                <span class="text-foreground">{{ authenticatedProviderCount }}</span> · Models:
+                <span class="text-foreground">{{ activeModelIds.length }}</span>
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'Git'">
+          <div class="space-y-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix setup</p>
+              <p class="mt-1 text-xs text-muted-foreground">Set default landing behavior, then jump into GitTrix (diff workbench) for commit flow.</p>
+            </div>
+
+            <div>
+              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Default project landing mode</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  :class="[
+                    'h-10 rounded-md border text-sm transition-colors',
+                    defaultOpenMode === 'diff'
+                      ? 'border-border bg-muted/80 text-foreground'
+                      : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
+                  ]"
+                  @click="$emit('update:open-mode', 'diff')"
+                >
+                  Diffs
+                </button>
+                <button
+                  type="button"
+                  :class="[
+                    'h-10 rounded-md border text-sm transition-colors',
+                    defaultOpenMode === 'session'
+                      ? 'border-border bg-muted/80 text-foreground'
+                      : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
+                  ]"
+                  @click="$emit('update:open-mode', 'session')"
+                >
+                  Session
+                </button>
+              </div>
+              <p class="mt-1.5 text-xs text-muted-foreground">Used as the default when selecting mode after opening or cloning a project.</p>
+            </div>
+
+            <div class="rounded-lg border border-border/70 bg-background/50 p-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-medium text-foreground">GitTrix controls</p>
+                  <p class="text-xs text-muted-foreground">Open GitTrix now. If a project is open it jumps to diffs, otherwise it opens project picker.</p>
+                </div>
+                <UiButton variant="outline" size="sm" @click="$emit('open-gittrix')">Open GitTrix</UiButton>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'Appearance'">
+          <div>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Theme</p>
+            <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
+          </div>
+        </template>
+
+        <template v-else>
+          <div>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Keyboard shortcuts</p>
+            <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
+          </div>
+        </template>
+      </section>
+    </div>
+  </UiDialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import ThemePicker from './ThemePicker.vue';
+import { computed, ref, watch } from 'vue';
+import UiButton from '../ui/button.vue';
+import UiDialog from '../ui/dialog.vue';
 import KeybindingsEditor from './KeybindingsEditor.vue';
+import ThemePicker from './ThemePicker.vue';
 
 const props = defineProps<{
   settings: { themePreset: string; defaultProvider: string; defaultModel: string };
   keybindings: Array<{ command: string; key: string }>;
   providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
+  defaultOpenMode: 'diff' | 'session';
+  initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
+
 defineEmits<{
   close: [];
   'update:theme': [value: string];
   'update:provider': [value: string];
   'update:model': [value: string];
   'update:keybinding': [command: string, key: string];
+  'update:open-mode': [value: 'diff' | 'session'];
+  'open-gittrix': [];
 }>();
 
-const tabs = ['General', 'Appearance', 'Keybindings'] as const;
-const tab = ref<(typeof tabs)[number]>('General');
+const tabs = ['Models', 'Git', 'Appearance', 'Keybindings'] as const;
+const tab = ref<(typeof tabs)[number]>(props.initialTab ?? 'Models');
+
+watch(
+  () => props.initialTab,
+  (next) => {
+    if (next) tab.value = next;
+  }
+);
 
 const activeProvider = computed(() => props.providers.find((provider) => provider.id === props.settings.defaultProvider));
 const activeModelIds = computed(() => activeProvider.value?.modelIds ?? []);
+const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
 </script>

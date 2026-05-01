@@ -1,6 +1,5 @@
 <template>
-  <div class="fixed inset-0 z-50 grid place-items-start bg-black/65 px-4 pt-[12vh] backdrop-blur-[2px]" @click.self="$emit('close')">
-    <div class="w-full max-w-[680px] overflow-hidden rounded-xl border border-border/90 bg-card/95 shadow-2xl shadow-black/45">
+  <UiDialog size="lg" placement="top" dialog-class="overflow-hidden" :show-close-button="false" @close="$emit('close')">
       <div class="border-b border-border/80 p-3">
         <UiInput :model-value="query" placeholder="Type a command..." class="h-10" @update:model-value="$emit('update:query', $event)" />
       </div>
@@ -19,11 +18,11 @@
           <span class="text-[11px] text-muted-foreground">{{ c.id }}</span>
         </button>
       </div>
-    </div>
-  </div>
+  </UiDialog>
 </template>
 
 <script setup lang="ts">
+import UiDialog from '../ui/dialog.vue';
 import UiInput from '../ui/input.vue';
 
 withDefaults(

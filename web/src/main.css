@@ -12,7 +12,7 @@
   --card-foreground: 220 17% 92%;
   --border: 220 14% 21%;
   --input: 220 14% 21%;
-  --ring: 225 80% 66%;
+  --ring: 225 62% 58%;
   --primary: 225 80% 66%;
   --primary-foreground: 225 33% 98%;
   --muted: 224 13% 16%;
@@ -63,17 +63,6 @@ body,
 
 *::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.85);
-}
-
-.ui-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(188,194,214,0.9)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.55rem center;
-  background-size: 12px 12px;
-  padding-right: 1.9rem;
 }
 
 ::selection {
