@@ -117,7 +117,60 @@
           <div class="space-y-5">
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix setup</p>
-              <p class="mt-1 text-xs text-muted-foreground">Set default landing behavior, then jump into GitTrix (diff workbench) for commit flow.</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                GitTrix keeps agent work isolated in ephemeral storage. Promote moves selected changes back to durable storage.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-background/45 p-3 text-xs">
+              <div>
+                <p class="text-muted-foreground">Durable</p>
+                <p class="mt-1 font-medium text-foreground">Local repo</p>
+              </div>
+              <div>
+                <p class="text-muted-foreground">Ephemeral</p>
+                <p class="mt-1 font-medium text-foreground">Local workspace</p>
+              </div>
+              <div>
+                <p class="text-muted-foreground">Promote</p>
+                <p class="mt-1 font-medium text-foreground">Commit</p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Durable provider</p>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button v-for="option in durableOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
+                    <span>{{ option.label }}</span>
+                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ephemeral provider</p>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button v-for="option in ephemeralOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
+                    <span>{{ option.label }}</span>
+                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Promote strategy</p>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button v-for="option in promoteOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
+                    <span>{{ option.label }}</span>
+                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
+              Ephemeral sessions are stored locally under <span class="font-mono text-foreground">&lt;configDir&gt;/gittrix-sessions</span>.
             </div>
 
             <div>
@@ -154,8 +207,8 @@
             <div class="rounded-lg border border-border/70 bg-background/50 p-3">
               <div class="flex items-center justify-between gap-3">
                 <div>
-                  <p class="text-sm font-medium text-foreground">GitTrix controls</p>
-                  <p class="text-xs text-muted-foreground">Open GitTrix now. If a project is open it jumps to diffs, otherwise it opens project picker.</p>
+                  <p class="text-sm font-medium text-foreground">Diff workbench</p>
+                  <p class="text-xs text-muted-foreground">Review durable repo changes before starting agent sessions.</p>
                 </div>
                 <UiButton variant="outline" size="sm" @click="$emit('open-gittrix')">Open GitTrix</UiButton>
               </div>
@@ -209,6 +262,39 @@ watch(
 const activeProvider = computed(() => props.providers.find((provider) => provider.id === props.settings.defaultProvider));
 const activeModelIds = computed(() => activeProvider.value?.modelIds ?? []);
 const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+
+const durableOptions = [
+  { id: 'local', label: 'Local repo', available: true, selected: true },
+  { id: 'github', label: 'GitHub', available: false, selected: false },
+  { id: 'gitlab', label: 'GitLab', available: false, selected: false },
+  { id: 'git-remote', label: 'Git remote', available: false, selected: false },
+  { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
+];
+
+const ephemeralOptions = [
+  { id: 'local', label: 'Local workspace', available: true, selected: true },
+  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: false, selected: false },
+  { id: 'gitfork', label: 'GitFork', available: false, selected: false },
+  { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
+];
+
+const promoteOptions = [
+  { id: 'commit', label: 'Commit', available: true, selected: true },
+  { id: 'branch', label: 'Branch', available: false, selected: false },
+  { id: 'pr', label: 'Pull Request', available: false, selected: false },
+  { id: 'patch', label: 'Patch', available: false, selected: false }
+];
+
+function optionClass(available: boolean, selected: boolean) {
+  return [
+    'flex h-10 items-center justify-between rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+    selected
+      ? 'border-border bg-muted/80 text-foreground'
+      : available
+        ? 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
+        : 'border-border/40 bg-background/25 text-muted-foreground'
+  ];
+}
 
 const authDraftProviderId = ref('');
 const authDraftApiKey = ref('');

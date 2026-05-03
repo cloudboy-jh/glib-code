@@ -34,7 +34,7 @@
           @diff-current="openCurrentSessionDiff"
           @diff-commits="openCommitsListDiff"
           @open-model="openSettings('Models')"
-          @git-action="noop"
+          @git-action="runPromote"
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
@@ -84,6 +84,10 @@
                   <div class="max-w-xl rounded-xl border border-border/80 bg-card/55 p-6 text-center">
                     <h2 class="mb-2 text-lg font-semibold">No session started</h2>
                     <p class="mb-4 text-sm text-muted-foreground">Review diffs first or start a new session with the agent.</p>
+                    <div v-if="state.agentSetupMessage" class="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
+                      <p>{{ state.agentSetupMessage }}</p>
+                      <button class="mt-2 underline underline-offset-2" @click="openSettings('Models')">Add provider key in Settings</button>
+                    </div>
                     <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="createSession">
                       Start session
                     </button>
@@ -183,14 +187,61 @@
         <pre class="max-h-[75vh] overflow-auto p-4 text-xs leading-6 text-foreground/95">{{ activeContextBundle.payload }}</pre>
       </div>
     </div>
+
+    <div v-if="state.promoteDialogOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.promoteDialogOpen = false">
+      <div class="max-h-[88vh] w-full max-w-6xl overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+        <div class="flex items-center justify-between border-b border-border/70 px-4 py-3">
+          <div>
+            <div class="text-sm font-medium">Session diff and promote</div>
+            <div class="mt-0.5 text-[11px] text-muted-foreground">Local repo → Local workspace · Commit promote</div>
+          </div>
+          <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Close</button>
+        </div>
+        <div class="grid max-h-[80vh] grid-cols-[260px_1fr] gap-3 p-3">
+          <div class="min-h-0 overflow-auto rounded-lg border border-border/70 p-2">
+            <div class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Files</div>
+            <label v-for="file in filesFromPatch(promote.diff)" :key="file" class="mb-1 flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-muted/50">
+              <input v-model="promote.selectedFiles" :value="file" type="checkbox" class="h-3.5 w-3.5" />
+              <span class="truncate text-xs">{{ file }}</span>
+            </label>
+          </div>
+          <div class="min-h-0 overflow-hidden">
+            <div v-if="promote.loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
+            <DiffView v-else :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-border/70 px-4 py-3">
+          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.promoteDialogOpen = false">Cancel</button>
+          <button class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground" @click="confirmPromote">Promote selected</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="state.conflictDialogOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.conflictDialogOpen = false">
+      <div class="w-full max-w-xl rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-2 text-sm font-semibold">Baseline conflict</div>
+        <p class="mb-3 text-xs text-muted-foreground">Durable branch moved and overlaps with selected files.</p>
+        <div class="mb-2 text-xs">Durable SHA: <span class="font-mono">{{ conflict.durableSha || 'unknown' }}</span></div>
+        <div class="mb-3 text-xs">Baseline SHA: <span class="font-mono">{{ conflict.baselineSha || 'unknown' }}</span></div>
+        <div class="max-h-44 overflow-auto rounded border border-border/70 p-2 text-xs">
+          <div v-for="file in conflict.conflictingFiles" :key="file" class="py-0.5 font-mono">{{ file }}</div>
+          <div v-if="conflict.conflictingFiles.length === 0" class="text-muted-foreground">No file list returned.</div>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.conflictDialogOpen = false">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import type { AgentEvent } from '@glib-code/shared/events/agent';
 import CommandPalette from './components/app/CommandPalette.vue';
 import TerminalDrawer from './components/app/TerminalDrawer.vue';
 import DiffWorkbench from './components/diff/DiffWorkbench.vue';
+import DiffView from './components/shared/DiffView.vue';
 import CloneRepoDialog from './components/picker/CloneRepoDialog.vue';
 import OpenProjectDialog from './components/picker/OpenProjectDialog.vue';
 import PickerScreen from './components/picker/PickerScreen.vue';
@@ -224,6 +275,18 @@ type Session = {
   repo: string;
   project: string;
   projectPath: string;
+};
+
+type SessionMetaApi = {
+  id: string;
+  projectId: string;
+  projectPath: string;
+  title: string;
+  model: string;
+  provider: string;
+  status: 'idle' | 'running' | 'aborted' | 'error' | 'done';
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ContextBundle = {
@@ -303,7 +366,22 @@ const state = reactive({
   themeDialogOpen: false,
   cloneDialogOpen: false,
   diffStyle: 'split' as 'split' | 'unified',
-  contextViewerOpen: false
+  contextViewerOpen: false,
+  promoteDialogOpen: false,
+  conflictDialogOpen: false,
+  agentSetupMessage: ''
+});
+
+const promote = reactive({
+  diff: '',
+  loading: false,
+  selectedFiles: [] as string[]
+});
+
+const conflict = reactive({
+  conflictingFiles: [] as string[],
+  durableSha: '',
+  baselineSha: ''
 });
 
 const forms = reactive({
@@ -360,10 +438,128 @@ const filteredPaletteCommands = computed(() => {
 
 const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n(simulated output)` : 'No commands run yet.'));
 const sidebarWidth = computed(() => (state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
+const streamsBySessionId = new Map<string, EventSource>();
+const seenEventKeysBySessionId = new Map<string, Set<string>>();
 
 let stopSidebarResize: (() => void) | null = null;
 
-function noop() {}
+
+function eventKey(event: AgentEvent) {
+  return `${event.type}:${JSON.stringify(event)}`;
+}
+
+function timeLabel(value?: string) {
+  if (!value) return 'now';
+  try {
+    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return 'now';
+  }
+}
+
+function appendTimelineEvent(sessionId: string, entry: TimelineEntry) {
+  const list = timelineBySessionId[sessionId] ?? (timelineBySessionId[sessionId] = []);
+  list.push(entry);
+}
+
+function filesFromPatch(patch: string) {
+  const files = new Set<string>();
+  const matches = patch.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm);
+  for (const m of matches) files.add((m[2] || m[1] || '').trim());
+  return [...files].filter(Boolean);
+}
+
+function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
+  const seen = seenEventKeysBySessionId.get(sessionId) ?? new Set<string>();
+  const key = eventKey(event);
+  if (seen.has(key)) return;
+  seen.add(key);
+  seenEventKeysBySessionId.set(sessionId, seen);
+
+  if (event.type === 'user_turn') {
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-u`, kind: 'User', text: event.prompt, time: timeLabel(event.at), level: 'info' });
+    return;
+  }
+  if (event.type === 'turn_start') {
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-ts`, kind: 'Agent', text: 'Working…', time: timeLabel(event.at), level: 'info' });
+    return;
+  }
+  if (event.type === 'text_part') {
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-t`, kind: 'Assistant', text: event.text, time: timeLabel(event.at), level: 'info' });
+    return;
+  }
+  if (event.type === 'tool_call') {
+    const text = event.output?.trim() ? `${event.tool}\n${event.output}` : `${event.tool}`;
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-tool`, kind: 'Tool', text, time: timeLabel(event.at), level: 'info' });
+    return;
+  }
+  if (event.type === 'error') {
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-err`, kind: 'Error', text: event.message ?? event.name, time: timeLabel(event.at), level: 'error' });
+    return;
+  }
+  if (event.type === 'turn_end') {
+    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-te`, kind: 'System', text: `Turn ended (${event.reason})`, time: timeLabel(event.at), level: event.reason === 'error' ? 'error' : 'info' });
+  }
+}
+
+function mapApiSession(meta: SessionMetaApi): Session {
+  const normalizedPath = meta.projectPath.replace(/\\/g, '/');
+  const repoName = normalizedPath.split('/').filter(Boolean).pop() ?? 'project';
+  return {
+    id: meta.id,
+    title: meta.title,
+    time: timeLabel(meta.updatedAt),
+    status: meta.status === 'done' ? 'Completed' : 'Working',
+    repo: repoName,
+    project: repoName,
+    projectPath: normalizedPath
+  };
+}
+
+async function hydrateSessionDoc(sessionId: string) {
+  const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}`);
+  timelineBySessionId[sessionId] = [];
+  seenEventKeysBySessionId.set(sessionId, new Set<string>());
+  for (const evt of doc.events) reduceAgentEventToTimeline(sessionId, evt);
+}
+
+function connectSessionStream(sessionId: string) {
+  if (streamsBySessionId.has(sessionId)) return;
+  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream`);
+  const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
+  for (const name of names) {
+    stream.addEventListener(name, (evt) => {
+      const message = evt as MessageEvent<string>;
+      try {
+        const parsed = JSON.parse(message.data) as AgentEvent;
+        reduceAgentEventToTimeline(sessionId, parsed);
+      } catch {
+        // ignore malformed data
+      }
+    });
+  }
+  stream.onerror = () => {
+    // browser will auto-retry
+  };
+  streamsBySessionId.set(sessionId, stream);
+}
+
+function disconnectSessionStream(sessionId: string) {
+  const stream = streamsBySessionId.get(sessionId);
+  if (!stream) return;
+  stream.close();
+  streamsBySessionId.delete(sessionId);
+}
+
+async function hydrateSessions() {
+  if (!currentProject.value) return;
+  const rows = await apiGet<SessionMetaApi[]>('/sessions');
+  sessions.splice(0, sessions.length, ...rows.map(mapApiSession));
+  for (const row of rows) {
+    await hydrateSessionDoc(row.id);
+    connectSessionStream(row.id);
+  }
+}
 
 function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {
   state.settingsTab = tab;
@@ -381,7 +577,10 @@ function openGitTrixFromSettings() {
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(detail || `request failed: ${response.status}`);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -391,13 +590,19 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(detail || `request failed: ${response.status}`);
+  }
   return response.json() as Promise<T>;
 }
 
 async function apiDelete(path: string): Promise<void> {
   const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(detail || `request failed: ${response.status}`);
+  }
 }
 
 async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -406,7 +611,10 @@ async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(detail || `request failed: ${response.status}`);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -461,6 +669,7 @@ function toggleSidebarCollapse() {
 }
 
 function goHome() {
+  for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   currentProject.value = null;
   state.mode = 'diff';
   state.activeSessionId = '';
@@ -512,6 +721,7 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
   }
 
   state.mode = mode;
+  state.agentSetupMessage = '';
   state.activeSessionId = activeSessionIdByProject[id] ?? '';
   forms.prompt = '';
 }
@@ -527,11 +737,11 @@ function queueProjectOpen(projectName: string, path: string) {
   }
 }
 
-function finalizeProjectOpen(mode: 'diff' | 'session') {
+async function finalizeProjectOpen(mode: 'diff' | 'session') {
   if (!pendingProjectOpen.value) return;
   openProject(pendingProjectOpen.value.name, pendingProjectOpen.value.path, mode);
   if (mode === 'session' && !state.activeSessionId) {
-    createSession();
+    await createSession();
   }
   closeProjectOpenModeDialog();
   state.openProjectDialogOpen = false;
@@ -630,27 +840,33 @@ function openCommitsListDiff() {
   state.mode = 'diff';
 }
 
-function createSession(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
-  if (!currentProject.value) return;
-  const normalizedPath = currentProject.value.path.replace(/\\/g, '/');
-  const repoName = currentProject.value.name.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? currentProject.value.name;
-  const projectName = normalizedPath.split('/').filter(Boolean).pop() ?? currentProject.value.name;
-  const id = `s${sessions.length + 1}`;
-  sessions.unshift({
-    id,
-    title: options?.title ?? 'New session',
-    time: 'now',
-    status: 'Working',
-    repo: repoName,
-    project: projectName,
-    projectPath: normalizedPath
-  });
-  timelineBySessionId[id] = options?.initialEntries ?? [];
-  sessionContextById[id] = options?.context ?? '';
-  state.activeSessionId = id;
-  activeSessionIdByProject[currentProject.value.id] = id;
+async function createSession(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
+  if (!currentProject.value) return null;
+  state.agentSetupMessage = '';
+  let created: SessionMetaApi;
+  try {
+    created = await apiPost<SessionMetaApi>('/agent/sessions', { title: options?.title ?? 'New Session' });
+  } catch (error) {
+    state.mode = 'session';
+    const message = error instanceof Error ? error.message : 'Unable to start session';
+    state.agentSetupMessage = message.includes('provider') || message.includes('model')
+      ? 'Add a provider API key before starting an agent session. Project picker and diff review still work without one.'
+      : message;
+    return null;
+  }
+  const mapped = mapApiSession(created);
+  sessions.unshift(mapped);
+  timelineBySessionId[mapped.id] = [];
+  sessionContextById[mapped.id] = options?.context ?? '';
+  state.activeSessionId = mapped.id;
+  activeSessionIdByProject[currentProject.value.id] = mapped.id;
+  await hydrateSessionDoc(mapped.id);
+  if (options?.initialEntries?.length) {
+    for (const entry of options.initialEntries) appendTimelineEvent(mapped.id, entry);
+  }
+  connectSessionStream(mapped.id);
   state.mode = 'session';
-  persistSessionState();
+  return mapped;
 }
 
 async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }) {
@@ -663,7 +879,7 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
     ? `commit ${payload.ref.slice(0, 7)}`
     : 'working tree changes';
   const diff = packed.diff?.trim() || 'No diff context available.';
-  createSession({
+  const created = await createSession({
     title: `Session from ${context}`,
     context,
     initialEntries: [{
@@ -674,6 +890,8 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
       level: 'info'
     }]
   });
+
+  if (!created) return;
 
   if (state.activeSessionId && currentProject.value) {
     contextBundleBySessionId[state.activeSessionId] = {
@@ -688,7 +906,6 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
       payload: diff
     };
   }
-  persistSessionState();
 }
 
 function selectSessionFromSidebar(sessionId: string) {
@@ -708,15 +925,12 @@ function selectSessionFromSidebar(sessionId: string) {
   }
 
   state.mode = 'session';
-  persistSessionState();
 }
 
-function sendPrompt() {
+async function sendPrompt() {
   if (!state.activeSessionId || !forms.prompt.trim()) return;
-  const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
-  list.push({ id: `e${list.length + 1}`, kind: 'User', text: forms.prompt, time: 'now', level: 'info' });
+  await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, { prompt: forms.prompt });
   forms.prompt = '';
-  persistSessionState();
 }
 
 function removeActiveContext() {
@@ -725,39 +939,74 @@ function removeActiveContext() {
   contextBundleBySessionId[state.activeSessionId] = undefined;
   const list = timelineBySessionId[state.activeSessionId] ?? (timelineBySessionId[state.activeSessionId] = []);
   list.push({ id: `e${list.length + 1}`, kind: 'System', text: 'Context removed from session.', time: 'now', level: 'info' });
-  persistSessionState();
 }
 
-function persistSessionState() {
-  const snapshot = {
-    sessions: JSON.parse(JSON.stringify(sessions)) as Session[],
-    timelineBySessionId: JSON.parse(JSON.stringify(timelineBySessionId)) as Record<string, TimelineEntry[]>,
-    sessionContextById: JSON.parse(JSON.stringify(sessionContextById)) as Record<string, string>,
-    contextBundleBySessionId: JSON.parse(JSON.stringify(contextBundleBySessionId)) as Record<string, ContextBundle | undefined>,
-    activeSessionIdByProject: JSON.parse(JSON.stringify(activeSessionIdByProject)) as Record<string, string>
-  };
-  localStorage.setItem('glib-session-state-v1', JSON.stringify(snapshot));
-}
-
-function hydrateSessionState() {
-  const raw = localStorage.getItem('glib-session-state-v1');
-  if (!raw) return;
+async function runPromote() {
+  if (!state.activeSessionId) return;
+  state.promoteDialogOpen = true;
+  promote.loading = true;
   try {
-    const parsed = JSON.parse(raw) as {
-      sessions?: Session[];
-      timelineBySessionId?: Record<string, TimelineEntry[]>;
-      sessionContextById?: Record<string, string>;
-      contextBundleBySessionId?: Record<string, ContextBundle | undefined>;
-      activeSessionIdByProject?: Record<string, string>;
-    };
-    if (Array.isArray(parsed.sessions)) sessions.splice(0, sessions.length, ...parsed.sessions);
-    Object.assign(timelineBySessionId, parsed.timelineBySessionId ?? {});
-    Object.assign(sessionContextById, parsed.sessionContextById ?? {});
-    Object.assign(contextBundleBySessionId, parsed.contextBundleBySessionId ?? {});
-    Object.assign(activeSessionIdByProject, parsed.activeSessionIdByProject ?? {});
-  } catch {
-    // ignore bad local state
+    const payload = await apiGet<{ diff: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff`);
+    promote.diff = payload.diff ?? '';
+    promote.selectedFiles = filesFromPatch(promote.diff);
+  } catch (error) {
+    appendTimelineEvent(state.activeSessionId, {
+      id: `${state.activeSessionId}-${Date.now()}-promote-open-err`,
+      kind: 'Promote',
+      text: error instanceof Error ? error.message : 'Failed to load session diff',
+      time: 'now',
+      level: 'error'
+    });
+    state.promoteDialogOpen = false;
+  } finally {
+    promote.loading = false;
   }
+}
+
+async function confirmPromote() {
+  if (!state.activeSessionId) return;
+  const files = promote.selectedFiles;
+  const selector = files.length === filesFromPatch(promote.diff).length ? { mode: 'all' as const } : { mode: 'files' as const, files };
+  try {
+    const result = await apiPost<{ sha: string; branch: string; prUrl?: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/promote`, {
+      selector,
+      strategy: 'commit'
+    });
+    state.promoteDialogOpen = false;
+    appendTimelineEvent(state.activeSessionId, {
+      id: `${state.activeSessionId}-${Date.now()}-promote`,
+      kind: 'Promote',
+      text: `Promoted to ${result.branch} @ ${result.sha.slice(0, 7)}`,
+      time: 'now',
+      level: 'info'
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Promote failed';
+    try {
+      const parsed = JSON.parse(message) as { code?: string; conflictingFiles?: string[]; durableSha?: string; baselineSha?: string };
+      if (parsed.code === 'BASELINE_CONFLICT') {
+        conflict.conflictingFiles = parsed.conflictingFiles ?? [];
+        conflict.durableSha = parsed.durableSha ?? '';
+        conflict.baselineSha = parsed.baselineSha ?? '';
+        state.conflictDialogOpen = true;
+        return;
+      }
+    } catch {
+      // non-json error
+    }
+    appendTimelineEvent(state.activeSessionId, {
+      id: `${state.activeSessionId}-${Date.now()}-promote-err`,
+      kind: 'Promote',
+      text: message,
+      time: 'now',
+      level: 'error'
+    });
+  }
+}
+
+async function abortTurn() {
+  if (!state.activeSessionId) return;
+  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn`);
 }
 
 function runTerminal() {
@@ -863,6 +1112,10 @@ function runComposerCommand(command: string) {
   if (command === 'undo' || command === 'redo' || command === 'share' || command === 'init') {
     openCommandPalette();
   }
+
+  if (command === 'stop' || command === 'abort') {
+    void abortTurn();
+  }
 }
 
 function onGlobalKeydown(event: KeyboardEvent) {
@@ -935,7 +1188,6 @@ function onGlobalKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
-  hydrateSessionState();
   applyTheme(settings.themePreset);
   const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
   if (storedSidebarWidth) {
@@ -950,12 +1202,21 @@ onMounted(() => {
 });
 
 watch(
+  () => currentProject.value?.path,
+  (next) => {
+    if (!next) return;
+    void hydrateSessions().catch(() => undefined);
+  }
+);
+
+watch(
   () => settings.themePreset,
   (next) => applyTheme(next)
 );
 
 onUnmounted(() => {
   stopSidebarResize?.();
+  for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   window.removeEventListener('keydown', onGlobalKeydown);
 });
 </script>

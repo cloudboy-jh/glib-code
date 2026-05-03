@@ -12,24 +12,6 @@
     </div>
 
     <section class="mb-8">
-      <div v-if="authenticatedProviderCount === 0" class="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-        <p class="text-sm font-medium text-foreground">Add an API key to get started</p>
-        <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[180px_1fr_auto]">
-          <select v-model="providerDraft" class="h-10 rounded-md border border-border/70 bg-background px-2 text-sm">
-            <option v-for="provider in providers" :key="provider.id" :value="provider.id">{{ provider.id }}</option>
-          </select>
-          <input
-            v-model="apiKeyDraft"
-            type="password"
-            class="h-10 rounded-md border border-border/70 bg-background px-3 text-sm"
-            placeholder="Paste API key"
-          />
-          <button class="h-10 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="saveProviderKey">
-            Save
-          </button>
-        </div>
-      </div>
-
       <div class="mb-3 flex items-center gap-3">
         <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Get Started</span>
         <div class="h-px flex-1 bg-border/80" />
@@ -47,6 +29,30 @@
         <button :class="['picker-row', pickerIndex === 2 ? 'picker-row-active' : '']" @click="emit('openPalette')">
           <span class="picker-row-left"><Command class="h-4 w-4" /><span>Open Command Palette</span></span>
           <span class="picker-kbd">Ctrl+K</span>
+        </button>
+      </div>
+    </section>
+
+    <section v-if="authenticatedProviderCount === 0" class="mb-8 rounded-lg border border-border/70 bg-background/35 p-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-sm font-medium text-foreground">Agent setup</p>
+          <p class="mt-1 text-xs text-muted-foreground">Optional for browsing projects and reviewing diffs. Add a key when you want the agent to work.</p>
+        </div>
+        <button class="text-xs text-primary underline underline-offset-2" @click="emit('openModel')">Settings</button>
+      </div>
+      <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
+        <select v-model="providerDraft" class="h-9 rounded-md border border-border/70 bg-background px-2 text-xs">
+          <option v-for="provider in providers" :key="provider.id" :value="provider.id">{{ provider.id }}</option>
+        </select>
+        <input
+          v-model="apiKeyDraft"
+          type="password"
+          class="h-9 rounded-md border border-border/70 bg-background px-3 text-xs"
+          placeholder="Paste API key"
+        />
+        <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-3 text-xs font-semibold text-primary-foreground" @click="saveProviderKey">
+          Save
         </button>
       </div>
     </section>
