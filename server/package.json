@@ -10,6 +10,8 @@
   "dependencies": {
     "@glib-code/shared": "workspace:*",
     "@hono/zod-validator": "^0.4.3",
+    "@mariozechner/pi-coding-agent": "^0.72.1",
+    "gittrix": "^0.1.0",
     "hono": "^4.7.7",
     "simple-git": "^3.27.0",
     "zod": "^3.24.3"

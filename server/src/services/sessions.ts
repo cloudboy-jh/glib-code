@@ -11,6 +11,9 @@ export type SessionMeta = {
   title: string;
   model: string;
   provider: string;
+  gittrixSessionId?: string;
+  ephemeralPath?: string;
+  baselineSha?: string;
   status: "idle" | "running" | "aborted" | "error" | "done";
   createdAt: string;
   updatedAt: string;
@@ -65,6 +68,9 @@ export async function createSession(params: {
   title: string;
   model: string;
   provider: string;
+  gittrixSessionId?: string;
+  ephemeralPath?: string;
+  baselineSha?: string;
 }) {
   const id = newSessionId();
   const now = nowIso();
@@ -75,6 +81,9 @@ export async function createSession(params: {
     title: params.title,
     model: params.model,
     provider: params.provider,
+    gittrixSessionId: params.gittrixSessionId,
+    ephemeralPath: params.ephemeralPath,
+    baselineSha: params.baselineSha,
     status: "idle",
     createdAt: now,
     updatedAt: now

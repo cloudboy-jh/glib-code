@@ -10,7 +10,7 @@ import {
   getProjectById
 } from "../services/state";
 import { inspectRecentPath } from "../services/projects";
-import { getOpencodeCapabilities } from "../services/opencode-capabilities";
+import { getPiCapabilities } from "../services/pi-capabilities";
 
 export const projectsRoutes = new Hono()
   .get("/recents", async (c) => c.json(await getRecents()))
@@ -72,11 +72,11 @@ export const projectsRoutes = new Hono()
     const project = getProjectById(id);
     if (!project) return c.json({ ok: false, message: "project not found" }, 404);
     const body = await c.req.json().catch(() => null) as { provider?: string; model?: string } | null;
-    const capabilities = await getOpencodeCapabilities();
-    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "opencode provider discovery failed" }, 503);
+    const capabilities = await getPiCapabilities();
+    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
     if (body?.provider) {
       const provider = capabilities.providers.find((p) => p.id === body.provider && p.hasAuth);
-      if (!provider) return c.json({ ok: false, message: "provider not available in opencode" }, 400);
+      if (!provider) return c.json({ ok: false, message: "provider not available in pi" }, 400);
       if (body.model && provider.modelIds.length > 0 && !provider.modelIds.includes(body.model)) {
         return c.json({ ok: false, message: "model not supported by provider" }, 400);
       }

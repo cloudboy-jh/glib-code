@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
 ## Server entry
 
@@ -31,24 +31,25 @@ Last updated: 2026-04-30
 - `GET /api/readiness`
 - Checks:
   - `git --version`
-  - `opencode --version`
-  - `opencode auth list`
+  - pi/provider capability availability
   - `gh --version`
 - 30s in-memory cache.
 - Uses shared schema type `ReadinessReport` from `shared/src/schemas/readiness.ts`.
-- Provider readiness is derived from shared opencode capability discovery.
+- Provider readiness is derived from pi capability discovery.
 
 ### Providers
 
 - `GET /api/providers`
 - `PATCH /api/providers/defaults`
+- `POST /api/providers/:id/auth`
+- `DELETE /api/providers/:id/auth`
 
 Behavior:
 
-- Backed by opencode capability discovery service (`opencode auth list` + model discovery).
+- Backed by pi capability discovery service.
 - Returns dynamic provider/model availability and current backend-selected defaults.
 - No static provider/model catalog in backend.
-- No backend key-write endpoints; auth is opencode-owned.
+- Provider keys are managed through in-app provider auth routes.
 
 ### Health
 
@@ -139,76 +140,54 @@ Stored in config dir `keybindings.json`.
 - `POST /api/auth/github` is `501`
 - `POST /api/auth/signout` returns `{ ok: true }`
 
-## Placeholder route groups (not implemented yet)
+## Session + agent routes
 
-- `/api/agent/*` -> implemented create/send/stream/abort/delete with subprocess + SSE
-- `/api/sessions/*` -> implemented list/read/fork/delete/patch on repo-local `.glib/sessions`
-- `/api/attachments/*` -> all 501
-- `/api/term` -> 501
-
-## GitTrix-backed session routes (target wiring)
-
-All session routes are typed Hono RPC. The `/api/sessions/:id/write` endpoint is internal-only and not exposed to renderer clients.
+- `/api/agent/*` is implemented for create/send/stream/abort/delete.
+- `/api/sessions/*` is implemented for list/read/fork/delete/patch plus GitTrix diff/promote/evict.
+- Session metadata is stored under repo-local `.glib/sessions` and includes GitTrix mapping in `SessionMeta`.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/sessions` | Create a new session. Body: `{ task, durableRef, ephemeralAdapter? }`. Calls `gittrix.startSession()`. Returns `{ glibSessionId, gittrixSessionId, workingDirRef }`. |
+| `POST` | `/api/sessions` | Create a new session and initialize matching GitTrix session metadata. |
 | `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
-| `GET` | `/api/sessions/:id` | Get session detail. Returns metadata + current `session.diff()` summary. |
-| `GET` | `/api/sessions/:id/diff` | Full diff for the session in the format `@pierre/diffs` consumes. Backed by `session.diff()`. |
-| `POST` | `/api/sessions/:id/promote` | Promote selected hunks/files to durable. Body: `{ selector: { hunks?, files? }, strategy: 'branch' \| 'commit' \| 'pr', branchName?, commitMessage?, prTitle?, prBody? }`. Returns `{ sha, branch?, prUrl? }` or structured conflict payload. |
-| `POST` | `/api/sessions/:id/evict` | Force-evict a session without promoting. Calls `session.evict()`. |
-| `POST` | `/api/sessions/:id/write` | Internal route used by opencode tool-result handler for write/edit events. Body: `{ path, content }`. Routes to `session.write()`. |
+| `GET` | `/api/sessions/:id` | Get session detail and metadata. |
+| `GET` | `/api/sessions/:id/diff` | Return full unified diff from GitTrix ephemeral vs durable baseline. |
+| `POST` | `/api/sessions/:id/promote` | Promote selected changes to durable. On baseline drift, returns 409 with structured conflict payload. |
+| `POST` | `/api/sessions/:id/evict` | Force-evict the GitTrix session workspace. |
 
 ## GitTrixService
 
-Add `server/services/gittrix.ts` as the single owner of the `GitTrix` instance and session mapping layer. Route handlers do not instantiate `GitTrix` directly.
+`server/src/services/gittrix.ts` is the single owner of the `GitTrix` instance. Route handlers do not instantiate `GitTrix` directly.
 
 Responsibilities:
 
 - Create and hold singleton `GitTrix` instance.
-- Configure adapters by surface/runtime mode.
-- Maintain `glibSessionId <-> gittrixSessionId` mapping.
-- Expose service API: `startSession`, `getSession`, `listSessions`, `diff`, `write`, `promote`, `evict`.
-
-Session metadata table (same state backend as other glib state; SQLite for self-host/desktop, D1 for hosted):
-
-```txt
-sessions:
-  glib_session_id        primary key
-  gittrix_session_id     foreign reference
-  project_id
-  task                   text from creation
-  durable_ref            adapter + path
-  ephemeral_adapter      name
-  baseline_sha           captured at session start
-  created_at
-  last_active
-  status                 active | promoted | evicted | conflicted
-```
+- Initialize adapter-local session root under `<configDir>/gittrix-sessions`.
+- Expose service API: `startSession`, `getSession`, `diff`, `promote`, `evict`.
+- Persist mapping on `SessionMeta` (`gittrixSessionId`, `ephemeralPath`, `baselineSha`).
 
 ## Surface -> adapter wiring defaults
 
 - Self-host
   - durable: `adapter-local` pointed at local repo
-  - ephemeral: `adapter-local` tmp path under `~/.glib/sessions/<id>/`
+  - ephemeral: `adapter-local` path under `<configDir>/gittrix-sessions/<id>/workspace`
 - Desktop (Electron)
   - Same adapter story as self-host; Electron only changes packaging/host process.
 - Hosted (glibcode.com), bridge mode
   - durable + ephemeral both proxied to desktop adapter over WebSocket.
   - Hosted glib never directly touches user filesystem.
-  - Latency expectation: `100ms+` per `session.write` round-trip; batch writes where opencode permits.
+  - Latency expectation: `100ms+` round-trip for remote file operations; batching is required where possible.
 - Hosted, glib cloud mode
   - durable: `adapter-github` (or `adapter-codestorage` once available)
   - ephemeral: GitTrix-managed cloud ephemeral adapter (`adapter-cloudflare` per GitTrix spec)
   - glib does not wire Cloudflare adapter internals directly; it consumes GitTrix library contracts.
-  - opencode runs in Durable Object; writes persist through Cloudflare-backed ephemeral storage via GitTrix; promote updates durable GitHub target.
+  - Agent runtime runs in hosted worker runtime; writes persist through GitTrix ephemeral storage; promote updates durable GitHub target.
 
-## opencode subprocess integration point
+## Agent integration point
 
-When a `tool_use` event arrives for write/edit tools, subprocess handling calls `gittrixService.write(sessionId, path, content)` instead of writing directly to disk. This is the promote-gate safety boundary.
-
-Read/bash/other tool operations remain unchanged and operate in the ephemeral working directory exposed by the active GitTrix session.
+- Agent runtime is pi in-process library, not subprocess.
+- `runTurn` executes with cwd set to the session's GitTrix ephemeral path.
+- No tool-call interception route is required for file writes.
 
 ## Eviction daemon + telemetry
 
@@ -243,7 +222,6 @@ Surface sinks:
 
 ## Gaps to close
 
-- Wire GitTrixService boundary for session.write/promote/evict.
 - Replace remaining 501 routes with real git mutation/terminal/attachments flows.
 - Move current-project state from in-memory global to client/session-aware storage.
 - Make diff sources consistent: if `branches`/`prs` are advertised, they need implementation.

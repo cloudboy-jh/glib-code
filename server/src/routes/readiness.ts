@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ReadinessReport } from "@glib-code/shared/schemas/readiness";
-import { getOpencodeCapabilities } from "../services/opencode-capabilities";
+import { getPiCapabilities } from "../services/pi-capabilities";
 
 type Cached = {
   at: number;
@@ -28,20 +28,14 @@ export const readinessRoutes = new Hono().get("/", async (c) => {
   }
 
   const git = await run(["git", "--version"]);
-  const opencodeVersion = await run(["opencode", "--version"]);
-  const opencodeAuth = opencodeVersion.ok ? await run(["opencode", "auth", "list"]) : { ok: false, out: "", err: "opencode missing" };
+  const piVersion = await run(["pi", "--version"]);
   const gh = await run(["gh", "--version"]);
 
-  const providers = opencodeAuth.out
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const capabilities = await getOpencodeCapabilities();
+  const capabilities = await getPiCapabilities();
   const readyProviders = capabilities.providers.filter((p) => p.hasAuth).map((p) => p.id);
 
   const value: ReadinessReport = {
-    ok: git.ok && opencodeVersion.ok && providers.length > 0 && readyProviders.length > 0,
+    ok: git.ok && piVersion.ok && readyProviders.length > 0,
     checks: {
       git: {
         ok: git.ok,
@@ -49,10 +43,10 @@ export const readinessRoutes = new Hono().get("/", async (c) => {
         error: git.ok ? undefined : git.err || "git not found"
       },
       opencode: {
-        ok: opencodeVersion.ok && providers.length > 0,
-        version: opencodeVersion.ok ? opencodeVersion.out : undefined,
-        error: opencodeVersion.ok ? (providers.length ? undefined : "no providers configured") : opencodeVersion.err || "opencode not found",
-        providers
+        ok: piVersion.ok && readyProviders.length > 0,
+        version: piVersion.ok ? piVersion.out : undefined,
+        error: piVersion.ok ? (readyProviders.length ? undefined : "no providers configured") : piVersion.err || "pi not found",
+        providers: readyProviders
       },
       gh: {
         ok: gh.ok,

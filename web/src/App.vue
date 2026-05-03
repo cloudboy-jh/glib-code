@@ -42,6 +42,7 @@
             <div class="grid h-full place-items-center px-6">
               <PickerScreen
                 :recents="recents"
+                :providers="providerCapabilities.providers"
                 :logo-src="logoWordmarkSrc"
                 :pending-project-path="pendingProjectOpen?.path ?? null"
                 :pending-project-name="pendingProjectOpen?.name ?? ''"
@@ -55,6 +56,7 @@
                 @open-recent="openRecentProject"
                 @remove-recent="removeRecentProject"
                 @forget-recent="forgetRecentProject"
+                @provider-auth-save="saveProviderAuth"
                 @select-project-mode="finalizeProjectOpen"
                 @cancel-project-mode="closeProjectOpenModeDialog"
               />
@@ -130,6 +132,8 @@
       @update:keybinding="updateKeybinding"
       @update:open-mode="settings.defaultOpenMode = $event"
       @open-gittrix="openGitTrixFromSettings"
+      @provider:add-auth="saveProviderAuth"
+      @provider:remove-auth="removeProviderAuth"
     />
 
     <TerminalDrawer
@@ -429,6 +433,19 @@ async function hydrateProviders() {
   providerCapabilities.providers = providers.providers;
   settings.defaultProvider = providers.defaultProvider;
   settings.defaultModel = providers.defaultModel;
+}
+
+async function saveProviderAuth(providerId: string, apiKey: string) {
+  const key = apiKey.trim();
+  if (!providerId || !key) return;
+  await apiPost('/providers/' + encodeURIComponent(providerId) + '/auth', { apiKey: key });
+  await hydrateProviders();
+}
+
+async function removeProviderAuth(providerId: string) {
+  if (!providerId) return;
+  await apiDelete('/providers/' + encodeURIComponent(providerId) + '/auth');
+  await hydrateProviders();
 }
 
 function clampSidebarWidth(width: number) {

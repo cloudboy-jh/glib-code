@@ -12,6 +12,24 @@
     </div>
 
     <section class="mb-8">
+      <div v-if="authenticatedProviderCount === 0" class="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+        <p class="text-sm font-medium text-foreground">Add an API key to get started</p>
+        <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[180px_1fr_auto]">
+          <select v-model="providerDraft" class="h-10 rounded-md border border-border/70 bg-background px-2 text-sm">
+            <option v-for="provider in providers" :key="provider.id" :value="provider.id">{{ provider.id }}</option>
+          </select>
+          <input
+            v-model="apiKeyDraft"
+            type="password"
+            class="h-10 rounded-md border border-border/70 bg-background px-3 text-sm"
+            placeholder="Paste API key"
+          />
+          <button class="h-10 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="saveProviderKey">
+            Save
+          </button>
+        </div>
+      </div>
+
       <div class="mb-3 flex items-center gap-3">
         <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Get Started</span>
         <div class="h-px flex-1 bg-border/80" />
@@ -83,6 +101,7 @@ import RecentList from './RecentList.vue';
 
 const props = defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
+  providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
   logoSrc?: string;
   pendingProjectPath?: string | null;
   pendingProjectName?: string;
@@ -98,14 +117,29 @@ const emit = defineEmits<{
   openTheme: [];
   openGittrix: [];
   openModel: [];
+  providerAuthSave: [providerId: string, apiKey: string];
   selectProjectMode: [mode: 'diff' | 'session'];
   cancelProjectMode: [];
 }>();
 
 const pickerIndex = ref(0);
 const pendingMode = ref<'diff' | 'session'>(props.defaultOpenMode ?? 'diff');
+const providerDraft = ref('openrouter');
+const apiKeyDraft = ref('');
 const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
+const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+
+watch(
+  () => props.providers,
+  (next) => {
+    if (!next.length) return;
+    if (!next.some((provider) => provider.id === providerDraft.value)) {
+      providerDraft.value = next.find((provider) => provider.id === 'openrouter')?.id ?? next[0]?.id ?? 'openrouter';
+    }
+  },
+  { immediate: true }
+);
 
 watch(totalPickerRows, (count) => {
   if (pickerIndex.value >= count) pickerIndex.value = Math.max(count - 1, 0);
@@ -176,6 +210,13 @@ function onPickerKeydown(event: KeyboardEvent) {
     event.preventDefault();
     runPickerSelection(pickerIndex.value);
   }
+}
+
+function saveProviderKey() {
+  const key = apiKeyDraft.value.trim();
+  if (!providerDraft.value || !key) return;
+  emit('providerAuthSave', providerDraft.value, key);
+  apiKeyDraft.value = '';
 }
 </script>
 

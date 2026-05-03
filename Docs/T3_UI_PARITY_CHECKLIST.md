@@ -1,6 +1,6 @@
 # UI Parity / Consistency Checklist
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
 This is now a practical checklist for current `web/` implementation quality, not a source-locked mirror document.
 

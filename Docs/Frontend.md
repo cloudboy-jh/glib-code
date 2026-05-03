@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
 ## App shell
 
@@ -42,8 +42,9 @@ Still local/mock in frontend state:
 
 Now API-backed in settings plane:
 
-- Provider/model capability list via `/api/providers` (opencode-discovered)
+- Provider/model capability list via `/api/providers` (pi-discovered)
 - Default provider/model updates via `/api/providers/defaults`
+- Provider auth key write/remove via `/api/providers/:id/auth`
 
 ## Picker flow
 
@@ -99,7 +100,7 @@ Current state:
 - Session shell/layout is in place.
 - Timeline renders entries with simple message cards.
 - Composer supports prompt typing and command trigger UI.
-- No real `/api/agent` stream or `/api/sessions` persistence wiring yet.
+- Backend session + agent routes exist; remaining work is full UI data-plane parity and promote UX.
 
 ## Settings + keybindings
 
@@ -109,7 +110,8 @@ Current state:
 ## Known frontend debts
 
 - Remove remaining local mock session state and hydrate from `/api/sessions`.
-- Replace local send simulation with `/api/agent/sessions/:id/send` + SSE stream.
+- Replace any remaining local send simulation with `/api/agent/sessions/:id/send` + SSE stream.
 - Remove hardcoded API base and use env/config.
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
+- Add in-session diff/promote surface with conflict handling.

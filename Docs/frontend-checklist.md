@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
 ## API wiring cleanup
 
@@ -13,8 +13,23 @@ Last updated: 2026-04-30
 
 - [x] Consume dynamic provider/model capabilities from `/api/providers`.
 - [x] Replace static settings model input with provider-scoped selectors.
-- [ ] Surface opencode auth/capability failures with explicit UI messages.
+- [ ] Surface provider auth/capability failures with explicit UI messages.
 - [ ] Add project-level provider/model override UX + effective state labels.
+
+## Provider auth UX
+
+- [ ] In Settings → Models, show "Add API key" for unauthenticated providers.
+- [ ] Save provider key with `POST /api/providers/:id/auth` and refresh capability state.
+- [ ] Allow key removal with `DELETE /api/providers/:id/auth`.
+- [ ] Show OpenRouter onboarding banner when no providers are authenticated.
+- [ ] Add first-run provider setup card in Picker before main actions.
+
+## Promote UX
+
+- [ ] Fetch and render `/api/sessions/:id/diff` via `@pierre/diffs`.
+- [ ] Add file/hunk selection UI for promote selectors.
+- [ ] Trigger `POST /api/sessions/:id/promote` from session UI.
+- [ ] Handle 409 baseline conflict response with dedicated modal/state.
 
 ## Diff → session context flow
 

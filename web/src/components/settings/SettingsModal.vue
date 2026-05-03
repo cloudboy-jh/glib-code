@@ -28,25 +28,55 @@
               <p class="mt-1 text-xs text-muted-foreground">Pick a provider first, then choose a model. This mirrors opencode provider/model capability state.</p>
             </div>
 
+            <div v-if="authenticatedProviderCount === 0" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+              New here? Get started with
+              <a class="underline underline-offset-2" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>
+              — one key, all models.
+            </div>
+
             <div>
               <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Providers</label>
               <div class="space-y-1 rounded-lg border border-border/70 bg-background/40 p-2">
-                <button
-                  v-for="provider in providers"
-                  :key="provider.id"
-                  type="button"
-                  :disabled="!provider.hasAuth"
-                  :class="[
-                    'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-                    settings.defaultProvider === provider.id
-                      ? 'border-border bg-muted/80 text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
-                  ]"
-                  @click="$emit('update:provider', provider.id)"
-                >
-                  <span class="truncate">{{ provider.id }}</span>
-                  <span class="text-[11px] text-muted-foreground">{{ provider.modelIds.length }} models</span>
-                </button>
+                <div v-for="provider in providers" :key="provider.id" class="rounded-md border border-transparent p-1 hover:border-border/60">
+                  <button
+                    type="button"
+                    :disabled="!provider.hasAuth"
+                    :class="[
+                      'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+                      settings.defaultProvider === provider.id
+                        ? 'border-border bg-muted/80 text-foreground'
+                        : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
+                    ]"
+                    @click="$emit('update:provider', provider.id)"
+                  >
+                    <span class="truncate">{{ provider.id }}</span>
+                    <span class="text-[11px] text-muted-foreground">{{ provider.modelIds.length }} models</span>
+                  </button>
+
+                  <div v-if="!provider.hasAuth" class="mt-2">
+                    <button
+                      v-if="authDraftProviderId !== provider.id"
+                      class="text-xs text-primary underline underline-offset-2"
+                      @click="startAuthDraft(provider.id)"
+                    >
+                      Add API key
+                    </button>
+                    <div v-else class="flex items-center gap-2">
+                      <input
+                        v-model="authDraftApiKey"
+                        type="password"
+                        class="h-8 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs"
+                        placeholder="Paste API key"
+                      />
+                      <UiButton size="sm" variant="outline" @click="saveProviderKey(provider.id)">Save</UiButton>
+                      <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
+                    </div>
+                  </div>
+
+                  <div v-else class="mt-1">
+                    <button class="text-xs text-muted-foreground underline underline-offset-2" @click="$emit('provider:remove-auth', provider.id)">Remove</button>
+                  </div>
+                </div>
                 <p v-if="providers.length === 0" class="px-2 py-3 text-xs text-amber-400">No providers discovered. Run <span class="font-mono">opencode auth list</span>.</p>
               </div>
             </div>
@@ -166,16 +196,6 @@ const props = defineProps<{
   initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
 
-defineEmits<{
-  close: [];
-  'update:theme': [value: string];
-  'update:provider': [value: string];
-  'update:model': [value: string];
-  'update:keybinding': [command: string, key: string];
-  'update:open-mode': [value: 'diff' | 'session'];
-  'open-gittrix': [];
-}>();
-
 const tabs = ['Models', 'Git', 'Appearance', 'Keybindings'] as const;
 const tab = ref<(typeof tabs)[number]>(props.initialTab ?? 'Models');
 
@@ -189,4 +209,36 @@ watch(
 const activeProvider = computed(() => props.providers.find((provider) => provider.id === props.settings.defaultProvider));
 const activeModelIds = computed(() => activeProvider.value?.modelIds ?? []);
 const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+
+const authDraftProviderId = ref('');
+const authDraftApiKey = ref('');
+
+const emit = defineEmits<{
+  close: [];
+  'update:theme': [value: string];
+  'update:provider': [value: string];
+  'update:model': [value: string];
+  'update:keybinding': [command: string, key: string];
+  'update:open-mode': [value: 'diff' | 'session'];
+  'open-gittrix': [];
+  'provider:add-auth': [providerId: string, apiKey: string];
+  'provider:remove-auth': [providerId: string];
+}>();
+
+function startAuthDraft(providerId: string) {
+  authDraftProviderId.value = providerId;
+  authDraftApiKey.value = '';
+}
+
+function cancelAuthDraft() {
+  authDraftProviderId.value = '';
+  authDraftApiKey.value = '';
+}
+
+function saveProviderKey(providerId: string) {
+  const key = authDraftApiKey.value.trim();
+  if (!key) return;
+  emit('provider:add-auth', providerId, key);
+  cancelAuthDraft();
+}
 </script>

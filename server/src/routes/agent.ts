@@ -3,7 +3,8 @@ import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/sessions";
 import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState } from "../services/state";
-import { getOpencodeCapabilities } from "../services/opencode-capabilities";
+import { getPiCapabilities } from "../services/pi-capabilities";
+import * as gittrixService from "../services/gittrix";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -20,8 +21,8 @@ export const agentRoutes = new Hono()
     const project = mustProject();
     if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const body = await c.req.json().catch(() => null) as { title?: string; model?: string; provider?: string } | null;
-    const [providerState, capabilities] = await Promise.all([getProvidersState(), getOpencodeCapabilities()]);
-    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "opencode provider discovery failed" }, 503);
+    const [providerState, capabilities] = await Promise.all([getProvidersState(), getPiCapabilities()]);
+    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
     const projectOverride = getProjectOverride(project.id);
     const requestedProvider = body?.provider || projectOverride?.provider || providerState.defaultProvider;
     const providerConfig = capabilities.providers.find((p) => p.id === requestedProvider);
@@ -31,12 +32,26 @@ export const agentRoutes = new Hono()
       return c.json({ ok: false, message: "model not supported by provider" }, 400);
     }
 
+    let gittrixMeta: { gittrixSessionId: string; ephemeralPath: string; baselineSha: string };
+    try {
+      gittrixMeta = await gittrixService.startSession({
+        projectPath: project.path,
+        task: body?.title?.trim() || "New Session",
+        branch: project.branch
+      });
+    } catch {
+      return c.json({ ok: false, message: "failed to start gittrix session" }, 500);
+    }
+
     const created = await createSession({
       projectId: project.id,
       projectPath: project.path,
       title: body?.title?.trim() || "New Session",
       model: requestedModel,
-      provider: requestedProvider
+      provider: requestedProvider,
+      gittrixSessionId: gittrixMeta.gittrixSessionId,
+      ephemeralPath: gittrixMeta.ephemeralPath,
+      baselineSha: gittrixMeta.baselineSha
     });
     const start: AgentEvent = {
       type: "session_start",
@@ -59,8 +74,8 @@ export const agentRoutes = new Hono()
     const body = await c.req.json().catch(() => null) as { prompt?: string; context?: string; attachments?: string[] } | null;
     const prompt = body?.prompt?.trim();
     if (!prompt) return c.json({ ok: false, message: "prompt required" }, 400);
-    const capabilities = await getOpencodeCapabilities();
-    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "opencode provider discovery failed" }, 503);
+    const capabilities = await getPiCapabilities();
+    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
     const provider = capabilities.providers.find((p) => p.id === existing.meta.provider && p.hasAuth);
     if (!provider) return c.json({ ok: false, message: "session provider is no longer authenticated" }, 400);
     if (provider.modelIds.length > 0 && !provider.modelIds.includes(existing.meta.model)) {
@@ -82,9 +97,10 @@ export const agentRoutes = new Hono()
 
     void runTurn({
       sessionId: id,
-      cwd: project.path,
+      cwd: existing.meta.ephemeralPath || project.path,
       prompt,
       model: existing.meta.model,
+      provider: existing.meta.provider,
       onEvent: async (event) => {
         await appendEvents(project.path, id, [event]);
         if (event.type === "turn_end") {
@@ -146,6 +162,14 @@ export const agentRoutes = new Hono()
     if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
     abortRunningTurn(id);
+    const session = await getSession(project.path, id);
     await deleteSession(project.path, id);
+    if (session?.meta.gittrixSessionId) {
+      try {
+        await gittrixService.evict(project.path, session.meta.gittrixSessionId, project.branch);
+      } catch {
+        // best effort cleanup
+      }
+    }
     return c.json({ ok: true, id });
   });

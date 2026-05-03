@@ -1,41 +1,32 @@
-# Agent Integration Status
+# Agent Integration
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
-## Current truth
+## Runtime model
 
-- Server agent routes now exist for create/send/stream/abort/delete.
-- Runtime spawns opencode subprocess turns and emits normalized events to SSE.
-- Session events are persisted under repo-local `.glib/sessions`.
+- Agent runtime uses `@mariozechner/pi-coding-agent` as an in-process library.
+- No subprocess spawn and no NDJSON/stdout parser layer.
+- Backend normalizes pi events into shared `AgentEvent` shape and streams them via SSE.
 
-## What already exists in shared contracts
+## Session isolation model
 
-`shared/src/events` exports event shape modules:
+- Each glib session is paired with a GitTrix session.
+- Agent turns run with cwd set to the session-specific GitTrix ephemeral workspace.
+- Agent writes land in ephemeral workspace, not the user’s durable repo.
+- Accepted changes are moved to durable only through explicit promote.
 
-- `events/opencode.ts`
-- `events/agent.ts`
+## Session persistence
 
-These are contract scaffolds and can be used when implementing the runtime, but they are not currently wired to live backend routes.
-
-## Expected integration path
-
-When implemented, agent flow should be:
-
-1. Create or select a session
-2. Send prompt (+ optional diff context)
-3. Spawn `opencode` process in project cwd
-4. Parse stdout event stream
-5. Emit normalized events over SSE
-6. Persist events under repo-local `.glib/` session storage
+- Session metadata and event timeline are persisted under repo-local `.glib/sessions`.
+- `SessionMeta` includes GitTrix mapping fields (`gittrixSessionId`, `ephemeralPath`, `baselineSha`).
 
 ## Provider/model authority
 
-- Provider/model availability and auth status are opencode-owned.
-- Session create and send validate against opencode-discovered capabilities.
-- Session stores provider/model snapshot at creation; send re-validates current availability.
+- pi is source of truth for provider auth and model discovery.
+- Session create/send validates provider/model against current pi capability state.
 
-## Blocking gaps
+## Active gaps
 
-- Attachments endpoints are placeholders (`/api/attachments`).
-- Terminal transport is placeholder (`/api/term`).
-- GitTrix `session.write/promote/evict` service boundary wiring still needs landing.
+- Attachments transport/API parity (`/api/attachments`).
+- Terminal transport parity (`/api/term` WebSocket).
+- Remaining git mutation parity endpoints under `/api/git`.

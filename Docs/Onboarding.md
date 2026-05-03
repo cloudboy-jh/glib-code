@@ -1,6 +1,6 @@
 # Onboarding and First-Run Flow (Current)
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 
 ## What exists today
 
@@ -12,13 +12,14 @@ Requirements:
 
 - Bun
 - Git
-- opencode CLI configured (`opencode auth list` should return at least one provider)
+- At least one provider API key configured in-app
 
 Steps:
 
 1. `bun install`
 2. `bun run dev`
 3. Open `http://127.0.0.1:5173`
+4. Add provider key in first-run setup card or Settings → Models
 
 Backend server listens on `http://127.0.0.1:4273` in dev.
 
@@ -37,7 +38,7 @@ Endpoint:
 Checks:
 
 - `git`
-- `opencode` + authenticated providers (source of truth for provider/model availability)
+- pi provider capability + authenticated providers
 - `gh` (optional for future PR integrations)
 
 This is the canonical dependency health report for startup UX.
@@ -50,9 +51,19 @@ If providers/models are unavailable there, UI provider/model controls must refle
 
 ## Auth state
 
-Current auth behavior is placeholder:
+Provider auth behavior:
+
+- `POST /api/providers/:id/auth` saves provider API key
+- `DELETE /api/providers/:id/auth` removes provider API key
+- `GET /api/providers` reflects authenticated providers/models
+
+Hosted account auth behavior is still placeholder:
 
 - `GET /api/auth/session` -> `{ signedIn: false }`
 - GitHub auth endpoint exists but returns `501`.
 
 No hosted sign-in/onboarding path should be documented as shipped yet.
+
+## GitTrix session storage
+
+- Ephemeral session workspaces live under `<configDir>/gittrix-sessions/`.
