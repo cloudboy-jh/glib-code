@@ -1,10 +1,10 @@
 # Frontend Checklist
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## API wiring cleanup
 
-- [ ] Replace hardcoded `API_BASE` with env-driven config.
+- [x] Replace hardcoded `API_BASE` with env-driven config.
 - [x] Remove localStorage-backed mock session persistence from primary session flow.
 - [x] Hydrate sessions from `/api/sessions`.
 - [ ] Handle backend 404/501 states with explicit UI fallbacks (not silent failures).
@@ -69,4 +69,4 @@ Last updated: 2026-05-03
 
 - [ ] No critical workflow depends on mock-only data paths.
 - [x] Diff review -> context attach -> prompt send -> streamed timeline works end-to-end.
-- [ ] Build and typecheck pass (`bun run --cwd web check`, `bun run --cwd web build`).
+- [x] Build and typecheck pass (`bun run --cwd web check`, `bun run --cwd web build`).

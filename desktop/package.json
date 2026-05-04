@@ -2,8 +2,9 @@
   "name": "@glib-code/desktop",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/main.ts",
+  "main": "dist/main.js",
   "scripts": {
+    "dev": "bun run build && electron .",
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit"
   },

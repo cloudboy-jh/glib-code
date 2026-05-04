@@ -1,5 +1,10 @@
-import config from "./dev.config.json";
 import style from "./console-style.json";
+import { isAbsolute, join } from "node:path";
+
+type DevConfig = {
+  processes: Omit<ProcSpec, "color">[];
+  links: string[];
+};
 
 const colors = {
   pink: "\x1b[95m",
@@ -24,13 +29,15 @@ type ProcSpec = {
 };
 
 const root = process.cwd();
+const configPath = process.argv[2] ?? "scripts/dev.config.json";
+const config = (await Bun.file(isAbsolute(configPath) ? configPath : join(root, configPath)).json()) as DevConfig;
 const prefixColor = colors[(style.prefixColor as ColorName) ?? "blue"] ?? colors.blue;
 const palette = style.colors as ColorName[];
 const specs = config.processes.map((spec) => ({
   ...spec,
   prefix: spec.prefix || spec.name,
   color: palette[config.processes.indexOf(spec) % palette.length] ?? "gray",
-  cwd: `${root}/${spec.cwd}`
+  cwd: join(root, spec.cwd)
 })) satisfies ProcSpec[];
 
 const children = new Map<string, ReturnType<typeof Bun.spawn>>();

@@ -1,6 +1,6 @@
 # Onboarding and First-Run Flow (Current)
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## What exists today
 
@@ -27,8 +27,11 @@ Backend server listens on `http://127.0.0.1:4273` in dev.
 
 ## Desktop onboarding
 
-- Electron boots and spawns Bun server at `:4173`.
-- Window loads `http://127.0.0.1:4173`.
+- Run `bun run dev:desktop` for local desktop development.
+- The dev stack starts the backend on `http://127.0.0.1:4273`, Vite on `http://127.0.0.1:5173`, and Electron.
+- Electron loads the Vite app in dev and opens DevTools.
+- Vite uses strict port `5173`; stale dev processes must be stopped instead of letting Vite drift to another port.
+- Production Electron starts the backend on `:4273` and loads `web/dist/index.html` after `bun run build`.
 - No desktop auth/sync flow is implemented yet.
 
 ## Runtime readiness

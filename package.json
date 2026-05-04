@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "bun run scripts/dev.ts",
+    "dev:desktop": "bun run scripts/dev.ts scripts/dev.desktop.config.json",
     "dev:server": "bun run --cwd server dev",
     "dev:web": "bun run --cwd web dev",
     "build": "bun run --cwd shared build && bun run --cwd server build && bun run --cwd web build && bun run --cwd desktop build",

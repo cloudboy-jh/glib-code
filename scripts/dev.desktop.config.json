@@ -1,0 +1,30 @@
+{
+  "processes": [
+    {
+      "name": "server",
+      "prefix": "api",
+      "cmd": ["bun", "run", "dev"],
+      "cwd": "server"
+    },
+    {
+      "name": "web",
+      "prefix": "web",
+      "cmd": ["bun", "run", "dev"],
+      "cwd": "web"
+    },
+    {
+      "name": "desktop",
+      "prefix": "app",
+      "cmd": ["bun", "run", "dev"],
+      "cwd": "desktop",
+      "env": {
+        "GLIB_DESKTOP_DEV": "1"
+      }
+    }
+  ],
+  "links": [
+    "server:  http://127.0.0.1:4273",
+    "web:     http://127.0.0.1:5173",
+    "desktop: Electron -> http://127.0.0.1:5173"
+  ]
+}

@@ -1,13 +1,13 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## App shell
 
 - Entry: `web/src/App.vue`
 - Framework: Vue 3 composition API
 - Styling: Tailwind + shared theme tokens
-- API target: currently hardcoded `http://127.0.0.1:4273/api` (still needs env switch)
+- API target: `import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api'`
 
 Primary surfaces:
 
@@ -121,7 +121,6 @@ Current state:
 
 ## Known frontend debts
 
-- Remove hardcoded API base and use env/config.
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
 - Add hunk-level session context/promote selection.

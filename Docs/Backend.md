@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## Server entry
 
@@ -177,6 +177,7 @@ Responsibilities:
   - ephemeral: local workspace adapter behavior under `<configDir>/gittrix-sessions/<id>/workspace`
 - Desktop (Electron)
   - Same adapter story as self-host; Electron only changes packaging/host process.
+  - Dev desktop relies on the normal backend at `:4273`; production Electron starts the Bun backend on `:4273` before loading the built web UI.
 - Hosted (glibcode.com), bridge mode
   - durable + ephemeral both proxied to desktop adapter over WebSocket.
   - Hosted glib never directly touches user filesystem.

@@ -70,12 +70,24 @@ bun run dev
 - API server: `http://127.0.0.1:4273`
 - Web app: `http://127.0.0.1:5173`
 
+Run desktop dev stack:
+
+```bash
+bun run dev:desktop
+```
+
+- API server: `http://127.0.0.1:4273`
+- Vite web app: `http://127.0.0.1:5173`
+- Electron window loads the Vite app in dev.
+- Vite uses strict port `5173`; if an old process is holding the port, stop it and rerun.
+
 Add a provider key in Settings → Models before starting an agent session. Project picker and diff review work without a provider key.
 
 ## Scripts
 
 ```bash
 bun run dev         # run server + web with prefixed logs
+bun run dev:desktop # run server + web + Electron desktop shell
 bun run dev:server  # backend only (:4273)
 bun run dev:web     # frontend only (vite)
 bun run build       # build shared + server + web + desktop

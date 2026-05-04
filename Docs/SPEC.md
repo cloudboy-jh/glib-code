@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 glib-code is a review-first AI coding workspace centered on this loop:
 
@@ -70,7 +70,9 @@ glib-code/
 ## Runtime modes
 
 - `bun run dev` runs server (`:4273`) + web (`:5173`) in parallel for development.
-- `desktop/src/main.ts` runs an Electron window pointed at local server `http://127.0.0.1:4173`.
+- `bun run dev:desktop` runs server (`:4273`) + web (`:5173`) + Electron in parallel.
+- Desktop dev loads the Vite app at `http://127.0.0.1:5173` and logs renderer output to the dev terminal.
+- Desktop production starts the Bun backend on `:4273` and loads the built web app from `web/dist/index.html`.
 
 ## Surface model
 

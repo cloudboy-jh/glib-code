@@ -1,6 +1,6 @@
 # Next Steps
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## Current shipped local loop
 
@@ -34,6 +34,8 @@ Last updated: 2026-05-03
 - Reworked Settings → Models and ModelPicker around active model + usable provider auth.
 - Kept Picker/project open/diff review available without provider keys.
 - Added README app screenshot.
+- Added `bun run dev:desktop` for server + Vite + Electron local desktop development.
+- Added strict Vite port handling and visible Electron startup/error logging for desktop dev.
 
 ## 1) Terminal WS
 

@@ -283,7 +283,7 @@ const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
-const API_BASE = 'http://127.0.0.1:4273/api';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 
 type Session = {
   id: string;
