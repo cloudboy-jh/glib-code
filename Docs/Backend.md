@@ -1,12 +1,12 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## Server entry
 
 - File: `server/src/index.ts`
 - Runtime: Bun + Hono
-- Default port: `4173` (supports `--port=`)
+- Default dev port: `4273` (supports `--port=`)
 - Mounted route groups:
   - `/api/readiness`
   - `/api/health`
@@ -21,7 +21,7 @@ Last updated: 2026-05-02
   - `/api/settings`
   - `/api/keybindings`
   - `/api/attachments`
-- `/api/term`
+  - `/api/term`
   - `/api/providers`
 
 ## Implemented routes
@@ -49,7 +49,8 @@ Behavior:
 - Backed by pi capability discovery service.
 - Returns dynamic provider/model availability and current backend-selected defaults.
 - No static provider/model catalog in backend.
-- Provider keys are managed through in-app provider auth routes.
+- Provider keys are managed through in-app provider auth routes and stored under `<configDir>/pi/auth.json`.
+- Unsupported OAuth credentials are rejected as unusable for providers that require API keys.
 
 ### Health
 
@@ -148,7 +149,10 @@ Stored in config dir `keybindings.json`.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/sessions` | Create a new session and initialize matching GitTrix session metadata. |
+| `POST` | `/api/agent/sessions` | Create a new agent session and initialize matching GitTrix session metadata. |
+| `POST` | `/api/agent/sessions/:id/send` | Persist user turn, broadcast it, and run pi in the session ephemeral workspace. |
+| `GET` | `/api/agent/sessions/:id/stream` | Replay + stream canonical agent events over SSE. |
+| `DELETE` | `/api/agent/sessions/:id/turn` | Abort the active turn. |
 | `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
 | `GET` | `/api/sessions/:id` | Get session detail and metadata. |
 | `GET` | `/api/sessions/:id/diff` | Return full unified diff from GitTrix ephemeral vs durable baseline. |
@@ -162,15 +166,15 @@ Stored in config dir `keybindings.json`.
 Responsibilities:
 
 - Create and hold singleton `GitTrix` instance.
-- Initialize adapter-local session root under `<configDir>/gittrix-sessions`.
+- Initialize local session root under `<configDir>/gittrix-sessions`.
 - Expose service API: `startSession`, `getSession`, `diff`, `promote`, `evict`.
 - Persist mapping on `SessionMeta` (`gittrixSessionId`, `ephemeralPath`, `baselineSha`).
 
 ## Surface -> adapter wiring defaults
 
 - Self-host
-  - durable: `adapter-local` pointed at local repo
-  - ephemeral: `adapter-local` path under `<configDir>/gittrix-sessions/<id>/workspace`
+  - durable: local repo adapter behavior pointed at the user repo
+  - ephemeral: local workspace adapter behavior under `<configDir>/gittrix-sessions/<id>/workspace`
 - Desktop (Electron)
   - Same adapter story as self-host; Electron only changes packaging/host process.
 - Hosted (glibcode.com), bridge mode
@@ -188,6 +192,8 @@ Responsibilities:
 - Agent runtime is pi in-process library, not subprocess.
 - `runTurn` executes with cwd set to the session's GitTrix ephemeral path.
 - No tool-call interception route is required for file writes.
+- pi events are normalized into shared `AgentEvent` records for timeline replay and SSE.
+- Assistant error messages from pi are surfaced as canonical `error` events.
 
 ## Eviction daemon + telemetry
 
@@ -219,12 +225,14 @@ Surface sinks:
   - macOS: `~/Library/Application Support/glib-code`
   - Linux: `$XDG_CONFIG_HOME/glib-code` or `~/.config/glib-code`
 - Repo-local: `.glib/` with `.gitignore` of `*`
+- Provider keys: `<configDir>/pi/auth.json`
 
 ## Gaps to close
 
 - Replace remaining 501 routes with real git mutation/terminal/attachments flows.
 - Move current-project state from in-memory global to client/session-aware storage.
 - Make diff sources consistent: if `branches`/`prs` are advertised, they need implementation.
+- Standardize API error envelopes across all route groups.
 
 ## Out of scope (v1)
 

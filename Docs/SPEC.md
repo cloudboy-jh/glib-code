@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 glib-code is a review-first AI coding workspace centered on this loop:
 
@@ -18,8 +18,9 @@ glib-code is a review-first AI coding workspace centered on this loop:
 ## Current reality
 
 - Agent runtime uses pi as an in-process library.
-- Session isolation is handled by GitTrix (`@gittrix/core` + `adapter-local`) with ephemeral workspaces.
-- Provider/model capability and auth authority is pi.
+- Session isolation is handled by GitTrix local workspaces.
+- Provider/model capability authority is pi.
+- glib-code stores user-entered provider keys in its own app config dir, not another tool's auth store.
 - Promote is explicit via session APIs and returns structured conflicts on baseline drift.
 
 ## Stack
@@ -41,7 +42,7 @@ Vue 3 + Vite (web/)
         ▼
 Hono server (server/)
    ├── pi agent library (@mariozechner/pi-coding-agent)
-   └── GitTrix (@gittrix/core + adapter-local)
+   └── GitTrix local adapter shim
         ├── durable repo (user project)
         └── ephemeral workspace (<configDir>/gittrix-sessions/<id>/workspace)
 ```
@@ -51,6 +52,8 @@ Hono server (server/)
 - pi is the source of truth for provider auth + model availability.
 - glib does not maintain a static provider/model catalog.
 - backend stores defaults and validates selections against pi capability state.
+- provider API keys are saved under glib-code app config (`<configDir>/pi/auth.json`).
+- unsupported OAuth credentials do not count as usable auth for agent sessions.
 
 ## Monorepo layout
 
@@ -83,6 +86,9 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 - Diff workbench (commit history + uncommitted diff + file-level navigation)
 - Session workspace shell (sidebar/header/timeline/composer)
 - Settings + keybindings persistence
+- Model picker + provider key management
+- Session timeline with streamed assistant text, errors, and compact tool-call cards
+- Session diff review and file-level promote
 - Readiness and health endpoints
 
 ## Source of truth docs
@@ -102,9 +108,9 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitT
 1. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
 2. Attachments API and frontend upload/reference flow.
 3. Git mutation routes parity (`stage/unstage/commit/push/pull/checkout`).
-4. Branch/PR diff-compare parity (`/api/diff/branch-compare`).
-5. Hosted mode architecture and bridge behavior definition.
-6. Reliability pass: route tests, error envelopes, restart recovery checks.
+4. Hunk-level session promote selection.
+5. Reliability pass: route tests, error envelopes, restart recovery checks.
+6. Cloudflare Artifacts adapter once GitTrix backend support lands.
 
 ## Out of scope (v1)
 

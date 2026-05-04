@@ -1,43 +1,50 @@
-const pink = "\x1b[95m";
-const green = "\x1b[92m";
-const blue = "\x1b[94m";
+import config from "./dev.config.json";
+import style from "./console-style.json";
+
+const colors = {
+  pink: "\x1b[95m",
+  green: "\x1b[92m",
+  blue: "\x1b[94m",
+  cyan: "\x1b[96m",
+  yellow: "\x1b[93m",
+  gray: "\x1b[90m"
+} as const;
+
 const reset = "\x1b[0m";
+
+type ColorName = keyof typeof colors;
 
 type ProcSpec = {
   name: string;
-  color: string;
+  prefix: string;
+  color: ColorName;
   cmd: string[];
   cwd: string;
+  env?: Record<string, string>;
 };
 
 const root = process.cwd();
-
-const specs: ProcSpec[] = [
-  {
-    name: "server",
-    color: pink,
-    cmd: ["bun", "run", "dev"],
-    cwd: `${root}/server`
-  },
-  {
-    name: "web",
-    color: green,
-    cmd: ["bun", "run", "dev"],
-    cwd: `${root}/web`
-  }
-];
+const prefixColor = colors[(style.prefixColor as ColorName) ?? "blue"] ?? colors.blue;
+const palette = style.colors as ColorName[];
+const specs = config.processes.map((spec) => ({
+  ...spec,
+  prefix: spec.prefix || spec.name,
+  color: palette[config.processes.indexOf(spec) % palette.length] ?? "gray",
+  cwd: `${root}/${spec.cwd}`
+})) satisfies ProcSpec[];
 
 const children = new Map<string, ReturnType<typeof Bun.spawn>>();
 
-function tag(name: string, color: string) {
-  return `${color}[${name}]${reset}`;
+function tag(prefix: string, color: ColorName) {
+  const shortPrefix = prefix.slice(0, style.prefixLength).padEnd(style.prefixLength);
+  return `${colors[color] ?? colors.gray}[${shortPrefix}]${reset}`;
 }
 
 function printBlue(message: string) {
-  process.stdout.write(`${blue}[dev]${reset} ${message}\n`);
+  process.stdout.write(`${prefixColor}[dev]${reset} ${message}\n`);
 }
 
-function pipeOutput(proc: ReturnType<typeof Bun.spawn>, name: string, color: string, stream: "stdout" | "stderr") {
+function pipeOutput(proc: ReturnType<typeof Bun.spawn>, prefix: string, color: ColorName, stream: "stdout" | "stderr") {
   const source = stream === "stdout" ? proc.stdout : proc.stderr;
   if (!source) return;
 
@@ -54,12 +61,12 @@ function pipeOutput(proc: ReturnType<typeof Bun.spawn>, name: string, color: str
       buffer = lines.pop() ?? "";
       for (const line of lines) {
         if (!line) continue;
-        process.stdout.write(`${tag(name, color)} ${line}\n`);
+        process.stdout.write(`${tag(prefix, color)} ${line}\n`);
       }
     }
 
     const tail = (buffer + decoder.decode()).trim();
-    if (tail) process.stdout.write(`${tag(name, color)} ${tail}\n`);
+    if (tail) process.stdout.write(`${tag(prefix, color)} ${tail}\n`);
   })();
 }
 
@@ -74,17 +81,25 @@ function stopAll(signal = "SIGTERM") {
 }
 
 for (const spec of specs) {
+  const env = {
+    ...process.env,
+    ...(spec.name === "server" ? { GLIB_LOG_REQUESTS: "1", GLIB_LOG_AGENT: "1" } : {}),
+    ...(spec.env ?? {})
+  };
+
   const proc = Bun.spawn({
     cmd: spec.cmd,
     cwd: spec.cwd,
+    env,
     stdout: "pipe",
     stderr: "pipe",
     stdin: "inherit"
   });
 
   children.set(spec.name, proc);
-  pipeOutput(proc, spec.name, spec.color, "stdout");
-  pipeOutput(proc, spec.name, spec.color, "stderr");
+  printBlue(`started ${spec.name}: ${spec.cmd.join(" ")}`);
+  pipeOutput(proc, spec.prefix, spec.color, "stdout");
+  pipeOutput(proc, spec.prefix, spec.color, "stderr");
 
   void proc.exited.then((code) => {
     printBlue(`${spec.name} exited (${code})`);
@@ -95,8 +110,7 @@ for (const spec of specs) {
   });
 }
 
-printBlue("server: http://127.0.0.1:4273");
-printBlue("web:    http://127.0.0.1:5173");
+for (const link of config.links) printBlue(link);
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {

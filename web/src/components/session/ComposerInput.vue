@@ -123,9 +123,20 @@ function onKeydown(event: KeyboardEvent) {
     return;
   }
 
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    if (commandMenuOpen.value) {
+      const item = filteredCommands.value[highlightedIndex.value];
+      if (item) selectCommand(item.value);
+      return;
+    }
+    if (props.modelValue.trim()) emit('send');
+    return;
+  }
+
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
     event.preventDefault();
-    emit('send');
+    if (props.modelValue.trim()) emit('send');
     return;
   }
 
@@ -140,13 +151,6 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowUp') {
     event.preventDefault();
     highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0);
-    return;
-  }
-
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    const item = filteredCommands.value[highlightedIndex.value];
-    if (item) selectCommand(item.value);
     return;
   }
 

@@ -1,210 +1,164 @@
 <template>
-  <UiDialog size="xl" :show-close-button="false" @close="$emit('close')">
-    <div class="flex h-14 items-center border-b border-border/80 px-5">
-      <h3 class="text-base font-semibold tracking-[0.01em]">Settings</h3>
+  <UiDialog size="xl" dialog-class="h-[82vh] max-w-[1180px] overflow-hidden" :show-close-button="false" @close="$emit('close')">
+    <div class="flex h-14 shrink-0 items-center border-b border-border/80 px-5">
+      <div>
+        <h3 class="text-base font-semibold tracking-[0.01em]">Settings</h3>
+        <p class="text-[11px] text-muted-foreground">Runtime, GitTrix, appearance, and shortcuts.</p>
+      </div>
       <UiButton variant="outline" size="sm" class="ml-auto" @click="$emit('close')">Close</UiButton>
     </div>
 
-    <div class="grid grid-cols-[180px_1fr]">
-      <nav class="border-r border-border/80 p-3">
+    <div class="grid min-h-0 flex-1 grid-cols-[190px_1fr]">
+      <nav class="border-r border-border/80 bg-background/20 p-3">
         <button
           v-for="t in tabs"
           :key="t"
           :class="[
-            'mb-1 h-10 w-full rounded-md border px-3 text-left text-sm font-medium transition-colors',
-            tab === t ? 'border-border bg-muted/80 text-foreground' : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55'
+            'mb-1 flex h-11 w-full items-center justify-between rounded-lg border px-3 text-left text-sm font-medium transition-colors',
+            tab === t ? 'border-border bg-muted/80 text-foreground' : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
           ]"
           @click="tab = t"
         >
-          {{ t }}
+          <span>{{ t }}</span>
+          <span v-if="t === 'Models'" class="rounded-full border border-border/60 px-1.5 py-0.5 text-[10px]">{{ authenticatedProviderCount }}</span>
         </button>
       </nav>
 
-      <section class="space-y-6 p-5">
+      <section class="min-h-0 overflow-auto p-6">
         <template v-if="tab === 'Models'">
-          <div class="space-y-5">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Model setup</p>
-              <p class="mt-1 text-xs text-muted-foreground">Pick a provider first, then choose a model. This mirrors opencode provider/model capability state.</p>
+          <div class="space-y-4">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Models</p>
+                <h4 class="mt-1 text-xl font-semibold tracking-tight">Model access</h4>
+                <p class="mt-1 text-sm text-muted-foreground">Choose the active model and manage provider keys.</p>
+              </div>
             </div>
 
-            <div v-if="authenticatedProviderCount === 0" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
+              <div class="flex items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-3">
+                  <ModelIcon :provider="settings.defaultProvider" :size="36" theme="dark" />
+                  <div class="min-w-0">
+                    <p class="text-xs text-muted-foreground">Active model</p>
+                    <p class="mt-1 truncate text-lg font-semibold text-foreground">{{ settings.defaultProvider }}/{{ settings.defaultModel }}</p>
+                    <p class="mt-1 text-xs text-muted-foreground">{{ settings.defaultProvider }} {{ activeProviderConnected ? 'connected' : 'needs key' }}</p>
+                  </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <UiButton v-if="!activeProviderConnected && authDraftProviderId !== settings.defaultProvider" variant="outline" size="sm" @click="startAuthDraft(settings.defaultProvider)">Add {{ settings.defaultProvider }} key</UiButton>
+                  <UiButton variant="outline" size="sm" @click="$emit('open-model-picker')">Change model</UiButton>
+                </div>
+              </div>
+              <div v-if="!activeProviderConnected && authDraftProviderId === settings.defaultProvider" class="mt-4 flex items-center gap-2 border-t border-border/60 pt-4">
+                <input v-model="authDraftApiKey" type="password" class="h-9 min-w-0 flex-1 rounded-md border border-border/70 bg-background px-3 text-sm" :placeholder="`Paste ${settings.defaultProvider} API key`" />
+                <UiButton size="sm" variant="outline" :disabled="!authDraftApiKey.trim()" @click="saveProviderKey(settings.defaultProvider)">Save</UiButton>
+                <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
+              </div>
+            </div>
+
+            <div v-if="authenticatedProviderCount === 0" class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
               New here? Get started with
               <a class="underline underline-offset-2" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>
-              — one key, all models.
+              — one key, broad model access.
             </div>
 
-            <div>
-              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Providers</label>
-              <div class="space-y-1 rounded-lg border border-border/70 bg-background/40 p-2">
-                <div v-for="provider in providers" :key="provider.id" class="rounded-md border border-transparent p-1 hover:border-border/60">
-                  <button
-                    type="button"
-                    :disabled="!provider.hasAuth"
-                    :class="[
-                      'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-                      settings.defaultProvider === provider.id
-                        ? 'border-border bg-muted/80 text-foreground'
-                        : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
-                    ]"
-                    @click="$emit('update:provider', provider.id)"
-                  >
-                    <span class="truncate">{{ provider.id }}</span>
-                    <span class="text-[11px] text-muted-foreground">{{ provider.modelIds.length }} models</span>
-                  </button>
+            <div class="rounded-xl border border-border/70 bg-background/35">
+              <div class="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                <div>
+                  <p class="text-sm font-medium">Providers</p>
+                  <p class="text-xs text-muted-foreground">Authenticated providers can run agent sessions.</p>
+                </div>
+                <span class="text-xs text-muted-foreground">{{ authenticatedProviderCount }} connected</span>
+              </div>
 
-                  <div v-if="!provider.hasAuth" class="mt-2">
-                    <button
-                      v-if="authDraftProviderId !== provider.id"
-                      class="text-xs text-primary underline underline-offset-2"
-                      @click="startAuthDraft(provider.id)"
-                    >
-                      Add API key
-                    </button>
-                    <div v-else class="flex items-center gap-2">
-                      <input
-                        v-model="authDraftApiKey"
-                        type="password"
-                        class="h-8 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs"
-                        placeholder="Paste API key"
-                      />
-                      <UiButton size="sm" variant="outline" @click="saveProviderKey(provider.id)">Save</UiButton>
-                      <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
+              <div class="max-h-[46vh] divide-y divide-border/60 overflow-auto">
+                <div v-for="provider in sortedProviders" :key="provider.id" class="grid min-h-[64px] grid-cols-[minmax(0,1fr)_92px] items-center gap-4 px-4 py-2.5">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <ModelIcon :provider="provider.id" :size="28" theme="dark" />
+                    <div class="min-w-0">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <button
+                          type="button"
+                          :disabled="!provider.hasAuth"
+                          class="min-w-0 truncate text-left text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:text-muted-foreground/60"
+                          @click="$emit('update:provider', provider.id)"
+                        >
+                          {{ provider.id }}
+                        </button>
+                        <span v-if="settings.defaultProvider === provider.id" class="rounded-full border border-primary/35 px-1.5 py-0.5 text-[10px] text-primary">Default</span>
+                      </div>
+                      <p class="mt-1 text-xs text-muted-foreground">{{ provider.modelIds.length }} models · <span :class="provider.hasAuth ? 'text-emerald-300/75' : 'text-muted-foreground/75'">{{ provider.hasAuth ? 'connected' : 'needs key' }}</span></p>
                     </div>
                   </div>
 
-                  <div v-else class="mt-1">
-                    <button class="text-xs text-muted-foreground underline underline-offset-2" @click="$emit('provider:remove-auth', provider.id)">Remove</button>
+                  <div>
+                    <div v-if="!provider.hasAuth && authDraftProviderId !== provider.id" class="flex justify-end">
+                      <UiButton size="sm" variant="ghost" @click="startAuthDraft(provider.id)">Add</UiButton>
+                    </div>
+                    <div v-else-if="provider.hasAuth" class="flex justify-end">
+                      <UiButton size="sm" variant="ghost" @click="$emit('provider:remove-auth', provider.id)">Remove</UiButton>
+                    </div>
+                    <div v-else class="col-span-3 flex items-center gap-2">
+                      <input v-model="authDraftApiKey" type="password" class="h-8 w-44 rounded-md border border-border/70 bg-background px-2 text-xs" placeholder="Paste API key" />
+                      <UiButton size="sm" variant="outline" :disabled="!authDraftApiKey.trim()" @click="saveProviderKey(provider.id)">Save</UiButton>
+                      <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
+                    </div>
                   </div>
                 </div>
-                <p v-if="providers.length === 0" class="px-2 py-3 text-xs text-amber-400">No providers discovered. Run <span class="font-mono">opencode auth list</span>.</p>
-              </div>
-            </div>
 
-            <div>
-              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Models for {{ activeProvider?.id ?? 'selected provider' }}</label>
-              <div class="max-h-[220px] space-y-1 overflow-auto rounded-lg border border-border/70 bg-background/40 p-2">
-                <button
-                  v-for="modelId in activeModelIds"
-                  :key="modelId"
-                  type="button"
-                  :class="[
-                    'flex h-10 w-full items-center rounded-md border px-3 text-left text-sm transition-colors',
-                    settings.defaultModel === modelId
-                      ? 'border-border bg-muted/80 text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
-                  ]"
-                  @click="$emit('update:model', modelId)"
-                >
-                  <span class="truncate">{{ modelId }}</span>
-                </button>
-                <p v-if="!activeProvider?.hasAuth" class="px-2 py-3 text-xs text-amber-400">Provider is not authenticated in opencode.</p>
-                <p v-else-if="activeModelIds.length === 0" class="px-2 py-3 text-xs text-amber-400">No models returned for this provider.</p>
+                <div v-if="providers.length === 0" class="p-4">
+                  <div class="rounded-lg border border-border/60 bg-background/55 p-4">
+                    <p class="text-sm text-amber-300">No providers discovered from the local runtime yet.</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Add an OpenRouter key to bootstrap model access.</p>
+                    <div class="mt-3 flex items-center gap-2">
+                      <input v-model="bootstrapApiKey" type="password" class="h-9 flex-1 rounded-md border border-border/70 bg-background px-3 text-sm" placeholder="Paste OpenRouter API key" />
+                      <UiButton size="sm" variant="outline" :disabled="!bootstrapApiKey.trim()" @click="saveBootstrapKey">Save</UiButton>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div class="rounded-lg border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
-              <p>
-                Providers: <span class="text-foreground">{{ providers.length }}</span> · Authenticated:
-                <span class="text-foreground">{{ authenticatedProviderCount }}</span> · Models:
-                <span class="text-foreground">{{ activeModelIds.length }}</span>
-              </p>
             </div>
           </div>
         </template>
 
-        <template v-else-if="tab === 'Git'">
+        <template v-else-if="tab === 'GitTrix'">
           <div class="space-y-5">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix setup</p>
-              <p class="mt-1 text-xs text-muted-foreground">
-                GitTrix keeps agent work isolated in ephemeral storage. Promote moves selected changes back to durable storage.
-              </p>
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix</p>
+              <h4 class="mt-1 text-xl font-semibold tracking-tight">Isolation and promote flow</h4>
+              <p class="mt-1 text-sm text-muted-foreground">Agent work runs in ephemeral storage. Promote moves selected changes back to durable storage.</p>
             </div>
 
-            <div class="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-background/45 p-3 text-xs">
-              <div>
-                <p class="text-muted-foreground">Durable</p>
-                <p class="mt-1 font-medium text-foreground">Local repo</p>
-              </div>
-              <div>
-                <p class="text-muted-foreground">Ephemeral</p>
-                <p class="mt-1 font-medium text-foreground">Local workspace</p>
-              </div>
-              <div>
-                <p class="text-muted-foreground">Promote</p>
-                <p class="mt-1 font-medium text-foreground">Commit</p>
-              </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="summary-card"><ProviderMark id="local" kind="git" /><div><p class="summary-label">Durable</p><p class="summary-value">Local repo</p></div></div>
+              <div class="summary-card"><ProviderMark id="local-workspace" kind="git" /><div><p class="summary-label">Ephemeral</p><p class="summary-value">Local workspace</p></div></div>
+              <div class="summary-card"><ProviderMark id="commit" kind="git" /><div><p class="summary-label">Promote</p><p class="summary-value">Commit</p></div></div>
             </div>
 
-            <div class="space-y-3">
-              <div>
-                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Durable provider</p>
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button v-for="option in durableOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
-                    <span>{{ option.label }}</span>
-                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ephemeral provider</p>
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button v-for="option in ephemeralOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
-                    <span>{{ option.label }}</span>
-                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Promote strategy</p>
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button v-for="option in promoteOptions" :key="option.id" :disabled="!option.available" :class="optionClass(option.available, option.selected)">
-                    <span>{{ option.label }}</span>
-                    <span class="text-[10px] text-muted-foreground">{{ option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon' }}</span>
-                  </button>
-                </div>
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
+              <p class="mb-3 text-sm font-medium">Available modes</p>
+              <div class="grid grid-cols-3 gap-4">
+                <OptionGroup title="Durable provider" :options="durableOptions" />
+                <OptionGroup title="Ephemeral provider" :options="ephemeralOptions" />
+                <OptionGroup title="Promote strategy" :options="promoteOptions" />
               </div>
             </div>
 
-            <div class="rounded-lg border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground">
               Ephemeral sessions are stored locally under <span class="font-mono text-foreground">&lt;configDir&gt;/gittrix-sessions</span>.
             </div>
 
-            <div>
-              <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Default project landing mode</label>
-              <div class="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  :class="[
-                    'h-10 rounded-md border text-sm transition-colors',
-                    defaultOpenMode === 'diff'
-                      ? 'border-border bg-muted/80 text-foreground'
-                      : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
-                  ]"
-                  @click="$emit('update:open-mode', 'diff')"
-                >
-                  Diffs
-                </button>
-                <button
-                  type="button"
-                  :class="[
-                    'h-10 rounded-md border text-sm transition-colors',
-                    defaultOpenMode === 'session'
-                      ? 'border-border bg-muted/80 text-foreground'
-                      : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
-                  ]"
-                  @click="$emit('update:open-mode', 'session')"
-                >
-                  Session
-                </button>
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
+              <p class="mb-3 text-sm font-medium">Default project landing mode</p>
+              <div class="grid max-w-md grid-cols-2 gap-2">
+                <button type="button" :class="landingClass(defaultOpenMode === 'diff')" @click="$emit('update:open-mode', 'diff')">Diffs</button>
+                <button type="button" :class="landingClass(defaultOpenMode === 'session')" @click="$emit('update:open-mode', 'session')">Session</button>
               </div>
-              <p class="mt-1.5 text-xs text-muted-foreground">Used as the default when selecting mode after opening or cloning a project.</p>
+              <p class="mt-2 text-xs text-muted-foreground">Used after opening or cloning a project.</p>
             </div>
 
-            <div class="rounded-lg border border-border/70 bg-background/50 p-3">
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-sm font-medium text-foreground">Diff workbench</p>
@@ -217,15 +171,21 @@
         </template>
 
         <template v-else-if="tab === 'Appearance'">
-          <div>
-            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Theme</p>
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Appearance</p>
+              <h4 class="mt-1 text-xl font-semibold tracking-tight">Theme</h4>
+            </div>
             <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
           </div>
         </template>
 
         <template v-else>
-          <div>
-            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Keyboard shortcuts</p>
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Keyboard shortcuts</p>
+              <h4 class="mt-1 text-xl font-semibold tracking-tight">Keybindings</h4>
+            </div>
             <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
           </div>
         </template>
@@ -235,33 +195,38 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, defineComponent, h, ref, watch } from 'vue';
 import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
+import ModelIcon from '../shared/ModelIcon.vue';
+import ProviderMark from '../shared/ProviderMark.vue';
 import KeybindingsEditor from './KeybindingsEditor.vue';
 import ThemePicker from './ThemePicker.vue';
+
+type Provider = { id: string; hasAuth: boolean; modelIds: string[] };
+type SettingsTab = 'Models' | 'GitTrix' | 'Appearance' | 'Keybindings';
 
 const props = defineProps<{
   settings: { themePreset: string; defaultProvider: string; defaultModel: string };
   keybindings: Array<{ command: string; key: string }>;
-  providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
+  providers: Provider[];
   defaultOpenMode: 'diff' | 'session';
   initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
 
-const tabs = ['Models', 'Git', 'Appearance', 'Keybindings'] as const;
-const tab = ref<(typeof tabs)[number]>(props.initialTab ?? 'Models');
+const tabs = ['Models', 'GitTrix', 'Appearance', 'Keybindings'] as const;
+const tab = ref<SettingsTab>(mapInitialTab(props.initialTab));
 
 watch(
   () => props.initialTab,
   (next) => {
-    if (next) tab.value = next;
+    tab.value = mapInitialTab(next);
   }
 );
 
-const activeProvider = computed(() => props.providers.find((provider) => provider.id === props.settings.defaultProvider));
-const activeModelIds = computed(() => activeProvider.value?.modelIds ?? []);
 const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+const activeProviderConnected = computed(() => props.providers.some((provider) => provider.id === props.settings.defaultProvider && provider.hasAuth));
+const sortedProviders = computed(() => [...props.providers].sort((a, b) => Number(b.hasAuth) - Number(a.hasAuth) || a.id.localeCompare(b.id)));
 
 const durableOptions = [
   { id: 'local', label: 'Local repo', available: true, selected: true },
@@ -285,19 +250,9 @@ const promoteOptions = [
   { id: 'patch', label: 'Patch', available: false, selected: false }
 ];
 
-function optionClass(available: boolean, selected: boolean) {
-  return [
-    'flex h-10 items-center justify-between rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-    selected
-      ? 'border-border bg-muted/80 text-foreground'
-      : available
-        ? 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
-        : 'border-border/40 bg-background/25 text-muted-foreground'
-  ];
-}
-
 const authDraftProviderId = ref('');
 const authDraftApiKey = ref('');
+const bootstrapApiKey = ref('');
 
 const emit = defineEmits<{
   close: [];
@@ -307,9 +262,48 @@ const emit = defineEmits<{
   'update:keybinding': [command: string, key: string];
   'update:open-mode': [value: 'diff' | 'session'];
   'open-gittrix': [];
+  'open-model-picker': [];
   'provider:add-auth': [providerId: string, apiKey: string];
   'provider:remove-auth': [providerId: string];
 }>();
+
+const OptionGroup = defineComponent({
+  props: { title: { type: String, required: true }, options: { type: Array as () => Array<{ id: string; label: string; available: boolean; selected: boolean }>, required: true } },
+  setup(componentProps) {
+    return () => {
+      const optionButtons = componentProps.options.map((option) => h('button', {
+        key: option.id,
+        disabled: !option.available,
+        class: [
+          'flex h-11 w-full items-center justify-between gap-3 rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+          option.selected ? 'border-border bg-muted/80 text-foreground' : option.available ? 'border-border/60 bg-background/55 text-muted-foreground hover:bg-muted/55' : 'border-border/40 bg-background/25 text-muted-foreground'
+        ]
+      }, [
+        h('span', { class: 'flex min-w-0 items-center gap-2' }, [
+          h(ProviderMark, { id: option.id, kind: 'git', size: 'sm', muted: !option.available }),
+          h('span', { class: 'truncate' }, option.label)
+        ]),
+        h('span', { class: 'text-[10px] text-muted-foreground' }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon')
+      ]));
+
+      return h('div', { class: 'space-y-2' }, [
+        h('p', { class: 'text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground' }, componentProps.title),
+        h('div', { class: 'space-y-2' }, optionButtons)
+      ]);
+    };
+  }
+});
+
+function mapInitialTab(value?: 'Models' | 'Git' | 'Appearance' | 'Keybindings'): SettingsTab {
+  return value === 'Git' ? 'GitTrix' : value ?? 'Models';
+}
+
+function landingClass(active: boolean) {
+  return [
+    'h-10 rounded-md border text-sm transition-colors',
+    active ? 'border-border bg-muted/80 text-foreground' : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
+  ];
+}
 
 function startAuthDraft(providerId: string) {
   authDraftProviderId.value = providerId;
@@ -327,4 +321,36 @@ function saveProviderKey(providerId: string) {
   emit('provider:add-auth', providerId, key);
   cancelAuthDraft();
 }
+
+function saveBootstrapKey() {
+  const key = bootstrapApiKey.value.trim();
+  if (!key) return;
+  emit('provider:add-auth', 'openrouter', key);
+  bootstrapApiKey.value = '';
+}
 </script>
+
+<style scoped>
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--background) / 0.35);
+  padding: 12px;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.summary-value {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+</style>

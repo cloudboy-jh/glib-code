@@ -1,13 +1,13 @@
 # UI Parity / Consistency Checklist
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 This is now a practical checklist for current `web/` implementation quality, not a source-locked mirror document.
 
 ## App shell
 
 - [ ] Sidebar collapse/resize behavior feels consistent across breakpoints.
-- [ ] Header, timeline, and composer spacing tokens are uniform.
+- [x] Header, timeline, and composer spacing tokens are uniform enough for current pass.
 - [ ] No component uses one-off hardcoded colors when token exists.
 
 ## Picker and project flows
@@ -25,12 +25,13 @@ This is now a practical checklist for current `web/` implementation quality, not
 
 ## Session UX
 
-- [ ] Empty session and empty timeline states are distinct and intentional.
+- [x] Empty session and empty timeline states are distinct and intentional.
 - [ ] Composer command interactions work with keyboard only.
 - [ ] Command palette actions respect current mode/project availability.
-- [ ] Provider/model selectors reflect backend capability state exactly.
-- [ ] Unavailable providers/models are never selectable.
-- [ ] Provider/model error states are explicit and actionable.
+- [x] Provider/model selectors reflect backend capability state exactly.
+- [x] Unavailable providers/models are not selectable for agent execution.
+- [x] Provider/model error states are explicit and actionable.
+- [x] Tool calls are not dumped as raw text; they render as compact expandable cards.
 
 ## Overlay behavior
 
@@ -40,6 +41,7 @@ This is now a practical checklist for current `web/` implementation quality, not
 
 ## Visual acceptance gate
 
-- [ ] Capture before/after screenshots for Picker, Diff, Session, Settings.
+- [ ] Capture before/after screenshots for Diff, Session, Settings.
+- [x] Add current Picker screenshot to README.
 - [ ] Build/typecheck pass after UI changes.
 - [ ] No placeholder text in primary product surfaces.

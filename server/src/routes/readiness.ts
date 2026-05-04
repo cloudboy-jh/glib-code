@@ -42,7 +42,7 @@ export const readinessRoutes = new Hono().get("/", async (c) => {
         version: git.ok ? git.out : undefined,
         error: git.ok ? undefined : git.err || "git not found"
       },
-      opencode: {
+      pi: {
         ok: piVersion.ok && readyProviders.length > 0,
         version: piVersion.ok ? piVersion.out : undefined,
         error: piVersion.ok ? (readyProviders.length ? undefined : "no providers configured") : piVersion.err || "pi not found",

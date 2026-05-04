@@ -1,35 +1,37 @@
 # Frontend Checklist
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## API wiring cleanup
 
 - [ ] Replace hardcoded `API_BASE` with env-driven config.
-- [ ] Remove remaining local/mock session data in `App.vue`.
-- [ ] Hydrate sessions from `/api/sessions` when backend routes are implemented.
+- [x] Remove localStorage-backed mock session persistence from primary session flow.
+- [x] Hydrate sessions from `/api/sessions`.
 - [ ] Handle backend 404/501 states with explicit UI fallbacks (not silent failures).
 
 ## Provider/model capability UX
 
 - [x] Consume dynamic provider/model capabilities from `/api/providers`.
 - [x] Replace static settings model input with provider-scoped selectors.
-- [ ] Surface provider auth/capability failures with explicit UI messages.
+- [x] Surface provider auth/capability failures with explicit UI messages.
 - [ ] Add project-level provider/model override UX + effective state labels.
 
 ## Provider auth UX
 
-- [ ] In Settings → Models, show "Add API key" for unauthenticated providers.
-- [ ] Save provider key with `POST /api/providers/:id/auth` and refresh capability state.
-- [ ] Allow key removal with `DELETE /api/providers/:id/auth`.
-- [ ] Show OpenRouter onboarding banner when no providers are authenticated.
-- [ ] Add first-run provider setup card in Picker before main actions.
+- [x] In Settings → Models, show "Add API key" for unauthenticated providers.
+- [x] Save provider key with `POST /api/providers/:id/auth` and refresh capability state.
+- [x] Allow key removal with `DELETE /api/providers/:id/auth`.
+- [x] Show OpenRouter onboarding banner when no providers are authenticated.
+- [x] Add optional provider setup card in Picker.
+- [x] Keep picker/project open/diff review usable without a provider key.
 
 ## Promote UX
 
-- [ ] Fetch and render `/api/sessions/:id/diff` via `@pierre/diffs`.
-- [ ] Add file/hunk selection UI for promote selectors.
-- [ ] Trigger `POST /api/sessions/:id/promote` from session UI.
-- [ ] Handle 409 baseline conflict response with dedicated modal/state.
+- [x] Fetch and render `/api/sessions/:id/diff` via `@pierre/diffs`.
+- [ ] Add hunk selection UI for promote selectors.
+- [x] Add file selection UI for promote selectors.
+- [x] Trigger `POST /api/sessions/:id/promote` from session UI.
+- [x] Handle 409 baseline conflict response with dedicated modal/state.
 
 ## Diff → session context flow
 
@@ -40,11 +42,12 @@ Last updated: 2026-05-02
 
 ## Session and streaming
 
-- [ ] Create sessions via `/api/agent/sessions`.
-- [ ] Send prompts via `/api/agent/sessions/:id/send`.
-- [ ] Stream events via `/api/agent/sessions/:id/stream`.
-- [ ] Reduce streamed events into timeline entries.
-- [ ] Implement abort action using `DELETE /api/agent/sessions/:id/turn`.
+- [x] Create sessions via `/api/agent/sessions`.
+- [x] Send prompts via `/api/agent/sessions/:id/send`.
+- [x] Stream events via `/api/agent/sessions/:id/stream`.
+- [x] Reduce streamed events into timeline entries.
+- [x] Render tool calls as compact expandable cards.
+- [x] Implement abort action using `DELETE /api/agent/sessions/:id/turn`.
 
 ## Terminal and attachments
 
@@ -60,10 +63,10 @@ Last updated: 2026-05-02
 ## Picker home controls
 
 - [x] Add home controls for Theme, GitTrix settings, and Model access.
-- [ ] Keep behavior parity between home quick controls and Settings modal.
+- [x] Keep behavior parity between home quick controls and Settings modal.
 
 ## Definition of done (frontend)
 
 - [ ] No critical workflow depends on mock-only data paths.
-- [ ] Diff review -> context attach -> prompt send -> streamed timeline works end-to-end.
+- [x] Diff review -> context attach -> prompt send -> streamed timeline works end-to-end.
 - [ ] Build and typecheck pass (`bun run --cwd web check`, `bun run --cwd web build`).

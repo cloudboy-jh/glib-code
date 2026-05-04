@@ -17,7 +17,7 @@ export type Settings = {
   defaultModel: string;
   confirmDestroy: boolean;
   telemetryOptIn: boolean;
-  opencodeBinaryPath: string;
+  piBinaryPath: string;
   maxImageAttachmentMb: number;
 };
 
@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: Settings = {
   defaultModel: "claude-opus-4.7",
   confirmDestroy: true,
   telemetryOptIn: false,
-  opencodeBinaryPath: "",
+  piBinaryPath: "",
   maxImageAttachmentMb: 10
 };
 

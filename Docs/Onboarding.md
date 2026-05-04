@@ -1,6 +1,6 @@
 # Onboarding and First-Run Flow (Current)
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## What exists today
 
@@ -12,14 +12,16 @@ Requirements:
 
 - Bun
 - Git
-- At least one provider API key configured in-app
+- At least one provider API key configured in-app before starting agent sessions
 
 Steps:
 
 1. `bun install`
 2. `bun run dev`
 3. Open `http://127.0.0.1:5173`
-4. Add provider key in first-run setup card or Settings → Models
+4. Open or clone a git repo
+5. Review diffs freely without a provider key
+6. Add a provider key in Picker setup or Settings → Models before starting an agent session
 
 Backend server listens on `http://127.0.0.1:4273` in dev.
 
@@ -56,6 +58,8 @@ Provider auth behavior:
 - `POST /api/providers/:id/auth` saves provider API key
 - `DELETE /api/providers/:id/auth` removes provider API key
 - `GET /api/providers` reflects authenticated providers/models
+- Keys are saved under glib-code app config at `<configDir>/pi/auth.json`
+- glib-code does not read other apps' auth stores
 
 Hosted account auth behavior is still placeholder:
 
@@ -67,3 +71,4 @@ No hosted sign-in/onboarding path should be documented as shipped yet.
 ## GitTrix session storage
 
 - Ephemeral session workspaces live under `<configDir>/gittrix-sessions/`.
+- Agent writes stay in the ephemeral workspace until the user promotes selected changes.

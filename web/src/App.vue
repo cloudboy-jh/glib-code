@@ -30,10 +30,10 @@
           :title="activeSession?.title ?? 'No active session'"
           :project="currentProject.name"
           :branch="currentProject.branch"
-          :model="settings.defaultModel"
+          :model="selectedModelLabel"
           @diff-current="openCurrentSessionDiff"
           @diff-commits="openCommitsListDiff"
-          @open-model="openSettings('Models')"
+          @open-model="state.modelPickerOpen = true"
           @git-action="runPromote"
         />
 
@@ -66,7 +66,7 @@
           <template v-else>
             <template v-if="state.mode === 'session'">
               <template v-if="activeSession">
-                <div class="grid h-full min-h-0 min-w-0 grid-rows-[auto_1fr_auto] overflow-hidden">
+                <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
                   <SessionContextCapsule
                     v-if="activeContextBundle"
                     :summary="activeContextSummary"
@@ -75,7 +75,7 @@
                     @back-to-diffs="state.mode = 'diff'"
                   />
                   <Timeline :entries="activeTimeline" />
-                  <Composer :context="contextLabel" :prompt="forms.prompt" @update:prompt="forms.prompt = $event" @send="sendPrompt" @execute-command="runComposerCommand" />
+                  <Composer :context="contextLabel" :prompt="forms.prompt" :meta="selectedModelLabel" @update:prompt="forms.prompt = $event" @send="sendPrompt" @execute-command="runComposerCommand" />
                 </div>
               </template>
 
@@ -86,7 +86,13 @@
                     <p class="mb-4 text-sm text-muted-foreground">Review diffs first or start a new session with the agent.</p>
                     <div v-if="state.agentSetupMessage" class="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
                       <p>{{ state.agentSetupMessage }}</p>
-                      <button class="mt-2 underline underline-offset-2" @click="openSettings('Models')">Add provider key in Settings</button>
+                      <div class="mt-2 flex flex-wrap gap-3">
+                        <button class="underline underline-offset-2" @click="openSettings('Models')">Add {{ settings.defaultProvider }} key</button>
+                        <button v-if="compatibleUsableModel" class="underline underline-offset-2" @click="selectModel(compatibleUsableModel.providerId, compatibleUsableModel.modelId)">
+                          Use {{ compatibleUsableModel.providerId }}/{{ compatibleUsableModel.modelId }}
+                        </button>
+                        <button class="underline underline-offset-2" @click="state.modelPickerOpen = true">Change model</button>
+                      </div>
                     </div>
                     <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="createSession">
                       Start session
@@ -132,12 +138,23 @@
       @close="state.settingsOpen = false"
       @update:theme="settings.themePreset = $event"
       @update:provider="updateDefaultProvider"
-      @update:model="settings.defaultModel = $event"
+      @update:model="selectModel(settings.defaultProvider, $event)"
       @update:keybinding="updateKeybinding"
       @update:open-mode="settings.defaultOpenMode = $event"
       @open-gittrix="openGitTrixFromSettings"
+      @open-model-picker="state.modelPickerOpen = true"
       @provider:add-auth="saveProviderAuth"
       @provider:remove-auth="removeProviderAuth"
+    />
+
+    <ModelPicker
+      v-if="state.modelPickerOpen"
+      :providers="providerCapabilities.providers"
+      :default-provider="settings.defaultProvider"
+      :default-model="settings.defaultModel"
+      @close="state.modelPickerOpen = false"
+      @select="selectModel"
+      @needs-auth="openProviderAuth"
     />
 
     <TerminalDrawer
@@ -236,17 +253,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import type { AgentEvent } from '@glib-code/shared/events/agent';
 import CommandPalette from './components/app/CommandPalette.vue';
 import TerminalDrawer from './components/app/TerminalDrawer.vue';
-import DiffWorkbench from './components/diff/DiffWorkbench.vue';
-import DiffView from './components/shared/DiffView.vue';
 import CloneRepoDialog from './components/picker/CloneRepoDialog.vue';
 import OpenProjectDialog from './components/picker/OpenProjectDialog.vue';
 import PickerScreen from './components/picker/PickerScreen.vue';
 import ThemeDialog from './components/picker/ThemeDialog.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
+import ModelPicker from './components/settings/ModelPicker.vue';
 import Composer from './components/session/Composer.vue';
 import SessionContextCapsule from './components/session/SessionContextCapsule.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
@@ -260,6 +276,8 @@ import logoWordmark from '../../glibcode-wordmark.png';
 
 const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
+const DiffWorkbench = defineAsyncComponent(() => import('./components/diff/DiffWorkbench.vue'));
+const DiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
 const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
 const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
@@ -307,6 +325,13 @@ type TimelineEntry = {
   text: string;
   time: string;
   level?: 'info' | 'error';
+  toolCalls?: Array<{
+    id: string;
+    title: string;
+    input?: string;
+    output?: string;
+    isError?: boolean;
+  }>;
 };
 
 type PendingProjectOpen = { name: string; path: string };
@@ -360,6 +385,7 @@ const state = reactive({
   paletteOpen: false,
   paletteIndex: 0,
   settingsOpen: false,
+  modelPickerOpen: false,
   settingsTab: 'Models' as 'Models' | 'Git' | 'Appearance' | 'Keybindings',
   terminalOpen: false,
   openProjectDialogOpen: false,
@@ -415,6 +441,18 @@ const activeTimeline = computed(() => {
   return timelineBySessionId[state.activeSessionId] ?? [];
 });
 
+const activeProvider = computed(() => providerCapabilities.providers.find((provider) => provider.id === settings.defaultProvider));
+const activeProviderConnected = computed(() => activeProvider.value?.hasAuth === true);
+const compatibleUsableModel = computed(() => {
+  if (activeProviderConnected.value) return null;
+  for (const provider of providerCapabilities.providers) {
+    if (!provider.hasAuth) continue;
+    const modelId = provider.modelIds.find((id) => id === settings.defaultModel || id === `${settings.defaultProvider}/${settings.defaultModel}`);
+    if (modelId) return { providerId: provider.id, modelId };
+  }
+  return null;
+});
+
 const contextLabel = computed(() => {
   if (state.mode !== 'session') return '';
   if (!currentProject.value) return '';
@@ -445,7 +483,16 @@ let stopSidebarResize: (() => void) | null = null;
 
 
 function eventKey(event: AgentEvent) {
-  return `${event.type}:${JSON.stringify(event)}`;
+  if (event.type === 'session_start') return `session_start:${event.sessionId}:${event.createdAt}`;
+  if (event.type === 'user_turn') return `user_turn:${event.turnId}:${event.at}`;
+  if (event.type === 'turn_start') return `turn_start:${event.turnId}:${event.at}`;
+  if (event.type === 'turn_end') return `turn_end:${event.turnId}:${event.reason}:${event.at}`;
+  if (event.type === 'aborted') return `aborted:${event.turnId}:${event.at}`;
+  if (event.type === 'step_start') return `step_start:${event.turnId}:${event.stepId}:${event.at}`;
+  if (event.type === 'step_end') return `step_end:${event.turnId}:${event.stepId}:${event.at}`;
+  if (event.type === 'text_part') return `text_part:${event.turnId}:${event.stepId}:${event.partId}:${event.at}`;
+  if (event.type === 'tool_call') return `tool_call:${event.turnId}:${event.stepId}:${event.callId}:${event.at}`;
+  return `error:${event.turnId}:${event.name}:${event.at}`;
 }
 
 function timeLabel(value?: string) {
@@ -460,6 +507,19 @@ function timeLabel(value?: string) {
 function appendTimelineEvent(sessionId: string, entry: TimelineEntry) {
   const list = timelineBySessionId[sessionId] ?? (timelineBySessionId[sessionId] = []);
   list.push(entry);
+}
+
+function findTimelineEntry(sessionId: string, id: string) {
+  return (timelineBySessionId[sessionId] ?? []).find((entry) => entry.id === id);
+}
+
+function ensureAssistantTurn(sessionId: string, turnId: string, at?: string) {
+  const id = `${turnId}-assistant`;
+  const existing = findTimelineEntry(sessionId, id);
+  if (existing) return existing;
+  const entry: TimelineEntry = { id, kind: 'Assistant', text: 'Working…', time: timeLabel(at), level: 'info' };
+  appendTimelineEvent(sessionId, entry);
+  return entry;
 }
 
 function filesFromPatch(patch: string) {
@@ -477,28 +537,60 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   seenEventKeysBySessionId.set(sessionId, seen);
 
   if (event.type === 'user_turn') {
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-u`, kind: 'User', text: event.prompt, time: timeLabel(event.at), level: 'info' });
+    const id = `${event.turnId}-user`;
+    if (!findTimelineEntry(sessionId, id)) {
+      appendTimelineEvent(sessionId, { id, kind: 'User', text: event.prompt, time: timeLabel(event.at), level: 'info' });
+    }
     return;
   }
   if (event.type === 'turn_start') {
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-ts`, kind: 'Agent', text: 'Working…', time: timeLabel(event.at), level: 'info' });
+    ensureAssistantTurn(sessionId, event.turnId, event.at);
     return;
   }
   if (event.type === 'text_part') {
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-t`, kind: 'Assistant', text: event.text, time: timeLabel(event.at), level: 'info' });
+    const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    entry.text = entry.text === 'Working…' ? event.text : `${entry.text}${event.text}`;
     return;
   }
   if (event.type === 'tool_call') {
-    const text = event.output?.trim() ? `${event.tool}\n${event.output}` : `${event.tool}`;
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-tool`, kind: 'Tool', text, time: timeLabel(event.at), level: 'info' });
+    const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    if (entry.text === 'Working…') entry.text = '';
+    const calls = entry.toolCalls ?? (entry.toolCalls = []);
+    const existing = calls.find((call) => call.id === event.callId);
+    const input = Object.keys(event.input ?? {}).length ? JSON.stringify(event.input, null, 2) : '';
+    const output = event.output?.trim() ?? '';
+    if (existing) {
+      existing.title = event.title || event.tool;
+      existing.input = input || existing.input;
+      existing.output = output || existing.output;
+      existing.isError = Boolean((event.metadata as { isError?: unknown })?.isError);
+    } else {
+      calls.push({
+        id: event.callId,
+        title: event.title || event.tool,
+        input,
+        output,
+        isError: Boolean((event.metadata as { isError?: unknown })?.isError)
+      });
+    }
     return;
   }
   if (event.type === 'error') {
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-err`, kind: 'Error', text: event.message ?? event.name, time: timeLabel(event.at), level: 'error' });
+    const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    entry.kind = 'Error';
+    entry.text = event.message ?? event.name;
+    entry.level = 'error';
     return;
   }
   if (event.type === 'turn_end') {
-    appendTimelineEvent(sessionId, { id: `${sessionId}-${Date.now()}-te`, kind: 'System', text: `Turn ended (${event.reason})`, time: timeLabel(event.at), level: event.reason === 'error' ? 'error' : 'info' });
+    const entry = findTimelineEntry(sessionId, `${event.turnId}-assistant`);
+    if (entry?.text === 'Working…') {
+      entry.text = event.reason === 'stop' ? 'No response returned.' : `Turn ended (${event.reason})`;
+      entry.level = event.reason === 'error' ? 'error' : 'info';
+    }
+    if (event.reason === 'aborted' && !findTimelineEntry(sessionId, `${event.turnId}-aborted`)) {
+      appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), level: 'info' });
+    }
   }
 }
 
@@ -578,10 +670,20 @@ function openGitTrixFromSettings() {
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(detail || `request failed: ${response.status}`);
+    throw new Error(await readApiError(response));
   }
   return response.json() as Promise<T>;
+}
+
+async function readApiError(response: Response) {
+  const detail = await response.text().catch(() => '');
+  if (!detail) return `request failed: ${response.status}`;
+  try {
+    const parsed = JSON.parse(detail) as { message?: string; error?: string; code?: string };
+    return parsed.message || parsed.error || parsed.code || detail;
+  } catch {
+    return detail;
+  }
 }
 
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -591,8 +693,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(detail || `request failed: ${response.status}`);
+    throw new Error(await readApiError(response));
   }
   return response.json() as Promise<T>;
 }
@@ -600,8 +701,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
 async function apiDelete(path: string): Promise<void> {
   const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(detail || `request failed: ${response.status}`);
+    throw new Error(await readApiError(response));
   }
 }
 
@@ -612,8 +712,7 @@ async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(detail || `request failed: ${response.status}`);
+    throw new Error(await readApiError(response));
   }
   return response.json() as Promise<T>;
 }
@@ -646,8 +745,14 @@ async function hydrateProviders() {
 async function saveProviderAuth(providerId: string, apiKey: string) {
   const key = apiKey.trim();
   if (!providerId || !key) return;
+  const shouldActivate = providerId === settings.defaultProvider;
+  const desiredModel = settings.defaultModel;
   await apiPost('/providers/' + encodeURIComponent(providerId) + '/auth', { apiKey: key });
   await hydrateProviders();
+  const provider = providerCapabilities.providers.find((item) => item.id === providerId);
+  if (shouldActivate && provider?.hasAuth && provider.modelIds.includes(desiredModel)) {
+    await selectModel(providerId, desiredModel);
+  }
 }
 
 async function removeProviderAuth(providerId: string) {
@@ -850,7 +955,7 @@ async function createSession(options?: { title?: string; context?: string; initi
     state.mode = 'session';
     const message = error instanceof Error ? error.message : 'Unable to start session';
     state.agentSetupMessage = message.includes('provider') || message.includes('model')
-      ? 'Add a provider API key before starting an agent session. Project picker and diff review still work without one.'
+      ? `${message}. Active model: ${settings.defaultProvider}/${settings.defaultModel}. Project picker and diff review still work without an agent key.`
       : message;
     return null;
   }
@@ -1050,6 +1155,26 @@ async function updateDefaultProvider(providerId: string) {
   settings.defaultModel = saved.defaultModel;
 }
 
+async function selectModel(providerId: string, modelId: string) {
+  const provider = providerCapabilities.providers.find((item) => item.id === providerId);
+  if (!provider || !provider.hasAuth) return;
+  if (provider.modelIds.length > 0 && !provider.modelIds.includes(modelId)) return;
+  const saved = await apiPatch<{ defaultProvider: string; defaultModel: string }>('/providers/defaults', {
+    defaultProvider: providerId,
+    defaultModel: modelId
+  });
+  settings.defaultProvider = saved.defaultProvider;
+  settings.defaultModel = saved.defaultModel;
+  state.modelPickerOpen = false;
+}
+
+function openProviderAuth(providerId: string, modelId?: string) {
+  settings.defaultProvider = providerId;
+  if (modelId) settings.defaultModel = modelId;
+  state.modelPickerOpen = false;
+  openSettings('Models');
+}
+
 watch(
   () => settings.defaultModel,
   async (nextModel, prevModel) => {
@@ -1076,7 +1201,7 @@ function runComposerCommand(command: string) {
   }
 
   if (command === 'models' || command === 'model') {
-    openSettings('Models');
+    state.modelPickerOpen = true;
     return;
   }
 
@@ -1200,6 +1325,8 @@ onMounted(() => {
   void hydrateProviders().catch(() => undefined);
   window.addEventListener('keydown', onGlobalKeydown);
 });
+
+const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);
 
 watch(
   () => currentProject.value?.path,

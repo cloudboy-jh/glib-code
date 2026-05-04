@@ -43,7 +43,7 @@
       </div>
       <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
         <select v-model="providerDraft" class="h-9 rounded-md border border-border/70 bg-background px-2 text-xs">
-          <option v-for="provider in providers" :key="provider.id" :value="provider.id">{{ provider.id }}</option>
+          <option v-for="provider in providerOptions" :key="provider.id" :value="provider.id">{{ provider.label }}</option>
         </select>
         <input
           v-model="apiKeyDraft"
@@ -51,7 +51,11 @@
           class="h-9 rounded-md border border-border/70 bg-background px-3 text-xs"
           placeholder="Paste API key"
         />
-        <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-3 text-xs font-semibold text-primary-foreground" @click="saveProviderKey">
+        <button
+          class="h-9 rounded-md border border-border/80 bg-primary/90 px-3 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!providerDraft || !apiKeyDraft.trim()"
+          @click="saveProviderKey"
+        >
           Save
         </button>
       </div>
@@ -135,6 +139,10 @@ const apiKeyDraft = ref('');
 const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
 const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+const providerOptions = computed(() => {
+  if (props.providers.length) return props.providers.map((provider) => ({ id: provider.id, label: provider.id }));
+  return [{ id: 'openrouter', label: 'OpenRouter' }];
+});
 
 watch(
   () => props.providers,

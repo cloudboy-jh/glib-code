@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## App shell
 
@@ -17,7 +17,7 @@ Primary surfaces:
 - Command palette
 - Settings modal
 - Theme dialog
-- Terminal drawer (UI-only simulation)
+- Terminal drawer (UI-only simulation until `/api/term` lands)
 
 Home surface controls in Picker now include:
 
@@ -35,16 +35,24 @@ Real API-backed:
 
 Still local/mock in frontend state:
 
-- Session list/timeline lifecycle
-- Composer send behavior (no backend streaming yet)
 - Terminal output text
 - Some project/session transitions are still UI-driven fallbacks
+
+Agent/session data-plane now API-backed:
+
+- Session list hydration from `/api/sessions`
+- Session create through `/api/agent/sessions`
+- Prompt send through `/api/agent/sessions/:id/send`
+- Timeline streaming through `/api/agent/sessions/:id/stream`
+- Abort through `DELETE /api/agent/sessions/:id/turn`
+- Session diff/promote through `/api/sessions/:id/diff` and `/api/sessions/:id/promote`
 
 Now API-backed in settings plane:
 
 - Provider/model capability list via `/api/providers` (pi-discovered)
 - Default provider/model updates via `/api/providers/defaults`
 - Provider auth key write/remove via `/api/providers/:id/auth`
+- Active-provider key actions in Settings and session empty state
 
 ## Picker flow
 
@@ -79,6 +87,7 @@ Current behavior:
 - File picker for changed files
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
+- Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
 
 Not implemented in UI yet:
 
@@ -98,20 +107,21 @@ Files:
 Current state:
 
 - Session shell/layout is in place.
-- Timeline renders entries with simple message cards.
-- Composer supports prompt typing and command trigger UI.
-- Backend session + agent routes exist; remaining work is full UI data-plane parity and promote UX.
+- Timeline renders user/assistant/error entries plus compact expandable tool-call cards.
+- Composer sends real prompts and supports `/stop`/`/abort` command handling.
+- Session create/send/stream flows use backend agent routes.
+- Empty session state explains active model/provider key failures and offers key/model actions.
 
 ## Settings + keybindings
 
 - Settings modal and theme picker are wired to local reactive settings and shared presets.
+- Models tab manages provider keys and active model selection.
+- GitTrix tab shows the shipped Local repo → Local workspace → Commit mode and disables future modes as Coming Soon.
 - Keybindings editor exists; backend keybindings API exists but full parity behavior still needs cleanup.
 
 ## Known frontend debts
 
-- Remove remaining local mock session state and hydrate from `/api/sessions`.
-- Replace any remaining local send simulation with `/api/agent/sessions/:id/send` + SSE stream.
 - Remove hardcoded API base and use env/config.
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
-- Add in-session diff/promote surface with conflict handling.
+- Add hunk-level session context/promote selection.

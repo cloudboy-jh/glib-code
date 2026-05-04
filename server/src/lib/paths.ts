@@ -18,11 +18,8 @@ export function getConfigDir() {
   return xdg ? join(xdg, "glib-code") : join(os.homedir(), ".config", "glib-code");
 }
 
-export function getOpencodeAuthPath() {
-  // opencode stores auth at ~/.local/share/opencode/auth.json
-  // Uses XDG_DATA_HOME if set, otherwise ~/.local/share
-  const dataHome = process.env.XDG_DATA_HOME || join(os.homedir(), ".local", "share");
-  return join(dataHome, "opencode", "auth.json");
+export function getPiAuthPath() {
+  return join(getConfigDir(), "pi", "auth.json");
 }
 
 export function repoGlibDir(repoPath: string) {

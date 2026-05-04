@@ -1,4 +1,4 @@
-import { refreshPiModels } from "./pi-core";
+import { hasUsableProviderAuth, refreshPiModels } from "./pi-core";
 
 type Cached<T> = { at: number; value: T };
 
@@ -31,12 +31,12 @@ async function discoverFresh(): Promise<PiCapabilities> {
       byProvider.set(provider, set);
     }
 
-    const providers: ProviderCapability[] = [...byProvider.entries()]
-      .map(([id, modelIds]) => ({
+    const providers: ProviderCapability[] = (await Promise.all([...byProvider.entries()]
+      .map(async ([id, modelIds]) => ({
         id,
-        hasAuth: modelRegistry.getProviderAuthStatus(id).configured,
+        hasAuth: await hasUsableProviderAuth(id),
         modelIds: [...modelIds.values()]
-      }))
+      }))))
       .sort((a, b) => a.id.localeCompare(b.id));
 
     return { ok: true, providers };

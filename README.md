@@ -1,31 +1,52 @@
 <p align="center">
-  <img src="./glibcode-wordmark.png" alt="glib-code" width="1100" />
+  <img src="./glibcode-wordmark.png" alt="glib-code" width="720" />
+</p>
+
+<p align="center">
+  <strong>Review changes first. Start agent sessions with context. Promote only what you accept.</strong>
+</p>
+
+<p align="center">
+  <img src="./readme-screenshot.png" alt="glib-code app screenshot" width="1100" />
 </p>
 
 # glib-code
 
-Review-first AI coding workspace.
+glib-code is a local-first AI coding workspace for reviewing repo changes before asking an agent to work. Agent writes run in an isolated GitTrix workspace and only move back into the durable repo when you explicitly promote them.
 
-## What exists right now
+## What works now
 
-- Monorepo with `server`, `web`, `desktop`, `shared`
-- Real project picker/open/init/create + recents persistence
-- Real diff API for uncommitted + commit history sources
-- Real settings + keybindings + readiness + health endpoints
-- Provider/model capability API backed by opencode discovery (`/api/providers`)
-- Vue shell for diff/session workflows
+- Project picker with open/clone/recents flows.
+- Diff workbench for uncommitted changes and commit history.
+- Session creation backed by GitTrix local ephemeral workspaces.
+- Agent runtime backed by `@mariozechner/pi-coding-agent` in-process.
+- Provider/model discovery through pi, with glib-owned API key storage.
+- SSE timeline streaming for user turns, assistant text, errors, and compact tool-call cards.
+- Session diff review and file-level promote back to the durable repo.
+- Settings for model access, GitTrix mode visibility, appearance, and keybindings.
 
-## Not finished yet
+## Still in progress
 
-- GitTrix service boundary wiring (`session.write/promote/evict`)
-- Git mutation routes (most `/api/git/*` still 501)
-- Terminal WS and attachments routes
+- Terminal WebSocket transport (`/api/term`).
+- Attachments API + composer attachment UX (`/api/attachments`).
+- Git mutation routes under `/api/git` beyond read/status/log/branches.
+- Hunk-level session promote selection.
+- Cloudflare Artifacts GitTrix adapter. It stays disabled as `Coming Soon` until the backend adapter lands.
 
-## Runtime authority boundary
+## Runtime boundaries
 
-- opencode owns provider/model/auth truth.
-- glib backend stores selection state (defaults/overrides/session snapshot) and validates against opencode capabilities.
-- glib frontend renders capability state from backend; it does not hardcode provider/model catalogs.
+- pi owns provider/model capability and agent execution.
+- glib-code owns user-facing provider key storage under its own app config dir.
+- GitTrix owns durable/ephemeral workspace boundaries and promote operations.
+- The frontend never hardcodes provider/model catalogs; it renders backend capability state.
+
+Provider keys are stored at:
+
+```txt
+Windows: %APPDATA%/glib-code/pi/auth.json
+macOS:   ~/Library/Application Support/glib-code/pi/auth.json
+Linux:   $XDG_CONFIG_HOME/glib-code/pi/auth.json or ~/.config/glib-code/pi/auth.json
+```
 
 ## Quick start
 
@@ -48,6 +69,8 @@ bun run dev
 
 - API server: `http://127.0.0.1:4273`
 - Web app: `http://127.0.0.1:5173`
+
+Add a provider key in Settings → Models before starting an agent session. Project picker and diff review work without a provider key.
 
 ## Scripts
 

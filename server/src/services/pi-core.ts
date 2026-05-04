@@ -2,13 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
-import { getOpencodeAuthPath } from "../lib/paths";
+import { getPiAuthPath } from "../lib/paths";
 
 let authStorage: AuthStorage | null = null;
 let modelRegistry: ModelRegistry | null = null;
 
 async function normalizeAuthFile() {
-  const path = getOpencodeAuthPath();
+  const path = getPiAuthPath();
   if (!existsSync(path)) return;
   try {
     const raw = await readFile(path, "utf8");
@@ -32,12 +32,36 @@ async function normalizeAuthFile() {
 export async function getPiCore() {
   await normalizeAuthFile();
   if (!authStorage) {
-    authStorage = AuthStorage.create(getOpencodeAuthPath());
+    authStorage = AuthStorage.create(getPiAuthPath());
   }
   if (!modelRegistry) {
     modelRegistry = ModelRegistry.create(authStorage);
   }
   return { authStorage, modelRegistry };
+}
+
+export async function hasUsableProviderAuth(provider: string) {
+  const { authStorage } = await getPiCore();
+  const status = authStorage.getAuthStatus(provider);
+  if (!status.source) return false;
+
+  const credential = authStorage.get(provider) as { type?: string } | undefined;
+  if (credential?.type === "oauth") {
+    return authStorage.getOAuthProviders().some((oauthProvider) => oauthProvider.id === provider);
+  }
+
+  return true;
+}
+
+export async function validateProviderAuth(provider: string) {
+  const { authStorage } = await getPiCore();
+  const credential = authStorage.get(provider) as { type?: string } | undefined;
+  if (credential?.type === "oauth" && !authStorage.getOAuthProviders().some((oauthProvider) => oauthProvider.id === provider)) {
+    throw new Error(`Unsupported OAuth credentials for "${provider}". Add an API key for this provider in Settings.`);
+  }
+
+  const apiKey = await authStorage.getApiKey(provider, { includeFallback: true });
+  if (!apiKey) throw new Error(`No API key found for "${provider}". Add one in Settings.`);
 }
 
 export async function refreshPiModels() {

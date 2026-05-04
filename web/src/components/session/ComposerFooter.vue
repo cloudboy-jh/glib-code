@@ -6,7 +6,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <UiButton class="h-9 rounded-full px-4" @click="$emit('send')">Send</UiButton>
+      <UiButton class="h-9 rounded-full px-4" :disabled="disabled" @click="$emit('send')">Send</UiButton>
     </div>
   </div>
 </template>
@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import UiButton from '../ui/button.vue';
 
-defineProps<{ meta: string }>();
+defineProps<{ meta: string; disabled?: boolean }>();
 defineEmits<{ send: []; openCommands: [] }>();
 </script>
 

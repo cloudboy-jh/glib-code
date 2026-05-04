@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
-import { abortRunningTurn, runTurn, subscribe } from "../services/agent-runtime";
+import { abortRunningTurn, broadcast, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/sessions";
 import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState } from "../services/state";
 import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix";
+import { log, logError } from "../lib/log";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -26,7 +27,8 @@ export const agentRoutes = new Hono()
     const projectOverride = getProjectOverride(project.id);
     const requestedProvider = body?.provider || projectOverride?.provider || providerState.defaultProvider;
     const providerConfig = capabilities.providers.find((p) => p.id === requestedProvider);
-    if (!providerConfig || !providerConfig.hasAuth) return c.json({ ok: false, message: "provider unavailable" }, 400);
+    if (!providerConfig) return c.json({ ok: false, message: `provider "${requestedProvider}" is not available` }, 400);
+    if (!providerConfig.hasAuth) return c.json({ ok: false, message: `provider "${requestedProvider}" needs a usable API key` }, 400);
     const requestedModel = body?.model || projectOverride?.model || providerState.defaultModel;
     if (providerConfig.modelIds.length > 0 && !providerConfig.modelIds.includes(requestedModel)) {
       return c.json({ ok: false, message: "model not supported by provider" }, 400);
@@ -77,7 +79,7 @@ export const agentRoutes = new Hono()
     const capabilities = await getPiCapabilities();
     if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
     const provider = capabilities.providers.find((p) => p.id === existing.meta.provider && p.hasAuth);
-    if (!provider) return c.json({ ok: false, message: "session provider is no longer authenticated" }, 400);
+    if (!provider) return c.json({ ok: false, message: `session provider "${existing.meta.provider}" needs a usable API key` }, 400);
     if (provider.modelIds.length > 0 && !provider.modelIds.includes(existing.meta.model)) {
       return c.json({ ok: false, message: "session model is no longer available for provider" }, 400);
     }
@@ -93,10 +95,12 @@ export const agentRoutes = new Hono()
     };
 
     await appendEvents(project.path, id, [userEvent]);
+    broadcast(id, userEvent);
     await patchSessionMeta(project.path, id, { status: "running" });
 
     void runTurn({
       sessionId: id,
+      turnId,
       cwd: existing.meta.ephemeralPath || project.path,
       prompt,
       model: existing.meta.model,
@@ -109,7 +113,7 @@ export const agentRoutes = new Hono()
           });
         }
       }
-    });
+    }).catch((error) => logError("agent", "runTurn promise rejected", error, { sessionId: id, turnId }));
 
     return c.json({ ok: true, sessionId: id, turnId });
   })
@@ -122,20 +126,42 @@ export const agentRoutes = new Hono()
 
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(new TextEncoder().encode(`event: ready\ndata: ${JSON.stringify({ sessionId: id })}\n\n`));
+        const encoder = new TextEncoder();
+        let closed = false;
+        const safeEnqueue = (chunk: string) => {
+          if (closed) return false;
+          try {
+            controller.enqueue(encoder.encode(chunk));
+            return true;
+          } catch (error) {
+            closed = true;
+            logError("agent", "sse enqueue failed", error, { sessionId: id });
+            return false;
+          }
+        };
+
+        log("agent", "sse open", { sessionId: id, replayEvents: existing.events.length });
+        safeEnqueue(`event: ready\ndata: ${JSON.stringify({ sessionId: id })}\n\n`);
         for (const evt of existing.events) {
-          controller.enqueue(new TextEncoder().encode(sseEncode(evt)));
+          if (!safeEnqueue(sseEncode(evt))) break;
         }
         const unsub = subscribe(id, (event) => {
-          controller.enqueue(new TextEncoder().encode(sseEncode(event)));
+          safeEnqueue(sseEncode(event));
         });
         const interval = setInterval(() => {
-          controller.enqueue(new TextEncoder().encode(`event: ping\ndata: {}\n\n`));
-        }, 15000);
+          safeEnqueue(`event: ping\ndata: {}\n\n`);
+        }, 5000);
         const close = () => {
+          if (closed) return;
+          closed = true;
           clearInterval(interval);
           unsub();
-          controller.close();
+          try {
+            controller.close();
+          } catch (error) {
+            logError("agent", "sse close failed", error, { sessionId: id });
+          }
+          log("agent", "sse close", { sessionId: id });
         };
         c.req.raw.signal.addEventListener("abort", close);
       }

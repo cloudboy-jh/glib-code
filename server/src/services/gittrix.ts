@@ -55,9 +55,17 @@ export async function startSession(params: { projectPath: string; task: string; 
   const fallbackPath = join(sessionsRoot(), session.id, "workspace");
   return {
     gittrixSessionId: session.id,
-    ephemeralPath: meta?.ephemeralRef.replace(/^local:\/\//, "").split("#")[0] || fallbackPath,
+    ephemeralPath: normalizeLocalRef(meta?.ephemeralRef) || fallbackPath,
     baselineSha: meta?.baselineSha ?? ""
   };
+}
+
+function normalizeLocalRef(ref?: string) {
+  if (!ref) return "";
+  let path = ref.split("#")[0] ?? "";
+  path = path.replace(/^local:\/\/\//, "").replace(/^local:\/\//, "");
+  if (/^[A-Za-z]:\//.test(path)) return path;
+  return path;
 }
 
 export async function diff(projectPath: string, gittrixSessionId: string, branch?: string) {

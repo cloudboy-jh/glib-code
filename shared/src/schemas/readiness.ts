@@ -11,7 +11,7 @@ export const readinessReportSchema = z.object({
   ok: z.boolean(),
   checks: z.object({
     git: checkSchema,
-    opencode: checkSchema,
+    pi: checkSchema,
     gh: checkSchema
   })
 });

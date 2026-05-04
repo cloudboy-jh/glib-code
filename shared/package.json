@@ -5,7 +5,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./events/agent": "./src/events/agent.ts",
-    "./events/opencode": "./src/events/opencode.ts",
     "./schemas/readiness": "./src/schemas/readiness.ts",
     "./theme/presets": "./src/theme/presets.ts"
   },

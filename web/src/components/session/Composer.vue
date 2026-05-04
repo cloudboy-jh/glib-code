@@ -22,7 +22,7 @@ import ComposerInput from './ComposerInput.vue';
 
 const composerInputRef = ref<{ openCommandDialog: () => void } | null>(null);
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     context: string;
     prompt: string;
@@ -31,5 +31,10 @@ withDefaults(
   { meta: 'GPT-5.3 Codex · High · Full access' }
 );
 
-defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string] }>();
+const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string] }>();
+
+function emitSend() {
+  if (!props.prompt.trim()) return;
+  emit('send');
+}
 </script>
