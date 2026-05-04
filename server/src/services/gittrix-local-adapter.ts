@@ -161,7 +161,7 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
 
 async function listFilesRecursive(path: string, root: string): Promise<ListEntry[]> {
   const entries: ListEntry[] = [];
-  let dirEntries: Awaited<ReturnType<typeof readdir>>;
+  let dirEntries: Array<{ name: string; isDirectory(): boolean }>;
   try {
     dirEntries = await readdir(path, { withFileTypes: true });
   } catch {

@@ -133,17 +133,20 @@
       :settings="settings"
       :keybindings="keybindings"
       :providers="providerCapabilities.providers"
+      :github-connected="authState.githubConnected"
       :default-open-mode="settings.defaultOpenMode"
       :initial-tab="state.settingsTab"
       @close="state.settingsOpen = false"
       @update:theme="settings.themePreset = $event"
       @update:provider="updateDefaultProvider"
       @update:model="selectModel(settings.defaultProvider, $event)"
-      @update:keybinding="updateKeybinding"
-      @update:open-mode="settings.defaultOpenMode = $event"
-      @open-gittrix="openGitTrixFromSettings"
-      @open-model-picker="state.modelPickerOpen = true"
-      @provider:add-auth="saveProviderAuth"
+                @update:keybinding="updateKeybinding"
+                @update:open-mode="settings.defaultOpenMode = $event"
+                @update:gittrix-provider="updateGitTrixProvider"
+                @connect-github="connectGitHub"
+                @open-gittrix="openGitTrixFromSettings"
+                @open-model-picker="state.modelPickerOpen = true"
+                @provider:add-auth="saveProviderAuth"
       @provider:remove-auth="removeProviderAuth"
     />
 
@@ -361,7 +364,14 @@ const settings = reactive({
   themePreset: 'catppuccin-mocha' as ThemePreset,
   defaultProvider: 'codex',
   defaultModel: 'gpt-5.3-codex',
+  durableProvider: 'local' as 'local' | 'github',
+  ephemeralProvider: 'local' as 'local' | 'cloudflare-artifacts',
+  promoteStrategy: 'commit' as 'commit' | 'branch' | 'pr' | 'patch',
   defaultOpenMode: 'diff' as 'diff' | 'session'
+});
+
+const authState = reactive({
+  githubConnected: false
 });
 
 const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: ProviderCapability[] }>({
@@ -740,6 +750,39 @@ async function hydrateProviders() {
   providerCapabilities.providers = providers.providers;
   settings.defaultProvider = providers.defaultProvider;
   settings.defaultModel = providers.defaultModel;
+}
+
+async function hydrateSettings() {
+  const saved = await apiGet<{
+    themePreset: ThemePreset;
+    durableProvider: 'local' | 'github';
+    ephemeralProvider: 'local' | 'cloudflare-artifacts';
+    promoteStrategy: 'commit' | 'branch' | 'pr' | 'patch';
+  }>('/settings');
+  settings.themePreset = saved.themePreset;
+  settings.durableProvider = saved.durableProvider;
+  settings.ephemeralProvider = saved.ephemeralProvider;
+  settings.promoteStrategy = saved.promoteStrategy;
+}
+
+async function hydrateAuth() {
+  const session = await apiGet<{ github?: { connected?: boolean } }>('/auth/session');
+  authState.githubConnected = session.github?.connected === true;
+}
+
+async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string) {
+  if (key === 'durableProvider' && !['local', 'github'].includes(value)) return;
+  if (key === 'ephemeralProvider' && !['local', 'cloudflare-artifacts'].includes(value)) return;
+  if (key === 'promoteStrategy' && value !== 'commit') return;
+  const saved = await apiPatch<typeof settings>('/settings', { [key]: value });
+  settings.durableProvider = saved.durableProvider;
+  settings.ephemeralProvider = saved.ephemeralProvider;
+  settings.promoteStrategy = saved.promoteStrategy;
+}
+
+async function connectGitHub() {
+  const result = await apiPost<{ connected: boolean }>('/auth/github', {});
+  authState.githubConnected = result.connected;
 }
 
 async function saveProviderAuth(providerId: string, apiKey: string) {
@@ -1322,6 +1365,8 @@ onMounted(() => {
     }
   }
   void hydrateRecents().catch(() => undefined);
+  void hydrateSettings().catch(() => undefined);
+  void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
   window.addEventListener('keydown', onGlobalKeydown);
 });

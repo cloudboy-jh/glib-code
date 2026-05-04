@@ -137,8 +137,8 @@ Stored in config dir `keybindings.json`.
 
 ### Auth
 
-- `GET /api/auth/session` returns `{ signedIn: false }`
-- `POST /api/auth/github` is `501`
+- `GET /api/auth/session` returns GitHub local auth status from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`.
+- `POST /api/auth/github` verifies that a GitHub token is available for GitTrix GitHub durable operations.
 - `POST /api/auth/signout` returns `{ ok: true }`
 
 ## Session + agent routes
@@ -165,8 +165,8 @@ Stored in config dir `keybindings.json`.
 
 Responsibilities:
 
-- Create and hold singleton `GitTrix` instance.
-- Initialize local session root under `<configDir>/gittrix-sessions`.
+- Create and hold singleton `GitTrix` instances keyed by project, branch, durable provider, and ephemeral provider.
+- Initialize local session root under `<configDir>/gittrix-sessions` or Cloudflare working root under `<configDir>/gittrix-cloudflare-ephemeral`.
 - Expose service API: `startSession`, `getSession`, `diff`, `promote`, `evict`.
 - Persist mapping on `SessionMeta` (`gittrixSessionId`, `ephemeralPath`, `baselineSha`).
 
@@ -175,6 +175,8 @@ Responsibilities:
 - Self-host
   - durable: local repo adapter behavior pointed at the user repo
   - ephemeral: local workspace adapter behavior under `<configDir>/gittrix-sessions/<id>/workspace`
+  - optional durable: GitHub adapter using the opened repo's `origin` and `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`
+  - optional ephemeral: Cloudflare Artifacts adapter using `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 - Desktop (Electron)
   - Same adapter story as self-host; Electron only changes packaging/host process.
   - Dev desktop relies on the normal backend at `:4273`; production Electron starts the Bun backend on `:4273` before loading the built web UI.
@@ -183,8 +185,8 @@ Responsibilities:
   - Hosted glib never directly touches user filesystem.
   - Latency expectation: `100ms+` round-trip for remote file operations; batching is required where possible.
 - Hosted, glib cloud mode
-  - durable: `adapter-github` (or `adapter-codestorage` once available)
-  - ephemeral: GitTrix-managed cloud ephemeral adapter (`adapter-cloudflare` per GitTrix spec)
+  - durable: GitHub adapter
+  - ephemeral: GitTrix-managed Cloudflare Artifacts adapter
   - glib does not wire Cloudflare adapter internals directly; it consumes GitTrix library contracts.
   - Agent runtime runs in hosted worker runtime; writes persist through GitTrix ephemeral storage; promote updates durable GitHub target.
 

@@ -15,6 +15,9 @@ export type Settings = {
   timestampFormat: "24-hour" | "12-hour" | "locale";
   defaultProvider: string;
   defaultModel: string;
+  durableProvider: "local" | "github";
+  ephemeralProvider: "local" | "cloudflare-artifacts";
+  promoteStrategy: "commit" | "branch" | "pr" | "patch";
   confirmDestroy: boolean;
   telemetryOptIn: boolean;
   piBinaryPath: string;
@@ -36,6 +39,9 @@ const DEFAULT_SETTINGS: Settings = {
   timestampFormat: "24-hour",
   defaultProvider: "codex",
   defaultModel: "claude-opus-4.7",
+  durableProvider: "local",
+  ephemeralProvider: "local",
+  promoteStrategy: "commit",
   confirmDestroy: true,
   telemetryOptIn: false,
   piBinaryPath: "",

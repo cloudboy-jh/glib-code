@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "glib-code",
@@ -20,7 +21,7 @@
         "@glib-code/shared": "workspace:*",
         "@hono/zod-validator": "^0.4.3",
         "@mariozechner/pi-coding-agent": "^0.72.1",
-        "gittrix": "^0.1.0",
+        "gittrix": "^0.1.2",
         "hono": "^4.7.7",
         "simple-git": "^3.27.0",
         "zod": "^3.24.3",
@@ -704,7 +705,7 @@
 
     "get-uri": ["get-uri@6.0.5", "", { "dependencies": { "basic-ftp": "^5.0.2", "data-uri-to-buffer": "^6.0.2", "debug": "^4.3.4" } }, "sha512-b1O07XYq8eRuVzBNgJLstU6FYc1tS6wnMtF1I1D9lE8LxZSOGZ7LhxN54yPP6mGw5f2CkXY2BQUL9Fx41qvcIg=="],
 
-    "gittrix": ["gittrix@0.1.0", "", {}, "sha512-EJ38+TZonXDB3WU2o1pxupLifIPUYN5k2upJ7BPQGruiSqX1jeh/I+ujihNDHNQ2OZQPH/awCVDdj1+kwsqq1Q=="],
+    "gittrix": ["gittrix@0.1.2", "", {}, "sha512-pTwTB3SCz34x1Sr0nOMMCTCkOvNCsw2thBvPuf/g8PEhV0naUMDQgJm9UdEKfZiDg9difk8cXwTZzL/1jZo3OQ=="],
 
     "glob": ["glob@13.0.6", "", { "dependencies": { "minimatch": "^10.2.2", "minipass": "^7.1.3", "path-scurry": "^2.0.2" } }, "sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw=="],
 

@@ -123,49 +123,56 @@
         </template>
 
         <template v-else-if="tab === 'GitTrix'">
-          <div class="space-y-5">
+          <div class="mx-auto max-w-[820px] space-y-5 pb-6">
             <div>
+              <div>
               <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix</p>
               <h4 class="mt-1 text-xl font-semibold tracking-tight">Isolation and promote flow</h4>
-              <p class="mt-1 text-sm text-muted-foreground">Agent work runs in ephemeral storage. Promote moves selected changes back to durable storage.</p>
-            </div>
-
-            <div class="grid grid-cols-3 gap-3">
-              <div class="summary-card"><ProviderMark id="local" kind="git" /><div><p class="summary-label">Durable</p><p class="summary-value">Local repo</p></div></div>
-              <div class="summary-card"><ProviderMark id="local-workspace" kind="git" /><div><p class="summary-label">Ephemeral</p><p class="summary-value">Local workspace</p></div></div>
-              <div class="summary-card"><ProviderMark id="commit" kind="git" /><div><p class="summary-label">Promote</p><p class="summary-value">Commit</p></div></div>
-            </div>
-
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-              <p class="mb-3 text-sm font-medium">Available modes</p>
-              <div class="grid grid-cols-3 gap-4">
-                <OptionGroup title="Durable provider" :options="durableOptions" />
-                <OptionGroup title="Ephemeral provider" :options="ephemeralOptions" />
-                <OptionGroup title="Promote strategy" :options="promoteOptions" />
+                <p class="mt-1 max-w-2xl text-sm text-muted-foreground">Configure durable storage, ephemeral storage, and promotion.</p>
               </div>
             </div>
 
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground">
-              Ephemeral sessions are stored locally under <span class="font-mono text-foreground">&lt;configDir&gt;/gittrix-sessions</span>.
+            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
+              <SettingsOptionGroup title="Durable provider" :options="durableOptions" @select="(id) => $emit('update:gittrix-provider', 'durableProvider', id)" />
+              <SettingsOptionGroup class="mt-5" title="Ephemeral provider" :options="ephemeralOptions" @select="(id) => $emit('update:gittrix-provider', 'ephemeralProvider', id)" />
+              <SettingsOptionGroup class="mt-5" title="Promote strategy" :options="promoteOptions" @select="(id) => $emit('update:gittrix-provider', 'promoteStrategy', id)" />
             </div>
 
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-              <p class="mb-3 text-sm font-medium">Default project landing mode</p>
-              <div class="grid max-w-md grid-cols-2 gap-2">
-                <button type="button" :class="landingClass(defaultOpenMode === 'diff')" @click="$emit('update:open-mode', 'diff')">Diffs</button>
-                <button type="button" :class="landingClass(defaultOpenMode === 'session')" @click="$emit('update:open-mode', 'session')">Session</button>
-              </div>
-              <p class="mt-2 text-xs text-muted-foreground">Used after opening or cloning a project.</p>
-            </div>
-
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="text-sm font-medium text-foreground">Diff workbench</p>
-                  <p class="text-xs text-muted-foreground">Review durable repo changes before starting agent sessions.</p>
+            <div class="space-y-4">
+                <div v-if="settings.durableProvider === 'github'" class="rounded-xl border border-border/70 bg-background/35 p-4">
+                  <div class="flex items-center gap-3">
+                    <ProviderMark id="github" kind="git" />
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-foreground">GitHub account</p>
+                      <p class="mt-1 text-xs text-muted-foreground">{{ githubConnected ? 'Connected' : 'Not connected' }}</p>
+                    </div>
+                    <UiButton class="ml-auto" variant="outline" size="sm" :disabled="githubConnected" @click="$emit('connect-github')">{{ githubConnected ? 'Connected' : 'Connect' }}</UiButton>
+                  </div>
+                  <p class="mt-3 text-xs text-muted-foreground">Uses <span class="font-mono text-foreground">gh auth</span>, <span class="font-mono text-foreground">GITHUB_TOKEN</span>, or <span class="font-mono text-foreground">GH_TOKEN</span>.</p>
                 </div>
-                <UiButton variant="outline" size="sm" @click="$emit('open-gittrix')">Open GitTrix</UiButton>
-              </div>
+
+                <div v-if="settings.ephemeralProvider === 'cloudflare-artifacts'" class="rounded-xl border border-border/70 bg-background/35 p-4">
+                  <div class="flex items-center gap-3">
+                    <ProviderMark id="cloudflare-artifacts" kind="git" />
+                    <div>
+                      <p class="text-sm font-medium text-foreground">Cloudflare Artifacts</p>
+                      <p class="mt-1 text-xs text-muted-foreground">Required for Cloudflare ephemeral storage.</p>
+                    </div>
+                  </div>
+                  <div class="mt-4 space-y-2 text-xs text-muted-foreground">
+                    <div class="env-row"><span>CLOUDFLARE_ACCOUNT_ID</span><span>required</span></div>
+                    <div class="env-row"><span>CLOUDFLARE_API_TOKEN</span><span>required</span></div>
+                    <div class="env-row"><span>CLOUDFLARE_ARTIFACTS_NAMESPACE</span><span>optional</span></div>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-border/70 bg-background/35 p-4">
+                  <p class="mb-3 text-sm font-medium">Default landing</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" :class="landingClass(defaultOpenMode === 'diff')" @click="$emit('update:open-mode', 'diff')">Diffs</button>
+                    <button type="button" :class="landingClass(defaultOpenMode === 'session')" @click="$emit('update:open-mode', 'session')">Session</button>
+                  </div>
+                </div>
             </div>
           </div>
         </template>
@@ -207,9 +214,10 @@ type Provider = { id: string; hasAuth: boolean; modelIds: string[] };
 type SettingsTab = 'Models' | 'GitTrix' | 'Appearance' | 'Keybindings';
 
 const props = defineProps<{
-  settings: { themePreset: string; defaultProvider: string; defaultModel: string };
+  settings: { themePreset: string; defaultProvider: string; defaultModel: string; durableProvider: string; ephemeralProvider: string; promoteStrategy: string };
   keybindings: Array<{ command: string; key: string }>;
   providers: Provider[];
+  githubConnected: boolean;
   defaultOpenMode: 'diff' | 'session';
   initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
@@ -228,27 +236,27 @@ const authenticatedProviderCount = computed(() => props.providers.filter((provid
 const activeProviderConnected = computed(() => props.providers.some((provider) => provider.id === props.settings.defaultProvider && provider.hasAuth));
 const sortedProviders = computed(() => [...props.providers].sort((a, b) => Number(b.hasAuth) - Number(a.hasAuth) || a.id.localeCompare(b.id)));
 
-const durableOptions = [
-  { id: 'local', label: 'Local repo', available: true, selected: true },
-  { id: 'github', label: 'GitHub', available: false, selected: false },
+const durableOptions = computed<GitTrixOption[]>(() => [
+  { id: 'local', label: 'Local repo', available: true, selected: props.settings.durableProvider === 'local' },
+  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github' },
   { id: 'gitlab', label: 'GitLab', available: false, selected: false },
   { id: 'git-remote', label: 'Git remote', available: false, selected: false },
   { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
-];
+]);
 
-const ephemeralOptions = [
-  { id: 'local', label: 'Local workspace', available: true, selected: true },
-  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: false, selected: false },
+const ephemeralOptions = computed<GitTrixOption[]>(() => [
+  { id: 'local', label: 'Local workspace', available: true, selected: props.settings.ephemeralProvider === 'local' },
+  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: true, selected: props.settings.ephemeralProvider === 'cloudflare-artifacts' },
   { id: 'gitfork', label: 'GitFork', available: false, selected: false },
   { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
-];
+]);
 
-const promoteOptions = [
-  { id: 'commit', label: 'Commit', available: true, selected: true },
+const promoteOptions = computed<GitTrixOption[]>(() => [
+  { id: 'commit', label: 'Commit', available: true, selected: props.settings.promoteStrategy === 'commit' },
   { id: 'branch', label: 'Branch', available: false, selected: false },
-  { id: 'pr', label: 'Pull Request', available: false, selected: false },
+  { id: 'pr', label: 'Pull request', available: false, selected: false },
   { id: 'patch', label: 'Patch', available: false, selected: false }
-];
+]);
 
 const authDraftProviderId = ref('');
 const authDraftApiKey = ref('');
@@ -261,29 +269,35 @@ const emit = defineEmits<{
   'update:model': [value: string];
   'update:keybinding': [command: string, key: string];
   'update:open-mode': [value: 'diff' | 'session'];
+  'update:gittrix-provider': [key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string];
+  'connect-github': [];
   'open-gittrix': [];
   'open-model-picker': [];
   'provider:add-auth': [providerId: string, apiKey: string];
   'provider:remove-auth': [providerId: string];
 }>();
 
-const OptionGroup = defineComponent({
-  props: { title: { type: String, required: true }, options: { type: Array as () => Array<{ id: string; label: string; available: boolean; selected: boolean }>, required: true } },
-  setup(componentProps) {
+type GitTrixOption = { id: string; label: string; available: boolean; selected: boolean };
+
+const SettingsOptionGroup = defineComponent({
+  props: { title: { type: String, required: true }, options: { type: Array as () => GitTrixOption[], required: true } },
+  emits: ['select'],
+  setup(componentProps, { emit: componentEmit }) {
     return () => {
       const optionButtons = componentProps.options.map((option) => h('button', {
         key: option.id,
         disabled: !option.available,
+        onClick: () => componentEmit('select', option.id),
         class: [
-          'flex h-11 w-full items-center justify-between gap-3 rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-          option.selected ? 'border-border bg-muted/80 text-foreground' : option.available ? 'border-border/60 bg-background/55 text-muted-foreground hover:bg-muted/55' : 'border-border/40 bg-background/25 text-muted-foreground'
+          'flex h-13 min-h-[52px] w-full items-center justify-between gap-3 rounded-lg border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+          option.selected ? 'border-primary/35 bg-primary/10 text-foreground' : option.available ? 'border-border/60 bg-background/55 text-foreground hover:bg-muted/55' : 'border-border/40 bg-background/25 text-muted-foreground'
         ]
       }, [
         h('span', { class: 'flex min-w-0 items-center gap-2' }, [
           h(ProviderMark, { id: option.id, kind: 'git', size: 'sm', muted: !option.available }),
           h('span', { class: 'truncate' }, option.label)
         ]),
-        h('span', { class: 'text-[10px] text-muted-foreground' }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming Soon')
+        h('span', { class: ['shrink-0 text-[11px]', option.selected ? 'text-primary' : 'text-muted-foreground'] }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming soon')
       ]));
 
       return h('div', { class: 'space-y-2' }, [
@@ -331,25 +345,19 @@ function saveBootstrapKey() {
 </script>
 
 <style scoped>
-.summary-card {
+.env-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  border-radius: 12px;
-  border: 1px solid hsl(var(--border) / 0.7);
-  background: hsl(var(--background) / 0.35);
-  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--background) / 0.45);
+  padding: 8px 10px;
 }
 
-.summary-label {
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-}
-
-.summary-value {
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 600;
+.env-row span:first-child {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   color: hsl(var(--foreground));
 }
 

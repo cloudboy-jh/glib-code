@@ -64,12 +64,13 @@ Provider auth behavior:
 - Keys are saved under glib-code app config at `<configDir>/pi/auth.json`
 - glib-code does not read other apps' auth stores
 
-Hosted account auth behavior is still placeholder:
+GitHub account auth behavior in local/desktop:
 
-- `GET /api/auth/session` -> `{ signedIn: false }`
-- GitHub auth endpoint exists but returns `501`.
+- `GET /api/auth/session` reports whether `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` is available.
+- `POST /api/auth/github` verifies local GitHub auth for GitTrix GitHub durable operations.
+- Users sign in by running `gh auth login` locally or by launching glib-code with `GITHUB_TOKEN`/`GH_TOKEN` set.
 
-No hosted sign-in/onboarding path should be documented as shipped yet.
+No hosted browser OAuth sign-in/onboarding path should be documented as shipped yet.
 
 ## GitTrix session storage
 

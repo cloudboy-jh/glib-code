@@ -51,6 +51,7 @@ Last updated: 2026-05-03
 
 - [ ] Keep readiness checks fast and cached while preserving actionable errors.
 - [ ] Either implement auth endpoints or mark them explicitly local-only in API contract.
+- [x] Add local GitHub auth status/connect check through `gh` or token environment.
 
 ## Definition of done (backend)
 

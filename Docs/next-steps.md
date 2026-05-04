@@ -26,7 +26,7 @@ Last updated: 2026-05-04
 - Wired provider/model discovery and provider key management through `/api/providers`.
 - Moved provider key storage to glib-owned app config (`<configDir>/pi/auth.json`).
 - Stopped reading opencode auth storage.
-- Added GitTrix local session start/diff/promote/evict wiring.
+- Added GitTrix local, GitHub durable, and Cloudflare Artifacts ephemeral session start/diff/promote/evict wiring.
 - Hydrated sessions from backend state and replayed persisted timelines.
 - Wired prompt send, SSE streaming, and abort routes.
 - Added compact tool-call cards in the timeline.
@@ -70,5 +70,5 @@ Last updated: 2026-05-04
 
 ## 6) Cloudflare Artifacts adapter
 
-- Keep Cloudflare Artifacts disabled as Coming Soon in Settings → GitTrix until the backend adapter is wired.
-- Replace the local adapter shim path with the real GitTrix adapter implementation when available.
+- Harden Cloudflare Artifacts error UX around missing account/token environment.
+- Add hosted browser OAuth for GitHub instead of relying on local `gh`/token auth.

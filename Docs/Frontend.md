@@ -116,7 +116,7 @@ Current state:
 
 - Settings modal and theme picker are wired to local reactive settings and shared presets.
 - Models tab manages provider keys and active model selection.
-- GitTrix tab shows the shipped Local repo → Local workspace → Commit mode and disables future modes as Coming Soon.
+- GitTrix tab lets users select Local/GitHub durable modes, Local/Cloudflare Artifacts ephemeral modes, and the Commit promote strategy. Coming-soon durable/ephemeral/promote options stay visible but disabled.
 - Keybindings editor exists; backend keybindings API exists but full parity behavior still needs cleanup.
 
 ## Known frontend debts
