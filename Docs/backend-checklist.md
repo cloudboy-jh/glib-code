@@ -1,6 +1,6 @@
 # Backend Checklist
 
-Last updated: 2026-05-03
+Last updated: 2026-05-06
 
 ## Core route completion
 
@@ -22,6 +22,7 @@ Last updated: 2026-05-03
 - [x] Surface pi assistant/runtime errors as canonical error events.
 - [x] Add clean abort handling per turn.
 - [ ] Add timeout handling per turn.
+- [x] Harden streamed/final assistant text reconciliation to avoid clipped turn tails.
 
 ## Session persistence
 
@@ -46,6 +47,12 @@ Last updated: 2026-05-03
 - [ ] Move current project state to a client/session scoped model (not single process-global value).
 - [ ] Harden FS read/tree for large repos and binary files.
 - [ ] Add consistent error envelopes for route failures.
+- [x] Return explicit GitTrix startup errors and Cloudflare preflight error codes/messages.
+
+## GitTrix workspace behavior
+
+- [x] Pre-hydrate ephemeral workspace from durable repo files on session start.
+- [ ] Add opt-out/size guard for very large repo hydration.
 
 ## Readiness/auth
 

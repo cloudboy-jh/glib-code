@@ -22,10 +22,12 @@
 </template>
 
 <script setup lang="ts">
+import { THEME_PRESET_IDS } from '@glib-code/shared/theme/presets';
+
 defineProps<{ modelValue: string }>();
 defineEmits<{ 'update:modelValue': [value: string] }>();
 
-const themes = ['tokyo-night', 'catppuccin-mocha', 'gruvbox-dark', 'nord'];
+const themes = THEME_PRESET_IDS;
 
 function pretty(value: string) {
   return value

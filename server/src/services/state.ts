@@ -35,7 +35,7 @@ export type ProjectOverride = {
 };
 
 const DEFAULT_SETTINGS: Settings = {
-  themePreset: "tokyo-night",
+  themePreset: "catppuccin-mocha",
   timestampFormat: "24-hour",
   defaultProvider: "codex",
   defaultModel: "claude-opus-4.7",

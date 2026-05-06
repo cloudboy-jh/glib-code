@@ -36,7 +36,7 @@ const containerClass = computed(() => {
   if (props.placement === 'top') {
     return 'fixed inset-0 z-10 grid place-items-start px-4 pt-[12vh] max-sm:px-0 max-sm:pt-12';
   }
-  return 'fixed inset-0 z-10 grid grid-rows-[1fr_auto_3fr] justify-items-center p-4 max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12';
+  return 'fixed inset-0 z-10 grid place-items-center p-4 max-sm:p-0';
 });
 
 const maxWidthClass = computed(() => {

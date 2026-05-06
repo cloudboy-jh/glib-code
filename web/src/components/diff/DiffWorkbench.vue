@@ -108,8 +108,9 @@
 
             <div
               v-if="fileMenuOpen"
-              class="absolute right-0 top-[calc(100%+6px)] z-30 w-[360px] max-w-[60vw] overflow-hidden rounded-md border border-border/80 bg-card/95 shadow-lg shadow-black/30"
+              class="fixed left-1/2 top-1/2 z-30 w-[520px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40"
             >
+              <div class="border-b border-border/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
               <div class="max-h-[280px] overflow-auto p-1">
                 <button
                   v-for="file in state.files"
@@ -166,6 +167,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ChevronDown, CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-next';
 import DiffView from '../shared/DiffView.vue';
+import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import diffsWordmark from '../../../../diffs-glibiconmain.png';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
@@ -186,7 +188,7 @@ const props = withDefaults(
     currentProject: { id: string; name: string; branch: string; path: string };
     diffStyle?: 'split' | 'unified';
     themeType?: 'dark' | 'light';
-    themePreset?: 'tokyo-night' | 'catppuccin-mocha' | 'gruvbox-dark' | 'nord';
+    themePreset?: ThemePreset;
   }>(),
   { diffStyle: 'split', themeType: 'dark', themePreset: 'catppuccin-mocha' }
 );

@@ -3,3 +3,9 @@ declare module "*.vue" {
   const component: DefineComponent<{}, {}, any>;
   export default component;
 }
+
+interface Window {
+  glibDesktop?: {
+    pickProjectDirectory: () => Promise<string | null>;
+  };
+}

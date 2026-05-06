@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createProject, forgetProject, initProject, openProject } from "../services/projects";
+import { createProject, forgetProject, initProject, openProject, projectCandidates } from "../services/projects";
 import {
   getRecents,
   putRecent,
@@ -14,6 +14,7 @@ import { getPiCapabilities } from "../services/pi-capabilities";
 
 export const projectsRoutes = new Hono()
   .get("/recents", async (c) => c.json(await getRecents()))
+  .get("/candidates", async (c) => c.json(await projectCandidates(c.req.query("q") ?? "")))
   .get("/recents/status", async (c) => {
     const recents = await getRecents();
     return c.json(

@@ -1,7 +1,13 @@
 <template>
-  <UiDialog size="lg" placement="top" dialog-class="overflow-hidden" :show-close-button="false" @close="$emit('close')">
+  <UiDialog size="lg" placement="center" dialog-class="overflow-hidden" :show-close-button="false" @close="$emit('close')">
       <div class="border-b border-border/80 p-3">
-        <UiInput :model-value="query" placeholder="Type a command..." class="h-10" @update:model-value="$emit('update:query', $event)" />
+        <input
+          ref="inputRef"
+          :value="query"
+          placeholder="Type a command..."
+          class="flex h-11 w-full rounded-md border border-input/80 bg-background/70 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          @input="$emit('update:query', ($event.target as HTMLInputElement).value)"
+        />
       </div>
 
       <div class="max-h-[420px] overflow-auto p-2">
@@ -17,13 +23,15 @@
           <span>{{ c.label }}</span>
           <span class="text-[11px] text-muted-foreground">{{ c.id }}</span>
         </button>
+
+        <div v-if="commands.length === 0" class="px-3 py-8 text-center text-sm text-muted-foreground">No matching commands</div>
       </div>
   </UiDialog>
 </template>
 
 <script setup lang="ts">
+import { nextTick, onMounted, ref } from 'vue';
 import UiDialog from '../ui/dialog.vue';
-import UiInput from '../ui/input.vue';
 
 withDefaults(
   defineProps<{
@@ -37,4 +45,10 @@ withDefaults(
 );
 
 defineEmits<{ close: []; run: [id: string]; 'update:query': [value: string] }>();
+
+const inputRef = ref<HTMLInputElement | null>(null);
+
+onMounted(() => {
+  void nextTick(() => inputRef.value?.focus());
+});
 </script>

@@ -81,3 +81,23 @@ export async function forgetProject(path: string) {
 export function projectIdFromPath(path: string) {
   return idForPath(path);
 }
+
+export async function projectCandidates(query = "") {
+  const q = query.trim();
+  const rows: Array<{ name: string; path: string; source: "zoxide" }> = [];
+  const args = q ? ["query", "-l", q] : ["query", "-l"];
+  const result = await run(["zoxide", ...args]).catch(() => null);
+  if (!result || result.code !== 0) return rows;
+
+  const seen = new Set<string>();
+  for (const line of result.out.split("\n")) {
+    const path = line.trim();
+    if (!path) continue;
+    const full = resolve(path);
+    if (seen.has(full) || !existsSync(full)) continue;
+    seen.add(full);
+    rows.push({ name: basename(full), path: full, source: "zoxide" });
+    if (rows.length >= 20) break;
+  }
+  return rows;
+}

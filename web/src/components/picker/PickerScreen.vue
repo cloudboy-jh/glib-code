@@ -75,7 +75,6 @@
         :pending-name="pendingProjectName"
         :pending-mode="pendingMode"
         @open="emit('openRecent', $event)"
-        @remove="emit('removeRecent', $event)"
         @forget="emit('forgetRecent', $event)"
         @select-mode="emit('selectProjectMode', $event)"
         @set-mode="pendingMode = $event"
@@ -122,7 +121,6 @@ const emit = defineEmits<{
   openClone: [];
   openPalette: [];
   openRecent: [path: string];
-  removeRecent: [id: string];
   forgetRecent: [id: string];
   openTheme: [];
   openGittrix: [];

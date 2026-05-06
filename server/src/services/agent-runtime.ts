@@ -20,7 +20,7 @@ type RuntimeSession = {
 const subscribers = new Map<string, Set<Subscriber>>();
 const runningTurns = new Map<string, RunningTurn>();
 const runtimeSessions = new Map<string, RuntimeSession>();
-const streamedTextLengthByTurn = new Map<string, number>();
+const streamedTextByTurn = new Map<string, string>();
 const errorEmittedByTurn = new Set<string>();
 
 function nowIso() {
@@ -82,7 +82,7 @@ function extractMessageError(message: unknown) {
 }
 
 function rememberText(turnId: string, text: string) {
-  streamedTextLengthByTurn.set(turnId, (streamedTextLengthByTurn.get(turnId) ?? 0) + text.length);
+  streamedTextByTurn.set(turnId, `${streamedTextByTurn.get(turnId) ?? ""}${text}`);
   return {
     type: "text_part" as const,
     turnId,
@@ -91,6 +91,16 @@ function rememberText(turnId: string, text: string) {
     text,
     at: nowIso()
   };
+}
+
+function suffixFromFinal(streamed: string, finalText: string) {
+  if (!finalText) return "";
+  if (!streamed) return finalText;
+  if (finalText.startsWith(streamed)) return finalText.slice(streamed.length);
+  let i = 0;
+  const max = Math.min(streamed.length, finalText.length);
+  while (i < max && streamed[i] === finalText[i]) i += 1;
+  return finalText.slice(i);
 }
 
 function rememberError(turnId: string, message: string): AgentEvent | null {
@@ -111,16 +121,16 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent): AgentEvent | null
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
     const finalText = extractMessageText((event as any).message);
-    const seenLength = streamedTextLengthByTurn.get(turnId) ?? 0;
-    const delta = finalText.slice(seenLength);
+    const streamed = streamedTextByTurn.get(turnId) ?? "";
+    const delta = suffixFromFinal(streamed, finalText);
     return delta ? rememberText(turnId, delta) : null;
   }
   if (event.type === "message_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
     const finalText = extractMessageText((event as any).message);
-    const seenLength = streamedTextLengthByTurn.get(turnId) ?? 0;
-    const delta = finalText.slice(seenLength);
+    const streamed = streamedTextByTurn.get(turnId) ?? "";
+    const delta = suffixFromFinal(streamed, finalText);
     return delta ? rememberText(turnId, delta) : null;
   }
   if (event.type === "message_update") {
@@ -255,7 +265,7 @@ export async function runTurn(params: {
   } finally {
     unsub();
     runningTurns.delete(params.sessionId);
-    streamedTextLengthByTurn.delete(params.turnId);
+    streamedTextByTurn.delete(params.turnId);
     errorEmittedByTurn.delete(params.turnId);
   }
 }

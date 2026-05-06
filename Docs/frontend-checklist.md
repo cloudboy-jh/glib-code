@@ -1,13 +1,13 @@
 # Frontend Checklist
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 ## API wiring cleanup
 
 - [x] Replace hardcoded `API_BASE` with env-driven config.
 - [x] Remove localStorage-backed mock session persistence from primary session flow.
 - [x] Hydrate sessions from `/api/sessions`.
-- [ ] Handle backend 404/501 states with explicit UI fallbacks (not silent failures).
+- [x] Handle backend startup/config errors with explicit actionable UI fallbacks (GitTrix + provider).
 
 ## Provider/model capability UX
 
@@ -48,6 +48,8 @@ Last updated: 2026-05-04
 - [x] Reduce streamed events into timeline entries.
 - [x] Render tool calls as compact expandable cards.
 - [x] Implement abort action using `DELETE /api/agent/sessions/:id/turn`.
+- [x] Differentiate agent setup errors vs GitTrix setup errors in session-start UI.
+- [x] Add quick fallback action to switch GitTrix providers to local/local.
 
 ## Terminal and attachments
 
@@ -59,6 +61,7 @@ Last updated: 2026-05-04
 - [ ] Keep picker keyboard controls working with all dialog states.
 - [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
+- [x] Keep multi-turn streaming stable beyond first turn (no clipped second-turn tail in normal flows).
 
 ## Picker home controls
 

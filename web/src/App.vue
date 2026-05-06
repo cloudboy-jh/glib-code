@@ -54,7 +54,6 @@
                 @open-gittrix="openSettings('Git')"
                 @open-model="openSettings('Models')"
                 @open-recent="openRecentProject"
-                @remove-recent="removeRecentProject"
                 @forget-recent="forgetRecentProject"
                 @provider-auth-save="saveProviderAuth"
                 @select-project-mode="finalizeProjectOpen"
@@ -86,7 +85,11 @@
                     <p class="mb-4 text-sm text-muted-foreground">Review diffs first or start a new session with the agent.</p>
                     <div v-if="state.agentSetupMessage" class="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
                       <p>{{ state.agentSetupMessage }}</p>
-                      <div class="mt-2 flex flex-wrap gap-3">
+                      <div v-if="state.agentSetupKind === 'gittrix'" class="mt-2 flex flex-wrap gap-3">
+                        <button class="underline underline-offset-2" @click="openSettings('Git')">Open GitTrix settings</button>
+                        <button class="underline underline-offset-2" @click="useLocalGitTrix">Use local GitTrix</button>
+                      </div>
+                      <div v-else class="mt-2 flex flex-wrap gap-3">
                         <button class="underline underline-offset-2" @click="openSettings('Models')">Add {{ settings.defaultProvider }} key</button>
                         <button v-if="compatibleUsableModel" class="underline underline-offset-2" @click="selectModel(compatibleUsableModel.providerId, compatibleUsableModel.modelId)">
                           Use {{ compatibleUsableModel.providerId }}/{{ compatibleUsableModel.modelId }}
@@ -134,10 +137,11 @@
       :keybindings="keybindings"
       :providers="providerCapabilities.providers"
       :github-connected="authState.githubConnected"
+      :github-account="authState.githubAccount"
       :default-open-mode="settings.defaultOpenMode"
       :initial-tab="state.settingsTab"
       @close="state.settingsOpen = false"
-      @update:theme="settings.themePreset = $event"
+      @update:theme="updateTheme"
       @update:provider="updateDefaultProvider"
       @update:model="selectModel(settings.defaultProvider, $event)"
                 @update:keybinding="updateKeybinding"
@@ -181,7 +185,7 @@
       v-if="state.themeDialogOpen"
       :model-value="settings.themePreset"
       @close="state.themeDialogOpen = false"
-      @update:model-value="settings.themePreset = $event"
+      @update:model-value="updateTheme"
     />
 
     <CloneRepoDialog
@@ -371,7 +375,8 @@ const settings = reactive({
 });
 
 const authState = reactive({
-  githubConnected: false
+  githubConnected: false,
+  githubAccount: ''
 });
 
 const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: ProviderCapability[] }>({
@@ -405,7 +410,8 @@ const state = reactive({
   contextViewerOpen: false,
   promoteDialogOpen: false,
   conflictDialogOpen: false,
-  agentSetupMessage: ''
+  agentSetupMessage: '',
+  agentSetupKind: 'agent' as 'agent' | 'gittrix'
 });
 
 const promote = reactive({
@@ -760,14 +766,22 @@ async function hydrateSettings() {
     promoteStrategy: 'commit' | 'branch' | 'pr' | 'patch';
   }>('/settings');
   settings.themePreset = saved.themePreset;
+  applyTheme(saved.themePreset);
   settings.durableProvider = saved.durableProvider;
   settings.ephemeralProvider = saved.ephemeralProvider;
   settings.promoteStrategy = saved.promoteStrategy;
 }
 
 async function hydrateAuth() {
-  const session = await apiGet<{ github?: { connected?: boolean } }>('/auth/session');
+  const session = await apiGet<{ github?: { connected?: boolean; account?: { login?: string; name?: string; email?: string } | null } }>('/auth/session');
   authState.githubConnected = session.github?.connected === true;
+  authState.githubAccount = session.github?.account?.login ?? '';
+}
+
+async function updateTheme(theme: ThemePreset) {
+  settings.themePreset = theme;
+  applyTheme(theme);
+  await apiPatch('/settings', { themePreset: theme });
 }
 
 async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string) {
@@ -781,8 +795,18 @@ async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider
 }
 
 async function connectGitHub() {
-  const result = await apiPost<{ connected: boolean }>('/auth/github', {});
+  const result = await apiPost<{ connected: boolean; account?: { login?: string } | null }>('/auth/github', {});
   authState.githubConnected = result.connected;
+  authState.githubAccount = result.account?.login ?? '';
+}
+
+async function useLocalGitTrix() {
+  const saved = await apiPatch<typeof settings>('/settings', { durableProvider: 'local', ephemeralProvider: 'local' });
+  settings.durableProvider = saved.durableProvider;
+  settings.ephemeralProvider = saved.ephemeralProvider;
+  settings.promoteStrategy = saved.promoteStrategy;
+  state.agentSetupMessage = '';
+  state.agentSetupKind = 'agent';
 }
 
 async function saveProviderAuth(providerId: string, apiKey: string) {
@@ -870,6 +894,7 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
 
   state.mode = mode;
   state.agentSetupMessage = '';
+  state.agentSetupKind = 'agent';
   state.activeSessionId = activeSessionIdByProject[id] ?? '';
   forms.prompt = '';
 }
@@ -997,7 +1022,9 @@ async function createSession(options?: { title?: string; context?: string; initi
   } catch (error) {
     state.mode = 'session';
     const message = error instanceof Error ? error.message : 'Unable to start session';
-    state.agentSetupMessage = message.includes('provider') || message.includes('model')
+    const isGitTrixError = message.toLowerCase().includes('gittrix') || message.includes('GITTRIX_SESSION_START_FAILED');
+    state.agentSetupKind = isGitTrixError ? 'gittrix' : 'agent';
+    state.agentSetupMessage = !isGitTrixError && (message.includes('provider') || message.includes('model'))
       ? `${message}. Active model: ${settings.defaultProvider}/${settings.defaultModel}. Project picker and diff review still work without an agent key.`
       : message;
     return null;
@@ -1077,7 +1104,11 @@ function selectSessionFromSidebar(sessionId: string) {
 
 async function sendPrompt() {
   if (!state.activeSessionId || !forms.prompt.trim()) return;
-  await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, { prompt: forms.prompt });
+  const bundle = contextBundleBySessionId[state.activeSessionId];
+  await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, {
+    prompt: forms.prompt,
+    context: bundle?.payload
+  });
   forms.prompt = '';
 }
 

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { cp, mkdir } from "node:fs/promises";
 import { GitTrix } from "gittrix/packages/core/src/gittrix.js";
 import { BaselineConflictError } from "gittrix/packages/core/src/errors.js";
 import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, UserSession } from "gittrix/packages/core/src/types.js";
@@ -122,6 +123,21 @@ function ephemeralWorkspacePath(provider: Settings["ephemeralProvider"], session
   return join(provider === "local" ? sessionsRoot() : cloudflareEphemeralRoot(), sessionId, provider === "local" ? "workspace" : "");
 }
 
+async function hydrateEphemeralWorkspace(projectPath: string, ephemeralPath: string) {
+  await mkdir(ephemeralPath, { recursive: true });
+  await cp(projectPath, ephemeralPath, {
+    recursive: true,
+    force: true,
+    errorOnExist: false,
+    filter: (source) => {
+      const normalized = source.replace(/\\/g, "/");
+      if (normalized.endsWith("/.git") || normalized.includes("/.git/")) return false;
+      if (normalized.endsWith("/.glib") || normalized.includes("/.glib/")) return false;
+      return true;
+    }
+  });
+}
+
 async function getUserSession(projectPath: string, gittrixSessionId: string, branch?: string): Promise<UserSession> {
   const rt = await getRuntime(projectPath, branch);
   return rt.getSession(gittrixSessionId);
@@ -134,6 +150,7 @@ export async function startSession(params: { projectPath: string; task: string; 
   const all = await rt.listSessions();
   const meta = all.find((item) => item.id === session.id);
   const fallbackPath = ephemeralWorkspacePath(settings.ephemeralProvider, session.id);
+  await hydrateEphemeralWorkspace(params.projectPath, fallbackPath);
   return {
     gittrixSessionId: session.id,
     ephemeralPath: fallbackPath || normalizeLocalRef(meta?.ephemeralRef),

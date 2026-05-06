@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, broadcast, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/sessions";
-import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState } from "../services/state";
+import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState, getSettings } from "../services/state";
 import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix";
+import { diffItems, packDiff } from "../services/diff";
 import { log, logError } from "../lib/log";
 
 function mustProject() {
@@ -15,6 +16,40 @@ function mustProject() {
 
 function sseEncode(event: AgentEvent) {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+async function buildDiffsContext(prompt: string) {
+  if (!/\bdiffs?\b/i.test(prompt)) return "";
+
+  const wantsLastCommit = /\b(last|latest|previous|head)\s+commit\b/i.test(prompt) || /\bcommit\b/i.test(prompt);
+  if (wantsLastCommit) {
+    const commits = await diffItems("commits", 1);
+    const ref = Array.isArray(commits) ? commits[0]?.ref : undefined;
+    if (!ref) return "";
+    const packed = await packDiff("commits", ref);
+    if (!packed?.diff?.trim()) return "";
+    return `Diffs tool result: last commit ${ref.slice(0, 7)}\n\n${packed.diff.trim()}`;
+  }
+
+  const packed = await packDiff("uncommitted");
+  if (!packed?.diff?.trim()) return "";
+  return `Diffs tool result: working tree changes\n\n${packed.diff.trim()}`;
+}
+
+async function buildAgentPrompt(prompt: string, context?: string) {
+  const chunks = [prompt];
+  const trimmedContext = context?.trim();
+  if (trimmedContext) chunks.push(`Attached context:\n\n${trimmedContext}`);
+  const diffsContext = await buildDiffsContext(prompt).catch(() => "");
+  if (diffsContext) chunks.push(diffsContext);
+  return chunks.join("\n\n---\n\n");
+}
+
+function missingCloudflareConfig() {
+  const missing: string[] = [];
+  if (!(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID)) missing.push("CLOUDFLARE_ACCOUNT_ID");
+  if (!(process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN)) missing.push("CLOUDFLARE_API_TOKEN");
+  return missing;
 }
 
 export const agentRoutes = new Hono()
@@ -34,6 +69,18 @@ export const agentRoutes = new Hono()
       return c.json({ ok: false, message: "model not supported by provider" }, 400);
     }
 
+    const runtimeSettings = await getSettings();
+    if (runtimeSettings.ephemeralProvider === "cloudflare-artifacts") {
+      const missing = missingCloudflareConfig();
+      if (missing.length) {
+        return c.json({
+          ok: false,
+          code: "GITTRIX_CLOUDFLARE_CONFIG_MISSING",
+          message: `Cloudflare Artifacts selected but missing ${missing.join(", ")}. Switch Ephemeral Provider to Local workspace or set the missing variables.`
+        }, 400);
+      }
+    }
+
     let gittrixMeta: { gittrixSessionId: string; ephemeralPath: string; baselineSha: string };
     try {
       gittrixMeta = await gittrixService.startSession({
@@ -41,8 +88,10 @@ export const agentRoutes = new Hono()
         task: body?.title?.trim() || "New Session",
         branch: project.branch
       });
-    } catch {
-      return c.json({ ok: false, message: "failed to start gittrix session" }, 500);
+    } catch (error) {
+      logError("agent", "failed to start gittrix session", error, { projectPath: project.path, branch: project.branch });
+      const message = error instanceof Error ? error.message : String(error);
+      return c.json({ ok: false, code: "GITTRIX_SESSION_START_FAILED", message: `failed to start gittrix session: ${message}` }, 500);
     }
 
     const created = await createSession({
@@ -98,11 +147,13 @@ export const agentRoutes = new Hono()
     broadcast(id, userEvent);
     await patchSessionMeta(project.path, id, { status: "running" });
 
+    const agentPrompt = await buildAgentPrompt(prompt, body?.context);
+
     void runTurn({
       sessionId: id,
       turnId,
       cwd: existing.meta.ephemeralPath || project.path,
-      prompt,
+      prompt: agentPrompt,
       model: existing.meta.model,
       provider: existing.meta.provider,
       onEvent: async (event) => {

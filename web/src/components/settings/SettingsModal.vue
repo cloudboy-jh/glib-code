@@ -139,33 +139,6 @@
             </div>
 
             <div class="space-y-4">
-                <div v-if="settings.durableProvider === 'github'" class="rounded-xl border border-border/70 bg-background/35 p-4">
-                  <div class="flex items-center gap-3">
-                    <ProviderMark id="github" kind="git" />
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium text-foreground">GitHub account</p>
-                      <p class="mt-1 text-xs text-muted-foreground">{{ githubConnected ? 'Connected' : 'Not connected' }}</p>
-                    </div>
-                    <UiButton class="ml-auto" variant="outline" size="sm" :disabled="githubConnected" @click="$emit('connect-github')">{{ githubConnected ? 'Connected' : 'Connect' }}</UiButton>
-                  </div>
-                  <p class="mt-3 text-xs text-muted-foreground">Uses <span class="font-mono text-foreground">gh auth</span>, <span class="font-mono text-foreground">GITHUB_TOKEN</span>, or <span class="font-mono text-foreground">GH_TOKEN</span>.</p>
-                </div>
-
-                <div v-if="settings.ephemeralProvider === 'cloudflare-artifacts'" class="rounded-xl border border-border/70 bg-background/35 p-4">
-                  <div class="flex items-center gap-3">
-                    <ProviderMark id="cloudflare-artifacts" kind="git" />
-                    <div>
-                      <p class="text-sm font-medium text-foreground">Cloudflare Artifacts</p>
-                      <p class="mt-1 text-xs text-muted-foreground">Required for Cloudflare ephemeral storage.</p>
-                    </div>
-                  </div>
-                  <div class="mt-4 space-y-2 text-xs text-muted-foreground">
-                    <div class="env-row"><span>CLOUDFLARE_ACCOUNT_ID</span><span>required</span></div>
-                    <div class="env-row"><span>CLOUDFLARE_API_TOKEN</span><span>required</span></div>
-                    <div class="env-row"><span>CLOUDFLARE_ARTIFACTS_NAMESPACE</span><span>optional</span></div>
-                  </div>
-                </div>
-
                 <div class="rounded-xl border border-border/70 bg-background/35 p-4">
                   <p class="mb-3 text-sm font-medium">Default landing</p>
                   <div class="grid grid-cols-2 gap-2">
@@ -218,6 +191,7 @@ const props = defineProps<{
   keybindings: Array<{ command: string; key: string }>;
   providers: Provider[];
   githubConnected: boolean;
+  githubAccount?: string;
   defaultOpenMode: 'diff' | 'session';
   initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
@@ -238,7 +212,7 @@ const sortedProviders = computed(() => [...props.providers].sort((a, b) => Numbe
 
 const durableOptions = computed<GitTrixOption[]>(() => [
   { id: 'local', label: 'Local repo', available: true, selected: props.settings.durableProvider === 'local' },
-  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github' },
+  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github', detail: [`Account: ${props.githubConnected ? (props.githubAccount ? `@${props.githubAccount}` : 'Connected account unknown') : 'Not connected'}`, 'Auth source: gh auth, GITHUB_TOKEN, or GH_TOKEN.'] },
   { id: 'gitlab', label: 'GitLab', available: false, selected: false },
   { id: 'git-remote', label: 'Git remote', available: false, selected: false },
   { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
@@ -246,7 +220,7 @@ const durableOptions = computed<GitTrixOption[]>(() => [
 
 const ephemeralOptions = computed<GitTrixOption[]>(() => [
   { id: 'local', label: 'Local workspace', available: true, selected: props.settings.ephemeralProvider === 'local' },
-  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: true, selected: props.settings.ephemeralProvider === 'cloudflare-artifacts' },
+  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: true, selected: props.settings.ephemeralProvider === 'cloudflare-artifacts', detail: ['CLOUDFLARE_ACCOUNT_ID · required', 'CLOUDFLARE_API_TOKEN · required', 'CLOUDFLARE_ARTIFACTS_NAMESPACE · optional'] },
   { id: 'gitfork', label: 'GitFork', available: false, selected: false },
   { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
 ]);
@@ -277,27 +251,33 @@ const emit = defineEmits<{
   'provider:remove-auth': [providerId: string];
 }>();
 
-type GitTrixOption = { id: string; label: string; available: boolean; selected: boolean };
+type GitTrixOption = { id: string; label: string; available: boolean; selected: boolean; detail?: string[] };
 
 const SettingsOptionGroup = defineComponent({
   props: { title: { type: String, required: true }, options: { type: Array as () => GitTrixOption[], required: true } },
   emits: ['select'],
   setup(componentProps, { emit: componentEmit }) {
     return () => {
-      const optionButtons = componentProps.options.map((option) => h('button', {
+      const optionButtons = componentProps.options.map((option) => h('div', {
         key: option.id,
-        disabled: !option.available,
-        onClick: () => componentEmit('select', option.id),
         class: [
-          'flex h-13 min-h-[52px] w-full items-center justify-between gap-3 rounded-lg border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+          'flex min-h-[52px] w-full flex-col gap-3 rounded-lg border px-3 py-3 text-left text-sm transition-colors',
           option.selected ? 'border-primary/35 bg-primary/10 text-foreground' : option.available ? 'border-border/60 bg-background/55 text-foreground hover:bg-muted/55' : 'border-border/40 bg-background/25 text-muted-foreground'
         ]
       }, [
-        h('span', { class: 'flex min-w-0 items-center gap-2' }, [
-          h(ProviderMark, { id: option.id, kind: 'git', size: 'sm', muted: !option.available }),
-          h('span', { class: 'truncate' }, option.label)
+        h('button', {
+          type: 'button',
+          disabled: !option.available,
+          onClick: () => componentEmit('select', option.id),
+          class: 'flex w-full min-w-0 items-center justify-between gap-3 text-left disabled:cursor-not-allowed'
+        }, [
+          h('span', { class: 'flex min-w-0 items-center gap-2' }, [
+            h(ProviderMark, { id: option.id, kind: 'git', size: 'sm', muted: !option.available }),
+            h('span', { class: 'truncate' }, option.label)
+          ]),
+          h('span', { class: ['shrink-0 text-[11px]', option.selected ? 'text-primary' : 'text-muted-foreground'] }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming soon')
         ]),
-        h('span', { class: ['shrink-0 text-[11px]', option.selected ? 'text-primary' : 'text-muted-foreground'] }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming soon')
+        option.selected && option.detail?.length ? h('div', { class: 'ml-11 grid gap-1 rounded-md border border-border/60 bg-background/45 p-2 text-[11px] text-muted-foreground' }, option.detail.map((line) => h('div', { class: 'font-mono' }, line))) : null
       ]));
 
       return h('div', { class: 'space-y-2' }, [

@@ -1,13 +1,13 @@
 # Next Steps
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 ## Current shipped local loop
 
 - Open/clone a local git repo.
 - Review uncommitted or commit diffs without a provider key.
 - Add provider API keys explicitly inside glib-code.
-- Start pi-backed agent sessions in GitTrix local ephemeral workspaces.
+- Start pi-backed agent sessions in GitTrix ephemeral workspaces pre-hydrated from the durable repo.
 - Stream user/assistant/error/tool-call timeline events over SSE.
 - Review session diffs and promote selected files back to the durable repo.
 
@@ -17,8 +17,8 @@ Last updated: 2026-05-04
 2. Attachments API + frontend integration (`/api/attachments`).
 3. Git mutation route completion under `/api/git`.
 4. Hunk-level context/promote selection.
-5. Reliability pass: structured errors, route tests, restart behavior, and dev/Electron parity.
-6. Cloudflare Artifacts adapter once backend support lands.
+5. Reliability pass: route tests, restart behavior, and dev/Electron parity.
+6. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
 
 ## Completed recently
 
@@ -33,6 +33,9 @@ Last updated: 2026-05-04
 - Added session diff/promote modal with file-level selection and baseline conflict handling.
 - Reworked Settings → Models and ModelPicker around active model + usable provider auth.
 - Kept Picker/project open/diff review available without provider keys.
+- Added explicit GitTrix startup errors and Cloudflare config preflight errors.
+- Added GitTrix quick fallback to Local durable/local ephemeral when provider setup fails.
+- Hydrated GitTrix ephemeral workspace from durable repo on session start.
 - Added README app screenshot.
 - Added `bun run dev:desktop` for server + Vite + Electron local desktop development.
 - Added strict Vite port handling and visible Electron startup/error logging for desktop dev.

@@ -14,8 +14,7 @@
         </button>
 
         <span class="recent-row-actions">
-          <button class="recent-row-action" type="button" @click="$emit('remove', r.id)">Remove</button>
-          <button class="recent-row-action" type="button" @click="$emit('forget', r.id)">Forget</button>
+          <button class="recent-row-action" type="button" title="Forget this project and remove glib metadata" @click="$emit('forget', r.id)">Forget</button>
         </span>
       </div>
 
@@ -81,7 +80,6 @@ withDefaults(
 );
 defineEmits<{
   open: [path: string];
-  remove: [id: string];
   forget: [id: string];
   selectMode: [mode: 'diff' | 'session'];
   setMode: [mode: 'diff' | 'session'];
@@ -159,11 +157,17 @@ defineEmits<{
 }
 
 .recent-mode-popover {
-  margin-left: 12px;
-  margin-top: -2px;
-  margin-bottom: 8px;
-  width: min(100%, 460px);
-  padding: 4px 0 0;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 60;
+  width: min(calc(100vw - 32px), 520px);
+  transform: translate(-50%, -50%);
+  border-radius: 14px;
+  border: 1px solid hsl(var(--border) / 0.85);
+  background: hsl(var(--card) / 0.96);
+  padding: 14px;
+  box-shadow: 0 24px 70px hsl(0 0% 0% / 0.45);
 }
 
 .recent-mode-head {

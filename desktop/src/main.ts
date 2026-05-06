@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -11,6 +11,10 @@ const healthUrl = `http://127.0.0.1:${apiPort}/api/health`;
 
 function getRepoRoot() {
   return resolve(app.getAppPath(), "..");
+}
+
+function getPreloadPath() {
+  return join(app.getAppPath(), "dist", "preload.js");
 }
 
 function getBunCommand() {
@@ -40,7 +44,8 @@ async function createWindow() {
     height: 800,
     webPreferences: {
       contextIsolation: true,
-      sandbox: true
+      sandbox: false,
+      preload: getPreloadPath()
     }
   });
 
@@ -79,6 +84,15 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  ipcMain.handle("glib:pick-project-directory", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Open Project",
+      properties: ["openDirectory"]
+    });
+    if (result.canceled) return null;
+    return result.filePaths[0] ?? null;
+  });
+
   if (!isDev) {
     serverProc = spawn(getBunCommand(), ["server/src/index.ts", `--port=${apiPort}`], {
       cwd: getRepoRoot(),
