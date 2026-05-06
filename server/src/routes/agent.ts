@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
-import { abortRunningTurn, broadcast, runTurn, subscribe } from "../services/agent-runtime";
+import { abortRunningTurn, broadcast, disposeRuntimeSession, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/sessions";
 import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState, getSettings } from "../services/state";
 import { getPiCapabilities } from "../services/pi-capabilities";
@@ -239,6 +239,7 @@ export const agentRoutes = new Hono()
     if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
     abortRunningTurn(id);
+    await disposeRuntimeSession(id);
     const session = await getSession(project.path, id);
     await deleteSession(project.path, id);
     if (session?.meta.gittrixSessionId) {

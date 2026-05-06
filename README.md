@@ -19,7 +19,7 @@ glib-code is a local-first AI coding workspace for reviewing repo changes before
 - Project picker with open/clone/recents flows.
 - Diff workbench for uncommitted changes and commit history.
 - Session creation backed by GitTrix local ephemeral workspaces.
-- Agent runtime backed by `@mariozechner/pi-coding-agent` in-process.
+- Agent runtime backed by pi RPC in a sandbox by default, with temporary SDK fallback via `GLIB_PI_RUNTIME=sdk`.
 - Provider/model discovery through pi, with glib-owned API key storage.
 - SSE timeline streaming for user turns, assistant text, errors, and compact tool-call cards.
 - Session diff review and file-level promote back to the durable repo.
@@ -36,6 +36,7 @@ glib-code is a local-first AI coding workspace for reviewing repo changes before
 ## Runtime boundaries
 
 - pi owns provider/model capability and agent execution.
+- In RPC mode, pi runs as a subprocess inside a sandbox instead of in-process.
 - glib-code owns user-facing provider key storage under its own app config dir.
 - GitTrix owns durable/ephemeral workspace boundaries and promote operations.
 - The frontend never hardcodes provider/model catalogs; it renders backend capability state.

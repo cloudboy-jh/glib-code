@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 ## Server entry
 
@@ -150,7 +150,7 @@ Stored in config dir `keybindings.json`.
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/agent/sessions` | Create a new agent session and initialize matching GitTrix session metadata. |
-| `POST` | `/api/agent/sessions/:id/send` | Persist user turn, broadcast it, and run pi in the session ephemeral workspace. |
+| `POST` | `/api/agent/sessions/:id/send` | Persist user turn, broadcast it, and run pi through the configured runtime in the session ephemeral workspace. |
 | `GET` | `/api/agent/sessions/:id/stream` | Replay + stream canonical agent events over SSE. |
 | `DELETE` | `/api/agent/sessions/:id/turn` | Abort the active turn. |
 | `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
@@ -188,12 +188,13 @@ Responsibilities:
   - durable: GitHub adapter
   - ephemeral: GitTrix-managed Cloudflare Artifacts adapter
   - glib does not wire Cloudflare adapter internals directly; it consumes GitTrix library contracts.
-  - Agent runtime runs in hosted worker runtime; writes persist through GitTrix ephemeral storage; promote updates durable GitHub target.
+- Agent runtime runs pi inside a hosted sandbox. GitTrix still owns ephemeral storage and promote; sandbox-to-Artifacts sync is separate hosted work.
 
 ## Agent integration point
 
-- Agent runtime is pi in-process library, not subprocess.
-- `runTurn` executes with cwd set to the session's GitTrix ephemeral path.
+- Agent runtime uses pi RPC subprocesses by default; set `GLIB_PI_RUNTIME=sdk` to use the temporary in-process SDK fallback.
+- `runTurn` executes with cwd set to the session's GitTrix ephemeral path for local sandbox sessions.
+- `/api/agent/*` routes stay thin; `agent-runtime.ts` owns runtime/sandbox lifecycle.
 - No tool-call interception route is required for file writes.
 - pi events are normalized into shared `AgentEvent` records for timeline replay and SSE.
 - Assistant error messages from pi are surfaced as canonical `error` events.

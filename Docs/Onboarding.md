@@ -12,6 +12,7 @@ Requirements:
 
 - Bun
 - Git
+- pi CLI installed locally for desktop/local agent sessions
 - At least one provider API key configured in-app before starting agent sessions
 
 Steps:
@@ -44,6 +45,7 @@ Checks:
 
 - `git`
 - pi provider capability + authenticated providers
+- pi CLI availability for local RPC runtime work
 - `gh` (optional for future PR integrations)
 
 This is the canonical dependency health report for startup UX.
@@ -63,6 +65,7 @@ Provider auth behavior:
 - `GET /api/providers` reflects authenticated providers/models
 - Keys are saved under glib-code app config at `<configDir>/pi/auth.json`
 - glib-code does not read other apps' auth stores
+- RPC runtime injects the selected key into the pi subprocess environment instead of writing it into sandbox disk.
 
 GitHub account auth behavior in local/desktop:
 
@@ -76,3 +79,4 @@ No hosted browser OAuth sign-in/onboarding path should be documented as shipped 
 
 - Ephemeral session workspaces live under `<configDir>/gittrix-sessions/`.
 - Agent writes stay in the ephemeral workspace until the user promotes selected changes.
+- Hosted sandboxes install pi inside the sandbox automatically; hosted deployment/sync is not shipped yet.

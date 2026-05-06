@@ -13,16 +13,17 @@ Last updated: 2026-05-06
 
 ## Immediate priority order
 
-1. Terminal WebSocket transport (`/api/term`).
-2. Attachments API + frontend integration (`/api/attachments`).
-3. Git mutation route completion under `/api/git`.
-4. Hunk-level context/promote selection.
-5. Reliability pass: route tests, restart behavior, and dev/Electron parity.
-6. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
+1. Sandbox + pi RPC runtime parity.
+2. Terminal WebSocket transport (`/api/term`).
+3. Attachments API + frontend integration (`/api/attachments`).
+4. Git mutation route completion under `/api/git`.
+5. Hunk-level context/promote selection.
+6. Reliability pass: route tests, restart behavior, and dev/Electron parity.
+7. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
 
 ## Completed recently
 
-- Migrated agent runtime to `@mariozechner/pi-coding-agent` in-process.
+- Made sandbox/RPC runtime the default; in-process SDK remains available with `GLIB_PI_RUNTIME=sdk` as a temporary fallback.
 - Wired provider/model discovery and provider key management through `/api/providers`.
 - Moved provider key storage to glib-owned app config (`<configDir>/pi/auth.json`).
 - Stopped reading opencode auth storage.
@@ -40,38 +41,45 @@ Last updated: 2026-05-06
 - Added `bun run dev:desktop` for server + Vite + Electron local desktop development.
 - Added strict Vite port handling and visible Electron startup/error logging for desktop dev.
 
-## 1) Terminal WS
+## 1) Sandbox + pi RPC runtime
+
+- Confirm exact pi RPC CLI flags and abort command/event schema.
+- Finish local RPC parity for create/send/stream/abort/delete.
+- Keep frontend `AgentEvent` contract untouched.
+- Keep GitTrix storage/promote interfaces untouched.
+
+## 2) Terminal WS
 
 - Replace placeholder terminal transport with real `/api/term` websocket lifecycle.
 - Add reconnect handling and explicit disconnected state in UI.
 - Route terminal cwd through the active project or active GitTrix ephemeral workspace depending on context.
 
-## 2) Attachments
+## 3) Attachments
 
 - Implement upload/read/delete backend routes.
 - Wire composer attachment selection + send payload.
 - Decide persistence boundary for attachments: repo-local `.glib`, config dir, or session-scoped workspace.
 
-## 3) Git mutations
+## 4) Git mutations
 
 - Complete missing stage/unstage/discard/commit/push/pull/checkout endpoints.
 - Align frontend command actions to real route behavior.
 - Ensure destructive actions have explicit confirmation/error surfaces.
 
-## 4) Hunk-level context/promote
+## 5) Hunk-level context/promote
 
 - Extend diff selection from file-level to hunk-level.
 - Reuse the same selection primitive for context packing and session promote selectors.
 - Keep file-level promote as the fallback for large or unsupported patches.
 
-## 5) Reliability pass
+## 6) Reliability pass
 
 - Standardize error payloads across route groups.
 - Add integration-level route tests for provider auth, session create/send/stream, diff, and promote.
 - Validate behavior across both hosts: Vite dev web and Electron shell.
 - Add restart/recovery checks for session metadata, timeline persistence, and GitTrix workspace mapping.
 
-## 6) Cloudflare Artifacts adapter
+## 7) Cloudflare Artifacts adapter
 
 - Harden Cloudflare Artifacts error UX around missing account/token environment.
 - Add hosted browser OAuth for GitHub instead of relying on local `gh`/token auth.

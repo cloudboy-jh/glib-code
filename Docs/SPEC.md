@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 glib-code is a review-first AI coding workspace centered on this loop:
 
@@ -17,7 +17,7 @@ glib-code is a review-first AI coding workspace centered on this loop:
 
 ## Current reality
 
-- Agent runtime uses pi as an in-process library.
+- Agent runtime is moving to pi as an RPC subprocess in a sandbox. The in-process SDK path is a temporary parity fallback.
 - Session isolation is handled by GitTrix local workspaces.
 - Provider/model capability authority is pi.
 - glib-code stores user-entered provider keys in its own app config dir, not another tool's auth store.
@@ -41,8 +41,10 @@ Vue 3 + Vite (web/)
         │ typed RPC + SSE
         ▼
 Hono server (server/)
-   ├── pi agent library (@mariozechner/pi-coding-agent)
-   └── GitTrix local adapter shim
+   ├── agent-runtime
+   │    ├── pi RPC client
+   │    └── sandbox (local or Cloudflare)
+   └── GitTrix adapter shim
         ├── durable repo (user project)
         └── ephemeral workspace (<configDir>/gittrix-sessions/<id>/workspace)
 ```
@@ -107,12 +109,13 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitT
 
 ## Build order
 
-1. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
-2. Attachments API and frontend upload/reference flow.
-3. Git mutation routes parity (`stage/unstage/commit/push/pull/checkout`).
-4. Hunk-level session promote selection.
-5. Reliability pass: route tests, error envelopes, restart recovery checks.
-6. Cloudflare Artifacts adapter once GitTrix backend support lands.
+1. Sandbox + pi RPC runtime parity.
+2. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
+3. Attachments API and frontend upload/reference flow.
+4. Git mutation routes parity (`stage/unstage/commit/push/pull/checkout`).
+5. Hunk-level session promote selection.
+6. Reliability pass: route tests, error envelopes, restart recovery checks.
+7. Cloudflare Artifacts adapter hardening once GitTrix backend support lands.
 
 ## Out of scope (v1)
 

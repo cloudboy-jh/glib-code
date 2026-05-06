@@ -2,6 +2,10 @@ import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { createAgentSession, SessionManager } from "@mariozechner/pi-coding-agent";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import { getPiCore, validateProviderAuth } from "./pi-core";
+import { attachPiRpc } from "./pi-rpc";
+import type { PiEvent, PiRpcClient } from "./pi-rpc";
+import { createSandboxFactory } from "./sandbox";
+import type { Sandbox, SandboxProcess, SandboxFactory } from "./sandbox";
 import { log, logError } from "../lib/log";
 
 type Subscriber = (event: AgentEvent) => void;
@@ -17,11 +21,23 @@ type RuntimeSession = {
   session: Awaited<ReturnType<typeof createAgentSession>>["session"];
 };
 
+type SandboxSession = {
+  sandbox: Sandbox;
+  process: SandboxProcess;
+  pi: PiRpcClient;
+  cwd: string;
+};
+
 const subscribers = new Map<string, Set<Subscriber>>();
 const runningTurns = new Map<string, RunningTurn>();
 const runtimeSessions = new Map<string, RuntimeSession>();
+const sandboxSessions = new Map<string, SandboxSession>();
 const streamedTextByTurn = new Map<string, string>();
 const errorEmittedByTurn = new Set<string>();
+let sandboxFactory: SandboxFactory | null = null;
+
+const PI_RPC_CMD = process.env.GLIB_PI_RPC_CMD || "pi";
+const PI_RPC_ARGS = process.env.GLIB_PI_RPC_ARGS?.split(" ").filter(Boolean) ?? ["--mode", "rpc", "--no-session"];
 
 function nowIso() {
   return new Date().toISOString();
@@ -55,6 +71,16 @@ export function abortRunningTurn(sessionId: string) {
   void running.abort();
   runningTurns.delete(sessionId);
   return running.turnId;
+}
+
+export async function disposeRuntimeSession(sessionId: string) {
+  const sdk = runtimeSessions.get(sessionId);
+  if (sdk) runtimeSessions.delete(sessionId);
+  const sandboxed = sandboxSessions.get(sessionId);
+  if (!sandboxed) return;
+  sandboxSessions.delete(sessionId);
+  await sandboxed.pi.dispose().catch((error) => logError("agent", "failed to dispose pi rpc", error, { sessionId }));
+  await sandboxed.sandbox.destroy().catch((error) => logError("agent", "failed to destroy sandbox", error, { sessionId }));
 }
 
 function isAssistantMessage(message: unknown) {
@@ -116,7 +142,20 @@ function rememberError(turnId: string, message: string): AgentEvent | null {
   };
 }
 
-function mapPiEvent(turnId: string, event: AgentSessionEvent): AgentEvent | null {
+function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEvent | null {
+  if (event.type === "process_exit") {
+    return {
+      type: "error",
+      turnId,
+      name: "pi_crashed",
+      message: `pi exited with code ${String((event as any).code ?? "unknown")}`,
+      retryable: false,
+      at: nowIso()
+    };
+  }
+  if (event.type === "aborted") {
+    return { type: "aborted", turnId, at: nowIso() };
+  }
   if (event.type === "turn_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
@@ -144,9 +183,9 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent): AgentEvent | null
       type: "tool_call",
       turnId,
       stepId: `step_${turnId}`,
-      callId: event.toolCallId,
-      tool: event.toolName,
-      title: event.toolName,
+      callId: String((event as any).toolCallId ?? ""),
+      tool: String((event as any).toolName ?? "tool"),
+      title: String((event as any).toolName ?? "tool"),
       input: (event.args ?? {}) as object,
       output: "",
       metadata: {},
@@ -159,9 +198,9 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent): AgentEvent | null
       type: "tool_call",
       turnId,
       stepId: `step_${turnId}`,
-      callId: event.toolCallId,
-      tool: event.toolName,
-      title: event.toolName,
+      callId: String((event as any).toolCallId ?? ""),
+      tool: String((event as any).toolName ?? "tool"),
+      title: String((event as any).toolName ?? "tool"),
       input: {},
       output: JSON.stringify(event.result ?? {}),
       metadata: { isError: event.isError },
@@ -170,6 +209,69 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent): AgentEvent | null
     };
   }
   return null;
+}
+
+function useRpcRuntime() {
+  return process.env.GLIB_PI_RUNTIME !== "sdk";
+}
+
+function providerEnvName(provider: string) {
+  const normalized = provider.toLowerCase().replace(/[^a-z0-9]/g, "_").toUpperCase();
+  const known: Record<string, string> = {
+    anthropic: "ANTHROPIC_API_KEY",
+    openai: "OPENAI_API_KEY",
+    google: "GOOGLE_API_KEY",
+    gemini: "GOOGLE_API_KEY",
+    groq: "GROQ_API_KEY",
+    openrouter: "OPENROUTER_API_KEY"
+  };
+  return known[provider.toLowerCase()] ?? `${normalized}_API_KEY`;
+}
+
+async function getOrCreateSandboxSession(sessionId: string, cwd: string, provider?: string, modelId?: string) {
+  const existing = sandboxSessions.get(sessionId);
+  if (existing && existing.cwd === cwd) return existing;
+  if (existing) await disposeRuntimeSession(sessionId);
+
+  const { modelRegistry, authStorage } = await getPiCore();
+  const model = provider && modelId ? modelRegistry.find(provider, modelId) : undefined;
+  if (provider && modelId && !model) throw new Error(`Model not found: ${provider}/${modelId}`);
+  if (model) await validateProviderAuth(model.provider);
+
+  sandboxFactory ??= createSandboxFactory();
+  const sandbox = await sandboxFactory.create({ sessionId, cwd });
+  const env: Record<string, string> = {};
+  if (provider) {
+    const key = await authStorage.getApiKey(provider, { includeFallback: true });
+    if (key) env[providerEnvName(provider)] = key;
+  }
+  const args = [...PI_RPC_ARGS];
+  if (provider) args.push("--provider", provider);
+  if (modelId) args.push("--model", modelId);
+
+  let processHandle: SandboxProcess;
+  try {
+    processHandle = await sandbox.spawn({ cmd: PI_RPC_CMD, args, cwd: sandbox.cwd, env });
+  } catch (error) {
+    await sandbox.destroy().catch(() => {});
+    const message = error instanceof Error ? error.message : String(error);
+    const code = /ENOENT|not found/i.test(message) ? "SANDBOX_PI_MISSING" : "SANDBOX_START_FAILED";
+    throw new Error(`${code}: ${message}`);
+  }
+
+  const pi = attachPiRpc(processHandle, {
+    onError: (error) => logError("agent", "pi rpc error", error, { sessionId })
+  });
+  const immediateExit = await Promise.race([processHandle.exitCode, new Promise<null>((resolve) => setTimeout(() => resolve(null), 100))]);
+  if (typeof immediateExit === "number") {
+    await sandbox.destroy().catch(() => {});
+    const stderr = pi.getStderr();
+    const code = /ENOENT|not found|not recognized/i.test(stderr) ? "SANDBOX_PI_MISSING" : "SANDBOX_START_FAILED";
+    throw new Error(`${code}: pi exited with code ${immediateExit}${stderr ? `: ${stderr}` : ""}`);
+  }
+  const next: SandboxSession = { sandbox, process: processHandle, pi, cwd };
+  sandboxSessions.set(sessionId, next);
+  return next;
 }
 
 async function getOrCreateRuntimeSession(sessionId: string, cwd: string, provider?: string, modelId?: string) {
@@ -208,12 +310,18 @@ export async function runTurn(params: {
   log("agent", "turn starting", { sessionId: params.sessionId, turnId: params.turnId, provider: params.provider, model: params.model, cwd: params.cwd });
 
   try {
-    const runtime = await getOrCreateRuntimeSession(params.sessionId, params.cwd, params.provider, params.model);
+    const runtime = useRpcRuntime()
+      ? await getOrCreateSandboxSession(params.sessionId, params.cwd, params.provider, params.model)
+      : await getOrCreateRuntimeSession(params.sessionId, params.cwd, params.provider, params.model);
     const startEvent: AgentEvent = { type: "turn_start", turnId: params.turnId, at: nowIso() };
     await params.onEvent(startEvent);
     broadcast(params.sessionId, startEvent);
 
-    unsub = runtime.session.subscribe(async (evt) => {
+    const subscribeToRuntime = "pi" in runtime ? runtime.pi.subscribe.bind(runtime.pi) : runtime.session.subscribe.bind(runtime.session);
+    const promptRuntime = "pi" in runtime ? runtime.pi.prompt.bind(runtime.pi) : runtime.session.prompt.bind(runtime.session);
+    const abortRuntime = "pi" in runtime ? runtime.pi.abort.bind(runtime.pi) : runtime.session.abort.bind(runtime.session);
+
+    unsub = subscribeToRuntime(async (evt: AgentSessionEvent | PiEvent) => {
       const message = (evt as any).message;
       const assistantMessageEvent = (evt as any).assistantMessageEvent;
       log("agent", "pi event", {
@@ -233,14 +341,19 @@ export async function runTurn(params: {
     runningTurns.set(params.sessionId, {
       turnId: params.turnId,
       startedAt: nowIso(),
-      abort: () => runtime.session.abort()
+      abort: () => abortRuntime()
     });
 
-    await runtime.session.prompt(params.prompt, {
-      preflightResult: (success) => {
-        log("agent", "pi preflight", { sessionId: params.sessionId, turnId: params.turnId, success });
-      }
-    });
+    if ("pi" in runtime) {
+      await promptRuntime(params.prompt);
+    } else {
+      await promptRuntime(params.prompt, {
+        preflightResult: (success: boolean) => {
+          log("agent", "pi preflight", { sessionId: params.sessionId, turnId: params.turnId, success });
+        }
+      });
+    }
+    if (runningTurns.get(params.sessionId)?.turnId !== params.turnId) return { turnId: params.turnId, ok: true };
     const end: AgentEvent = { type: "turn_end", turnId: params.turnId, reason: "stop", at: nowIso() };
     await params.onEvent(end);
     broadcast(params.sessionId, end);

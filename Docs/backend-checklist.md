@@ -16,13 +16,24 @@ Last updated: 2026-05-06
 
 ## Agent runtime
 
-- [x] Replace subprocess runtime with pi in-process runtime.
+- [x] Replace old placeholder runtime with pi in-process runtime. Superseded by sandbox/RPC direction for hosted parity.
 - [x] Add SSE event fanout for active session streams.
 - [x] Normalize pi events into shared timeline events.
 - [x] Surface pi assistant/runtime errors as canonical error events.
 - [x] Add clean abort handling per turn.
 - [ ] Add timeout handling per turn.
 - [x] Harden streamed/final assistant text reconciliation to avoid clipped turn tails.
+
+## Sandbox + RPC runtime
+
+- [x] Add sandbox interface and LocalSandbox process/filesystem implementation.
+- [x] Add pi RPC JSONL parser/client scaffolding.
+- [x] Make RPC runtime the default with SDK opt-out (`GLIB_PI_RUNTIME=sdk`).
+- [x] Add CloudflareSandbox implementation skeleton.
+- [ ] Confirm exact pi RPC CLI invocation and abort schema.
+- [ ] Complete real local pi RPC parity test against installed pi binary.
+- [x] Flip default runtime to RPC.
+- [ ] Remove in-process SDK runtime path after parity.
 
 ## Session persistence
 
