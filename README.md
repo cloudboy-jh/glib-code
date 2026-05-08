@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Review changes first. Start agent sessions with context. Promote only what you accept.</strong>
+  <strong>Start fresh or with context. Work in isolation. Promote only what you accept.</strong>
 </p>
 
 <p align="center">
@@ -12,18 +12,18 @@
 
 # glib-code
 
-glib-code is a local-first AI coding workspace built around one rule: the agent does not write directly into your durable repo. You review existing changes, start an agent session with explicit context, let the agent work in an isolated workspace, then promote only the files you accept.
+glib-code is an AI coding workspace built around one rule: the agent does not write directly into your durable repo. Start a fresh session or attach explicit context, let the agent work in an isolated workspace, then promote only the files you accept.
 
 It combines a diff-first review UI, pi-backed coding agents, and GitTrix workspace isolation into one app.
 
 ## Core Ideas
 
-- Diff-first workflow: inspect uncommitted changes and commit history before prompting.
-- Contextful sessions: start agent work from a selected commit, working tree diff, or file scope.
+- Flexible session workflow: start from a blank prompt or attach repo context when it helps.
+- Contextful sessions: attach a selected commit, working tree diff, or file scope.
 - Isolated execution: agent writes happen in a GitTrix ephemeral workspace, not your main checkout.
 - Explicit promotion: changes move back to the durable repo only through review and promote.
 - Provider-neutral models: provider/model availability comes from pi capability discovery, not hardcoded frontend lists.
-- Local-first by default: project files, sessions, provider keys, and GitTrix workspaces stay on the machine unless a remote adapter is explicitly configured.
+- Explicit execution boundaries: project files, sessions, provider keys, and GitTrix workspaces live wherever the selected distribution mode runs them.
 
 ## Feature Set
 
