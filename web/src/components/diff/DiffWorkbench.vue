@@ -251,7 +251,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
 }
 
 async function loadHistory() {
-  const rows = await apiGet<Array<{ id: string; ref?: string; title?: string }>>('/diff/items?source=commits&limit=120');
+  const rows = await apiGet<Array<{ id: string; ref?: string; title?: string }>>(`/diff/items?source=commits&limit=120&projectPath=${encodeURIComponent(props.currentProject.path)}`);
   state.items = rows.map((row) => ({
     id: row.id,
     ref: row.ref ?? row.id,
@@ -270,8 +270,8 @@ async function loadHistory() {
 async function loadFilesAndPatch() {
   const source = state.openSource === 'commit' ? 'commits' : 'uncommitted';
   const filesQuery = source === 'commits' && state.selectedCommitRef
-    ? `/diff/files?source=commits&ref=${encodeURIComponent(state.selectedCommitRef)}`
-    : `/diff/files?source=uncommitted`;
+    ? `/diff/files?source=commits&ref=${encodeURIComponent(state.selectedCommitRef)}&projectPath=${encodeURIComponent(props.currentProject.path)}`
+    : `/diff/files?source=uncommitted&projectPath=${encodeURIComponent(props.currentProject.path)}`;
 
   const rows = await apiGet<Array<{ file: string; status?: string }>>(filesQuery);
   state.files = rows.map((row) => ({ path: row.file, stats: row.status ?? '' }));
@@ -280,6 +280,7 @@ async function loadFilesAndPatch() {
   }
 
   const payload: Record<string, unknown> = { source };
+  payload.projectPath = props.currentProject.path;
   if (source === 'commits' && state.selectedCommitRef) payload.ref = state.selectedCommitRef;
   if (state.selectedFilePath) payload.file = state.selectedFilePath;
   const packed = await apiPost<{ diff: string }>('/diff/pack', payload);

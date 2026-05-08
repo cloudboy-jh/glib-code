@@ -32,7 +32,10 @@ const subscribers = new Map<string, Set<Subscriber>>();
 const runningTurns = new Map<string, RunningTurn>();
 const runtimeSessions = new Map<string, RuntimeSession>();
 const sandboxSessions = new Map<string, SandboxSession>();
-const streamedTextByTurn = new Map<string, string>();
+const assistantMessageSeqByTurn = new Map<string, number>();
+const currentAssistantMessageKeyByTurn = new Map<string, string>();
+const streamedTextByMessage = new Map<string, string>();
+const turnHasAssistantText = new Set<string>();
 const errorEmittedByTurn = new Set<string>();
 let textPartSeq = 0;
 let sandboxFactory: SandboxFactory | null = null;
@@ -108,8 +111,27 @@ function extractMessageError(message: unknown) {
   return typeof msg?.errorMessage === "string" ? msg.errorMessage : "";
 }
 
-function rememberText(turnId: string, text: string) {
-  streamedTextByTurn.set(turnId, `${streamedTextByTurn.get(turnId) ?? ""}${text}`);
+function currentMessageKey(turnId: string) {
+  let key = currentAssistantMessageKeyByTurn.get(turnId);
+  if (key) return key;
+  const seq = (assistantMessageSeqByTurn.get(turnId) ?? 0) + 1;
+  assistantMessageSeqByTurn.set(turnId, seq);
+  key = `${turnId}:${seq}`;
+  currentAssistantMessageKeyByTurn.set(turnId, key);
+  return key;
+}
+
+function startAssistantMessage(turnId: string) {
+  const seq = (assistantMessageSeqByTurn.get(turnId) ?? 0) + 1;
+  assistantMessageSeqByTurn.set(turnId, seq);
+  const key = `${turnId}:${seq}`;
+  currentAssistantMessageKeyByTurn.set(turnId, key);
+  return key;
+}
+
+function rememberText(turnId: string, text: string, messageKey = currentMessageKey(turnId), storeText = true) {
+  if (storeText) streamedTextByMessage.set(messageKey, `${streamedTextByMessage.get(messageKey) ?? ""}${text}`);
+  if (text.trim()) turnHasAssistantText.add(turnId);
   return {
     type: "text_part" as const,
     turnId,
@@ -160,18 +182,22 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   if (event.type === "turn_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
-    const finalText = extractMessageText((event as any).message);
-    const streamed = streamedTextByTurn.get(turnId) ?? "";
-    const delta = suffixFromFinal(streamed, finalText);
-    return delta ? rememberText(turnId, delta) : null;
+    return null;
+  }
+  if (event.type === "message_start") {
+    const message = (event as any).message;
+    if (!isAssistantMessage(message)) return null;
+    const key = startAssistantMessage(turnId);
+    return turnHasAssistantText.has(turnId) ? rememberText(turnId, "\n\n", key, false) : null;
   }
   if (event.type === "message_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
     const finalText = extractMessageText((event as any).message);
-    const streamed = streamedTextByTurn.get(turnId) ?? "";
+    const key = currentMessageKey(turnId);
+    const streamed = streamedTextByMessage.get(key) ?? "";
     const delta = suffixFromFinal(streamed, finalText);
-    return delta ? rememberText(turnId, delta) : null;
+    return delta ? rememberText(turnId, delta, key) : null;
   }
   if (event.type === "message_update") {
     const assistantEvent = (event as any).assistantMessageEvent;
@@ -325,14 +351,16 @@ export async function runTurn(params: {
     unsub = subscribeToRuntime(async (evt: AgentSessionEvent | PiEvent) => {
       const message = (evt as any).message;
       const assistantMessageEvent = (evt as any).assistantMessageEvent;
-      log("agent", "pi event", {
-        sessionId: params.sessionId,
-        turnId: params.turnId,
-        type: evt.type,
-        role: message?.role,
-        contentLength: extractMessageText(message).length,
-        assistantEvent: assistantMessageEvent?.type
-      });
+      if (assistantMessageEvent?.type !== "thinking_delta") {
+        log("agent", "pi event", {
+          sessionId: params.sessionId,
+          turnId: params.turnId,
+          type: evt.type,
+          role: message?.role,
+          contentLength: extractMessageText(message).length,
+          assistantEvent: assistantMessageEvent?.type
+        });
+      }
       const mapped = mapPiEvent(params.turnId, evt);
       if (!mapped) return;
       await params.onEvent(mapped);
@@ -379,7 +407,11 @@ export async function runTurn(params: {
   } finally {
     unsub();
     runningTurns.delete(params.sessionId);
-    streamedTextByTurn.delete(params.turnId);
+    const seq = assistantMessageSeqByTurn.get(params.turnId) ?? 0;
+    for (let i = 1; i <= seq; i += 1) streamedTextByMessage.delete(`${params.turnId}:${i}`);
+    assistantMessageSeqByTurn.delete(params.turnId);
+    currentAssistantMessageKeyByTurn.delete(params.turnId);
+    turnHasAssistantText.delete(params.turnId);
     errorEmittedByTurn.delete(params.turnId);
   }
 }

@@ -22,29 +22,29 @@ function sseEncode(event: AgentEvent) {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
-async function buildDiffsContext(prompt: string) {
+async function buildDiffsContext(prompt: string, projectPath?: string) {
   if (!/\bdiffs?\b/i.test(prompt)) return "";
 
   const wantsLastCommit = /\b(last|latest|previous|head)\s+commit\b/i.test(prompt) || /\bcommit\b/i.test(prompt);
   if (wantsLastCommit) {
-    const commits = await diffItems("commits", 1);
+    const commits = await diffItems("commits", 1, projectPath);
     const ref = Array.isArray(commits) ? commits[0]?.ref : undefined;
     if (!ref) return "";
-    const packed = await packDiff("commits", ref);
+    const packed = await packDiff("commits", ref, undefined, projectPath);
     if (!packed?.diff?.trim()) return "";
     return `Diffs tool result: last commit ${ref.slice(0, 7)}\n\n${packed.diff.trim()}`;
   }
 
-  const packed = await packDiff("uncommitted");
+  const packed = await packDiff("uncommitted", undefined, undefined, projectPath);
   if (!packed?.diff?.trim()) return "";
   return `Diffs tool result: working tree changes\n\n${packed.diff.trim()}`;
 }
 
-async function buildAgentPrompt(prompt: string, context?: string) {
+async function buildAgentPrompt(prompt: string, context?: string, projectPath?: string) {
   const chunks = [prompt];
   const trimmedContext = context?.trim();
   if (trimmedContext) chunks.push(`Attached context:\n\n${trimmedContext}`);
-  const diffsContext = await buildDiffsContext(prompt).catch(() => "");
+  const diffsContext = await buildDiffsContext(prompt, projectPath).catch(() => "");
   if (diffsContext) chunks.push(diffsContext);
   return chunks.join("\n\n---\n\n");
 }
@@ -151,7 +151,7 @@ export const agentRoutes = new Hono()
     broadcast(id, userEvent);
     await patchSessionMeta(projectPath, id, { status: "running" });
 
-    const agentPrompt = await buildAgentPrompt(prompt, body?.context);
+    const agentPrompt = await buildAgentPrompt(prompt, body?.context, projectPath);
 
     void runTurn({
       sessionId: id,

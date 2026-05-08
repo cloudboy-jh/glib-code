@@ -1,14 +1,15 @@
 import { simpleGit } from "simple-git";
 import { getCurrentProjectId, getProjectById } from "./state";
 
-function repoPath() {
+function repoPath(projectPath?: string) {
+  if (projectPath) return projectPath;
   const id = getCurrentProjectId();
   if (!id) return null;
   return getProjectById(id)?.path ?? null;
 }
 
-async function gitRaw(args: string[]) {
-  const repo = repoPath();
+async function gitRaw(args: string[], projectPath?: string) {
+  const repo = repoPath(projectPath);
   if (!repo) return null;
   const proc = Bun.spawn({ cmd: ["git", ...args], cwd: repo, stdout: "pipe", stderr: "pipe" });
   const code = await proc.exited;
@@ -16,13 +17,13 @@ async function gitRaw(args: string[]) {
   return code === 0 ? out : null;
 }
 
-export async function diffItems(source: string, limit = 50) {
+export async function diffItems(source: string, limit = 50, projectPath?: string) {
   if (source === "uncommitted") {
     return [{ id: "working-tree", title: "Working tree", ref: "working-tree" }];
   }
 
   if (source === "commits") {
-    const repo = repoPath();
+    const repo = repoPath(projectPath);
     if (!repo) return null;
     const git = simpleGit(repo);
     const log = await git.log({ maxCount: limit });
@@ -38,9 +39,9 @@ export async function diffItems(source: string, limit = 50) {
   return [];
 }
 
-export async function diffFiles(source: string, ref?: string) {
+export async function diffFiles(source: string, ref?: string, projectPath?: string) {
   if (source === "uncommitted") {
-    const out = await gitRaw(["status", "--porcelain"]);
+    const out = await gitRaw(["status", "--porcelain"], projectPath);
     if (out == null) return null;
     return out
       .split("\n")
@@ -54,7 +55,7 @@ export async function diffFiles(source: string, ref?: string) {
   }
 
   if (source === "commits" && ref) {
-    const out = await gitRaw(["show", "--name-status", "--pretty=format:", ref]);
+    const out = await gitRaw(["show", "--name-status", "--pretty=format:", ref], projectPath);
     if (out == null) return null;
     return out
       .split("\n")
@@ -69,12 +70,12 @@ export async function diffFiles(source: string, ref?: string) {
   return [];
 }
 
-export async function diffHunks(source: string, file: string, ref?: string) {
+export async function diffHunks(source: string, file: string, ref?: string, projectPath?: string) {
   const args = source === "commits" && ref
     ? ["show", ref, "--", file]
     : ["diff", "--", file];
 
-  const out = await gitRaw(args);
+  const out = await gitRaw(args, projectPath);
   if (out == null) return null;
   const lines = out.split("\n");
 
@@ -88,14 +89,14 @@ export async function diffHunks(source: string, file: string, ref?: string) {
   return hunks;
 }
 
-export async function packDiff(source: string, ref?: string, file?: string) {
+export async function packDiff(source: string, ref?: string, file?: string, projectPath?: string) {
   let args: string[];
   if (source === "commits" && ref) {
     args = file ? ["show", ref, "--", file] : ["show", ref];
   } else {
     args = file ? ["diff", "--", file] : ["diff"];
   }
-  const diff = await gitRaw(args);
+  const diff = await gitRaw(args, projectPath);
   if (diff == null) return null;
   return {
     diff,

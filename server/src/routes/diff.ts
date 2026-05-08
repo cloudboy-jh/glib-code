@@ -11,14 +11,14 @@ export const diffRoutes = new Hono()
   .get("/items", async (c) => {
     const source = c.req.query("source") ?? "uncommitted";
     const limit = Number(c.req.query("limit") ?? "50");
-    const items = await diffItems(source, Number.isFinite(limit) ? limit : 50);
+    const items = await diffItems(source, Number.isFinite(limit) ? limit : 50, c.req.query("projectPath"));
     if (!items) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(items);
   })
   .get("/files", async (c) => {
     const source = c.req.query("source") ?? "uncommitted";
     const ref = c.req.query("ref");
-    const files = await diffFiles(source, ref);
+    const files = await diffFiles(source, ref, c.req.query("projectPath"));
     if (!files) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(files);
   })
@@ -27,14 +27,14 @@ export const diffRoutes = new Hono()
     const ref = c.req.query("ref");
     const file = c.req.query("file");
     if (!file) return c.json({ ok: false, message: "file required" }, 400);
-    const hunks = await diffHunks(source, file, ref);
+    const hunks = await diffHunks(source, file, ref, c.req.query("projectPath"));
     if (!hunks) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(hunks);
   })
   .post("/pack", async (c) => {
-    const body = await c.req.json().catch(() => null) as { source?: string; ref?: string; file?: string } | null;
+    const body = await c.req.json().catch(() => null) as { source?: string; ref?: string; file?: string; projectPath?: string } | null;
     const source = body?.source ?? "uncommitted";
-    const packed = await packDiff(source, body?.ref, body?.file);
+    const packed = await packDiff(source, body?.ref, body?.file, body?.projectPath);
     if (!packed) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(packed);
   })

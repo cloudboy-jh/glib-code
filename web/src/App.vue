@@ -1061,7 +1061,7 @@ async function createSessionInner(options?: { title?: string; context?: string; 
 
 async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }) {
   if (!currentProject.value) return;
-  const packBody: Record<string, unknown> = { source: payload.source === 'commit' ? 'commits' : 'uncommitted' };
+  const packBody: Record<string, unknown> = { source: payload.source === 'commit' ? 'commits' : 'uncommitted', projectPath: currentProject.value.path };
   if (payload.source === 'commit' && payload.ref) packBody.ref = payload.ref;
   if (payload.file) packBody.file = payload.file;
   const packed = await apiPost<{ diff: string }>('/diff/pack', packBody);
