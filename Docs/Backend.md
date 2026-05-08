@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-06
+Last updated: 2026-05-08
 
 ## Server entry
 
@@ -146,13 +146,14 @@ Stored in config dir `keybindings.json`.
 - `/api/agent/*` is implemented for create/send/stream/abort/delete.
 - `/api/sessions/*` is implemented for list/read/fork/delete/patch plus GitTrix diff/promote/evict.
 - Session metadata is stored under repo-local `.glib/sessions` and includes GitTrix mapping in `SessionMeta`.
+- Session-scoped agent routes require explicit `projectPath` for send/stream/abort/delete lookup. They do not rely on process-global current project state.
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/agent/sessions` | Create a new agent session and initialize matching GitTrix session metadata. |
-| `POST` | `/api/agent/sessions/:id/send` | Persist user turn, broadcast it, and run pi through the configured runtime in the session ephemeral workspace. |
-| `GET` | `/api/agent/sessions/:id/stream` | Replay + stream canonical agent events over SSE. |
-| `DELETE` | `/api/agent/sessions/:id/turn` | Abort the active turn. |
+| `POST` | `/api/agent/sessions/:id/send` | Persist user turn, broadcast it, and run pi through the configured runtime in the session ephemeral workspace. Body includes `projectPath`. |
+| `GET` | `/api/agent/sessions/:id/stream` | Replay + stream canonical agent events over SSE. Query includes `projectPath`. |
+| `DELETE` | `/api/agent/sessions/:id/turn` | Abort the active turn. Query includes `projectPath`. |
 | `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
 | `GET` | `/api/sessions/:id` | Get session detail and metadata. |
 | `GET` | `/api/sessions/:id/diff` | Return full unified diff from GitTrix ephemeral vs durable baseline. |
@@ -197,6 +198,7 @@ Responsibilities:
 - `/api/agent/*` routes stay thin; `agent-runtime.ts` owns runtime/sandbox lifecycle.
 - No tool-call interception route is required for file writes.
 - pi events are normalized into shared `AgentEvent` records for timeline replay and SSE.
+- Text chunk `partId`s are monotonic per server process, not wall-clock based, so same-millisecond pi deltas are not dropped by frontend dedupe.
 - Assistant error messages from pi are surfaced as canonical `error` events.
 
 ## Eviction daemon + telemetry

@@ -496,6 +496,7 @@ const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();
 
 let stopSidebarResize: (() => void) | null = null;
+let creatingSession: Promise<Session | null> | null = null;
 
 
 function eventKey(event: AgentEvent) {
@@ -633,7 +634,9 @@ async function hydrateSessionDoc(sessionId: string) {
 
 function connectSessionStream(sessionId: string) {
   if (streamsBySessionId.has(sessionId)) return;
-  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream`);
+  const session = sessions.find((entry) => entry.id === sessionId);
+  if (!session?.projectPath) return;
+  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}`);
   const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
   for (const name of names) {
     stream.addEventListener(name, (evt) => {
@@ -663,6 +666,10 @@ async function hydrateSessions() {
   if (!currentProject.value) return;
   const rows = await apiGet<SessionMetaApi[]>('/sessions');
   sessions.splice(0, sessions.length, ...rows.map(mapApiSession));
+  const activeIds = new Set(rows.map((row) => row.id));
+  for (const id of [...streamsBySessionId.keys()]) {
+    if (!activeIds.has(id)) disconnectSessionStream(id);
+  }
   for (const row of rows) {
     await hydrateSessionDoc(row.id);
     connectSessionStream(row.id);
@@ -1014,6 +1021,14 @@ function openCommitsListDiff() {
 }
 
 async function createSession(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
+  if (creatingSession) return creatingSession;
+  creatingSession = createSessionInner(options).finally(() => {
+    creatingSession = null;
+  });
+  return creatingSession;
+}
+
+async function createSessionInner(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
   if (!currentProject.value) return null;
   state.agentSetupMessage = '';
   let created: SessionMetaApi;
@@ -1104,12 +1119,25 @@ function selectSessionFromSidebar(sessionId: string) {
 
 async function sendPrompt() {
   if (!state.activeSessionId || !forms.prompt.trim()) return;
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
   const bundle = contextBundleBySessionId[state.activeSessionId];
-  await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, {
-    prompt: forms.prompt,
-    context: bundle?.payload
-  });
-  forms.prompt = '';
+  try {
+    await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, {
+      prompt: forms.prompt,
+      context: bundle?.payload,
+      projectPath: session.projectPath
+    });
+    forms.prompt = '';
+  } catch (error) {
+    appendTimelineEvent(state.activeSessionId, {
+      id: `${state.activeSessionId}-${Date.now()}-send-err`,
+      kind: 'Error',
+      text: error instanceof Error ? error.message : 'Failed to send prompt',
+      time: 'now',
+      level: 'error'
+    });
+  }
 }
 
 function removeActiveContext() {
@@ -1185,7 +1213,9 @@ async function confirmPromote() {
 
 async function abortTurn() {
   if (!state.activeSessionId) return;
-  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn`);
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
+  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
 }
 
 function runTerminal() {

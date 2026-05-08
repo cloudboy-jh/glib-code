@@ -1,6 +1,6 @@
 # Agent Integration
 
-Last updated: 2026-05-06
+Last updated: 2026-05-08
 
 ## Runtime model
 
@@ -23,6 +23,7 @@ Last updated: 2026-05-06
 - Agent writes land in the ephemeral workspace, not the durable repo.
 - Accepted changes move to durable only through explicit promote.
 - GitTrix interfaces/adapters are unchanged by the RPC runtime work.
+- Session-scoped agent actions use the session's explicit `projectPath`; send/stream/abort/delete do not resolve through process-global current project state.
 
 ## Pi RPC protocol
 
@@ -51,6 +52,8 @@ pi subprocess in sandbox
 
 `AgentEvent` stays stable so the frontend does not care whether events came from SDK callbacks or RPC stdout.
 
+Text chunk events use collision-proof part IDs. Do not derive `text_part.partId` from wall-clock time because pi can emit several deltas in the same millisecond and the frontend dedupes by event identity.
+
 ## Abort and dispose
 
 - Abort calls the active runtime's abort method. In RPC mode that writes an abort command to pi stdin and waits briefly for ack/abort/end.
@@ -70,9 +73,11 @@ pi subprocess in sandbox
 - Session metadata and event timelines persist under repo-local `.glib/sessions`.
 - Live SDK sessions, subprocesses, and sandboxes do not survive server restart.
 - First send after restart creates a fresh runtime for the existing session metadata.
+- Existing session actions continue to target the persisted repo-local session as long as the frontend supplies the session's `projectPath`.
 
 ## Active gaps
 
 - Finish authenticated prompt/abort smoke coverage against an installed pi binary.
+- Add regression coverage for duplicate session creation and project-scoped send/stream behavior.
 - Complete real Cloudflare Sandbox integration once hosted deployment work starts.
 - Add hosted sync between sandbox filesystem and Cloudflare Artifacts before promote, unless a native mount path is verified.

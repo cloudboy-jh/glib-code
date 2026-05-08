@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-04
+Last updated: 2026-05-08
 
 ## App shell
 
@@ -46,6 +46,7 @@ Agent/session data-plane now API-backed:
 - Timeline streaming through `/api/agent/sessions/:id/stream`
 - Abort through `DELETE /api/agent/sessions/:id/turn`
 - Session diff/promote through `/api/sessions/:id/diff` and `/api/sessions/:id/promote`
+- Session send/stream/abort calls include the active session's `projectPath` to avoid stale global-project 404s.
 
 Now API-backed in settings plane:
 
@@ -110,6 +111,9 @@ Current state:
 - Timeline renders user/assistant/error entries plus compact expandable tool-call cards.
 - Composer sends real prompts and supports `/stop`/`/abort` command handling.
 - Session create/send/stream flows use backend agent routes.
+- Session creation is guarded so repeated clicks or keyboard actions reuse the in-flight request instead of creating duplicate sessions.
+- Session hydration closes streams for sessions outside the active project.
+- Send failures render as timeline errors instead of silent hangs.
 - Empty session state explains active model/provider key failures and offers key/model actions.
 
 ## Settings + keybindings
@@ -124,3 +128,4 @@ Current state:
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
 - Add hunk-level session context/promote selection.
+- Add frontend regression coverage for duplicate create prevention and project-scoped session sends.

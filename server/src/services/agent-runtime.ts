@@ -34,6 +34,7 @@ const runtimeSessions = new Map<string, RuntimeSession>();
 const sandboxSessions = new Map<string, SandboxSession>();
 const streamedTextByTurn = new Map<string, string>();
 const errorEmittedByTurn = new Set<string>();
+let textPartSeq = 0;
 let sandboxFactory: SandboxFactory | null = null;
 
 const PI_RPC_CMD = process.env.GLIB_PI_RPC_CMD || "pi";
@@ -113,7 +114,7 @@ function rememberText(turnId: string, text: string) {
     type: "text_part" as const,
     turnId,
     stepId: `step_${turnId}`,
-    partId: `part_${Date.now().toString(36)}`,
+    partId: `part_${turnId}_${++textPartSeq}`,
     text,
     at: nowIso()
   };

@@ -1,6 +1,6 @@
 # Next Steps
 
-Last updated: 2026-05-06
+Last updated: 2026-05-08
 
 ## Current shipped local loop
 
@@ -9,6 +9,8 @@ Last updated: 2026-05-06
 - Add provider API keys explicitly inside glib-code.
 - Start pi-backed agent sessions in GitTrix ephemeral workspaces pre-hydrated from the durable repo.
 - Stream user/assistant/error/tool-call timeline events over SSE.
+- Keep session send/stream/abort actions scoped to the session's project path so reloads, project switches, and other tabs do not strand valid sessions.
+- Preserve streamed assistant text chunks with collision-proof event IDs.
 - Review session diffs and promote selected files back to the durable repo.
 
 ## Immediate priority order
@@ -18,7 +20,7 @@ Last updated: 2026-05-06
 3. Attachments API + frontend integration (`/api/attachments`).
 4. Git mutation route completion under `/api/git`.
 5. Hunk-level context/promote selection.
-6. Reliability pass: route tests, restart behavior, and dev/Electron parity.
+6. Reliability pass: route tests, restart behavior, multi-tab behavior, and dev/Electron parity.
 7. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
 
 ## Completed recently
@@ -40,6 +42,9 @@ Last updated: 2026-05-06
 - Added README app screenshot.
 - Added `bun run dev:desktop` for server + Vite + Electron local desktop development.
 - Added strict Vite port handling and visible Electron startup/error logging for desktop dev.
+- Fixed same-millisecond streamed text chunk collisions that could drop words from assistant responses.
+- Added explicit project-path routing for agent session send/stream/abort/delete so valid sessions do not 404 after global project changes.
+- Added frontend guards against duplicate session creation and stale session EventSource streams.
 
 ## 1) Sandbox + pi RPC runtime
 
@@ -76,6 +81,7 @@ Last updated: 2026-05-06
 
 - Standardize error payloads across route groups.
 - Add integration-level route tests for provider auth, session create/send/stream, diff, and promote.
+- Add multi-tab and reload regression coverage for project-scoped session actions.
 - Validate behavior across both hosts: Vite dev web and Electron shell.
 - Add restart/recovery checks for session metadata, timeline persistence, and GitTrix workspace mapping.
 

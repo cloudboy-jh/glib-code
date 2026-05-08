@@ -14,6 +14,10 @@ function mustProject() {
   return getProjectById(projectId);
 }
 
+function requiredProjectPath(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function sseEncode(event: AgentEvent) {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
@@ -116,13 +120,13 @@ export const agentRoutes = new Hono()
     return c.json(created, 201);
   })
   .post("/sessions/:id/send", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
-    const existing = await getSession(project.path, id);
+    const body = await c.req.json().catch(() => null) as { prompt?: string; context?: string; attachments?: string[]; projectPath?: string } | null;
+    const projectPath = requiredProjectPath(body?.projectPath);
+    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
+    const existing = await getSession(projectPath, id);
     if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
 
-    const body = await c.req.json().catch(() => null) as { prompt?: string; context?: string; attachments?: string[] } | null;
     const prompt = body?.prompt?.trim();
     if (!prompt) return c.json({ ok: false, message: "prompt required" }, 400);
     const capabilities = await getPiCapabilities();
@@ -143,23 +147,23 @@ export const agentRoutes = new Hono()
       at: new Date().toISOString()
     };
 
-    await appendEvents(project.path, id, [userEvent]);
+    await appendEvents(projectPath, id, [userEvent]);
     broadcast(id, userEvent);
-    await patchSessionMeta(project.path, id, { status: "running" });
+    await patchSessionMeta(projectPath, id, { status: "running" });
 
     const agentPrompt = await buildAgentPrompt(prompt, body?.context);
 
     void runTurn({
       sessionId: id,
       turnId,
-      cwd: existing.meta.ephemeralPath || project.path,
+      cwd: existing.meta.ephemeralPath || projectPath,
       prompt: agentPrompt,
       model: existing.meta.model,
       provider: existing.meta.provider,
       onEvent: async (event) => {
-        await appendEvents(project.path, id, [event]);
+        await appendEvents(projectPath, id, [event]);
         if (event.type === "turn_end") {
-          await patchSessionMeta(project.path, id, {
+          await patchSessionMeta(projectPath, id, {
             status: event.reason === "error" ? "error" : event.reason === "aborted" ? "aborted" : "done"
           });
         }
@@ -169,10 +173,10 @@ export const agentRoutes = new Hono()
     return c.json({ ok: true, sessionId: id, turnId });
   })
   .get("/sessions/:id/stream", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
-    const existing = await getSession(project.path, id);
+    const projectPath = requiredProjectPath(c.req.query("projectPath"));
+    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
+    const existing = await getSession(projectPath, id);
     if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
 
     const stream = new ReadableStream({
@@ -224,27 +228,30 @@ export const agentRoutes = new Hono()
     return c.body(stream);
   })
   .delete("/sessions/:id/turn", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
+    const projectPath = requiredProjectPath(c.req.query("projectPath"));
+    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
+    const existing = await getSession(projectPath, id);
+    if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
     const turnId = abortRunningTurn(id);
     if (!turnId) return c.json({ ok: false, message: "no active turn" }, 404);
     const evt: AgentEvent = { type: "aborted", turnId, at: new Date().toISOString() };
-    await appendEvents(project.path, id, [evt, { type: "turn_end", turnId, reason: "aborted", at: new Date().toISOString() }]);
-    await patchSessionMeta(project.path, id, { status: "aborted" });
+    await appendEvents(projectPath, id, [evt, { type: "turn_end", turnId, reason: "aborted", at: new Date().toISOString() }]);
+    await patchSessionMeta(projectPath, id, { status: "aborted" });
     return c.json({ ok: true, sessionId: id, turnId });
   })
   .delete("/sessions/:id", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
+    const projectPath = requiredProjectPath(c.req.query("projectPath"));
+    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
     abortRunningTurn(id);
     await disposeRuntimeSession(id);
-    const session = await getSession(project.path, id);
-    await deleteSession(project.path, id);
+    const session = await getSession(projectPath, id);
+    await deleteSession(projectPath, id);
     if (session?.meta.gittrixSessionId) {
       try {
-        await gittrixService.evict(project.path, session.meta.gittrixSessionId, project.branch);
+        const project = getProjectById(session.meta.projectId);
+        await gittrixService.evict(projectPath, session.meta.gittrixSessionId, project?.branch ?? "main");
       } catch {
         // best effort cleanup
       }
