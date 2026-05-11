@@ -24,8 +24,24 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type PromptWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+
 function isTurnEnd(event: PiEvent) {
-  return event.type === "agent_end" || event.type === "aborted" || event.type === "error" || event.type === "process_exit";
+  return event.type === "agent_end" || event.type === "turn_end" || event.type === "aborted" || event.type === "error" || event.type === "process_exit";
+}
+
+function eventError(event: PiEvent) {
+  if (event.type === "error") return new Error(typeof event.message === "string" ? event.message : "pi RPC error");
+  if (event.type === "process_exit") return new Error(`pi RPC process exited with code ${String(event.code ?? "unknown")}`);
+  if (event.type === "response" && event.success === false) return new Error(typeof event.error === "string" ? event.error : "pi RPC command failed");
+  if (event.type === "turn_end") {
+    const message = event.message as { errorMessage?: unknown } | undefined;
+    if (typeof message?.errorMessage === "string") return new Error(message.errorMessage);
+  }
+  return null;
 }
 
 export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRpcClient {
@@ -39,7 +55,15 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
   let disposed = false;
   let requestId = 0;
   const pendingRequests = new Map<string, PendingRequest>();
-  let promptWaiter: (() => void) | null = null;
+  let promptWaiter: PromptWaiter | null = null;
+
+  const failPendingRequests = (error: Error) => {
+    for (const [id, pendingRequest] of pendingRequests) {
+      pendingRequests.delete(id);
+      clearTimeout(pendingRequest.timeout);
+      pendingRequest.reject(error);
+    }
+  };
 
   const emit = (event: PiEvent) => {
     if (event.type === "response" && typeof event.id === "string") {
@@ -54,9 +78,28 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
         }
         return;
       }
+
+      if (event.success === false) {
+        const errorEvent: PiEvent = {
+          type: "error",
+          message: typeof event.error === "string" ? event.error : "pi RPC command failed",
+          command: event.command,
+          id: event.id
+        };
+        if (promptWaiter) {
+          promptWaiter.reject(eventError(errorEvent) ?? new Error("pi RPC command failed"));
+          promptWaiter = null;
+        }
+        for (const handler of handlers) {
+          void Promise.resolve(handler(errorEvent)).catch((error) => opts.onError?.(error instanceof Error ? error : new Error(String(error))));
+        }
+        return;
+      }
     }
     if (isTurnEnd(event) && promptWaiter) {
-      promptWaiter();
+      const error = eventError(event);
+      if (error) promptWaiter.reject(error);
+      else promptWaiter.resolve();
       promptWaiter = null;
     }
     for (const handler of handlers) {
@@ -116,7 +159,11 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
   void consume();
   void consumeStderr();
   void process.exitCode.then((code) => {
-    if (!disposed && code !== 0) emit({ type: "process_exit", code });
+    if (disposed) return;
+    if (code === 0 && pendingRequests.size === 0 && !promptWaiter) return;
+    const error = new Error(`pi RPC process exited with code ${code}`);
+    failPendingRequests(error);
+    emit({ type: "process_exit", code });
   });
 
   const writeJson = (payload: PiEvent) => {
@@ -141,10 +188,15 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
   return {
     async prompt(text, promptOpts) {
       const message = promptOpts?.context ? `${text}\n\n---\n\n${promptOpts.context}` : text;
-      const completion = new Promise<void>((resolve) => {
-        promptWaiter = resolve;
+      const completion = new Promise<void>((resolve, reject) => {
+        promptWaiter = { resolve, reject };
       });
-      await send({ type: "prompt", message });
+      try {
+        await send({ type: "prompt", message });
+      } catch (error) {
+        promptWaiter = null;
+        throw error;
+      }
       await completion;
     },
     async abort() {
@@ -163,10 +215,10 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
     },
     async dispose() {
       disposed = true;
-      for (const [id, pendingRequest] of pendingRequests) {
-        pendingRequests.delete(id);
-        clearTimeout(pendingRequest.timeout);
-        pendingRequest.reject(new Error("RPC client disposed"));
+      failPendingRequests(new Error("RPC client disposed"));
+      if (promptWaiter) {
+        promptWaiter.reject(new Error("RPC client disposed"));
+        promptWaiter = null;
       }
       try {
         await writer.close();

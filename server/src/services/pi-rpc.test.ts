@@ -58,7 +58,7 @@ describe("attachPiRpc", () => {
     expect(events).toEqual([{ type: "message_update", text }]);
   });
 
-  test("prompt sends real RPC message command and waits for agent_end", async () => {
+  test("prompt sends real RPC message command and waits for turn_end", async () => {
     let stdout!: ReadableStreamDefaultController<Uint8Array>;
     const writes: unknown[] = [];
     const proc: SandboxProcess = {
@@ -68,7 +68,7 @@ describe("attachPiRpc", () => {
           const command = JSON.parse(line) as { id: string; type: string; message: string };
           writes.push(command);
           stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ id: command.id, type: "response", command: command.type, success: true })}\n`));
-          stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ type: "agent_end", messages: [] })}\n`));
+          stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ type: "turn_end", messages: [] })}\n`));
         }
       }),
       stdout: new ReadableStream<Uint8Array>({
@@ -84,5 +84,63 @@ describe("attachPiRpc", () => {
     const client = attachPiRpc(proc);
     await client.prompt("hello");
     expect(writes).toEqual([{ id: "req_1", type: "prompt", message: "hello" }]);
+  });
+
+  test("prompt rejects and emits error when pi reports async prompt failure", async () => {
+    let stdout!: ReadableStreamDefaultController<Uint8Array>;
+    const events: unknown[] = [];
+    const proc: SandboxProcess = {
+      stdin: new WritableStream<Uint8Array>({
+        write(chunk) {
+          const line = new TextDecoder().decode(chunk).trim();
+          const command = JSON.parse(line) as { id: string; type: string; message: string };
+          stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ id: command.id, type: "response", command: command.type, success: true })}\n`));
+          stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ id: command.id, type: "response", command: command.type, success: false, error: "No API key found" })}\n`));
+        }
+      }),
+      stdout: new ReadableStream<Uint8Array>({
+        start(controller) {
+          stdout = controller;
+        }
+      }),
+      stderr: new ReadableStream<Uint8Array>({ start(controller) { controller.close(); } }),
+      exitCode: new Promise(() => {}),
+      kill: async () => {}
+    };
+
+    const client = attachPiRpc(proc);
+    client.subscribe((event) => {
+      events.push(event);
+    });
+
+    await expect(client.prompt("hello")).rejects.toThrow("No API key found");
+    expect(events).toEqual([{ type: "error", message: "No API key found", command: "prompt", id: "req_1" }]);
+  });
+
+  test("prompt rejects when RPC process exits before turn completion", async () => {
+    let stdout!: ReadableStreamDefaultController<Uint8Array>;
+    let resolveExit!: (code: number) => void;
+    const proc: SandboxProcess = {
+      stdin: new WritableStream<Uint8Array>({
+        write(chunk) {
+          const line = new TextDecoder().decode(chunk).trim();
+          const command = JSON.parse(line) as { id: string; type: string; message: string };
+          stdout.enqueue(new TextEncoder().encode(`${JSON.stringify({ id: command.id, type: "response", command: command.type, success: true })}\n`));
+          resolveExit(1);
+          return;
+        }
+      }),
+      stdout: new ReadableStream<Uint8Array>({
+        start(controller) {
+          stdout = controller;
+        }
+      }),
+      stderr: new ReadableStream<Uint8Array>({ start(controller) { controller.close(); } }),
+      exitCode: new Promise<number>((resolve) => { resolveExit = resolve; }),
+      kill: async () => {}
+    };
+
+    const client = attachPiRpc(proc);
+    await expect(client.prompt("hello")).rejects.toThrow("pi RPC process exited with code 1");
   });
 });

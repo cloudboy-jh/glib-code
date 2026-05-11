@@ -272,6 +272,7 @@ function cleanupTurnState(turnId: string) {
 
 function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEvent | null {
   if (event.type === "process_exit") {
+    errorEmittedByTurn.add(turnId);
     return {
       type: "error",
       turnId,
@@ -283,6 +284,9 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   }
   if (event.type === "aborted") {
     return { type: "aborted", turnId, at: nowIso() };
+  }
+  if (event.type === "error") {
+    return rememberError(turnId, typeof (event as any).message === "string" ? (event as any).message : "pi runtime error");
   }
   if (event.type === "turn_end") {
     const errorMessage = extractMessageError((event as any).message);
@@ -531,16 +535,18 @@ export async function runTurn(params: {
     return { turnId: params.turnId, ok: true };
   } catch (error) {
     logError("agent", "turn failed", error, { sessionId: params.sessionId, turnId: params.turnId });
-    const evt: AgentEvent = {
-      type: "error",
-      turnId: params.turnId,
-      name: "pi_error",
-      message: error instanceof Error ? error.message : "failed to run pi",
-      retryable: false,
-      at: nowIso()
-    };
-    await params.onEvent(evt);
-    broadcast(params.sessionId, evt);
+    if (!errorEmittedByTurn.has(params.turnId)) {
+      const evt: AgentEvent = {
+        type: "error",
+        turnId: params.turnId,
+        name: "pi_error",
+        message: error instanceof Error ? error.message : "failed to run pi",
+        retryable: false,
+        at: nowIso()
+      };
+      await params.onEvent(evt);
+      broadcast(params.sessionId, evt);
+    }
     const end: AgentEvent = { type: "turn_end", turnId: params.turnId, reason: "error", at: nowIso() };
     await params.onEvent(end);
     broadcast(params.sessionId, end);

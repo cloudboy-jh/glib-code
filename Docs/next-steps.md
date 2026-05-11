@@ -47,10 +47,10 @@ Last updated: 2026-05-10
 - Added session-id routing and app-level session indexing for agent send/stream/abort/delete so valid sessions do not 404 after global project changes.
 - Split server app state into focused settings and project stores.
 - Added frontend guards against duplicate session creation and stale session EventSource streams.
+- Confirmed pi RPC CLI invocation (`pi --mode rpc --no-session`) and abort command schema (`{ type: "abort", id }` -> response event).
 
 ## 1) Sandbox + pi RPC runtime
 
-- Confirm exact pi RPC CLI flags and abort command/event schema.
 - Finish local RPC parity for create/send/stream/abort/delete.
 - Keep frontend `AgentEvent` contract untouched.
 - Keep GitTrix storage/promote interfaces untouched.

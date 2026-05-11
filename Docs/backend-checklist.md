@@ -30,7 +30,7 @@ Last updated: 2026-05-10
 - [x] Add pi RPC JSONL parser/client scaffolding.
 - [x] Make RPC runtime the default with SDK opt-out (`GLIB_PI_RUNTIME=sdk`).
 - [x] Add CloudflareSandbox implementation skeleton.
-- [ ] Confirm exact pi RPC CLI invocation and abort schema.
+- [x] Confirm exact pi RPC CLI invocation and abort schema.
 - [ ] Complete real local pi RPC parity test against installed pi binary.
 - [x] Flip default runtime to RPC.
 - [ ] Remove in-process SDK runtime path after parity.
