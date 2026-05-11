@@ -1,6 +1,6 @@
 # Backend Checklist
 
-Last updated: 2026-05-06
+Last updated: 2026-05-10
 
 ## Core route completion
 
@@ -38,8 +38,10 @@ Last updated: 2026-05-06
 ## Session persistence
 
 - [x] Store session metadata and timeline events in repo-local `.glib/`.
+- [x] Index session IDs in app config for project-path-free agent route lookup.
 - [x] Implement list/read/fork/delete semantics.
-- [ ] Ensure project switching does not cross-contaminate session data beyond current process-global project scope.
+- [x] Ensure agent send/stream/abort does not depend on process-global current project scope.
+- [ ] Ensure project browsing/listing state moves beyond single process-global current project scope.
 
 ## Provider/model authority
 
@@ -59,6 +61,7 @@ Last updated: 2026-05-06
 - [ ] Harden FS read/tree for large repos and binary files.
 - [ ] Add consistent error envelopes for route failures.
 - [x] Return explicit GitTrix startup errors and Cloudflare preflight error codes/messages.
+- [x] Split settings/provider/keybinding persistence from project selection/recents state.
 
 ## GitTrix workspace behavior
 

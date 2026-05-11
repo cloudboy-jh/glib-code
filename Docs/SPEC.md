@@ -1,24 +1,25 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-06
+Last updated: 2026-05-10
 
-glib-code is a review-first AI coding workspace centered on this loop:
+glib-code is an isolated AI coding workspace centered on this loop:
 
 1. Open a git repo
-2. Review commit/uncommitted diffs
-3. Start a session with selected diff context
+2. Start a fresh session or review commit/uncommitted diffs
+3. Optionally start a session with selected diff context
 4. Chat with an agent running in an isolated ephemeral workspace
 5. Promote accepted changes back to the durable repo
 
 ## Thesis
 
-- Review first, then prompt.
+- Start fresh or with explicit repo/diff context.
 - Agent writes are isolated by default and never land in durable storage unless user-promoted.
 
 ## Current reality
 
 - Agent runtime is moving to pi as an RPC subprocess in a sandbox. The in-process SDK path is a temporary parity fallback.
 - Session isolation is handled by GitTrix local workspaces.
+- Agent session routes resolve by server-owned `sessionId` metadata, not browser-provided project paths.
 - Provider/model capability authority is pi.
 - glib-code stores user-entered provider keys in its own app config dir, not another tool's auth store.
 - Promote is explicit via session APIs and returns structured conflicts on baseline drift.

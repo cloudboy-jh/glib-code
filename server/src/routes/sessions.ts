@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/sessions";
-import { getCurrentProjectId, getProjectById } from "../services/state";
-import * as gittrixService from "../services/gittrix";
+import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
+import { getCurrentProjectId, getProjectById } from "../services/project-store";
+import * as gittrixService from "../services/gittrix-service";
 
 function mustProject() {
   const projectId = getCurrentProjectId();

@@ -1,21 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { readinessRoutes } from "./routes/readiness";
-import { healthRoutes } from "./routes/health";
-import { authRoutes } from "./routes/auth";
-import { projectsRoutes } from "./routes/projects";
-import { repoRoutes } from "./routes/repo";
-import { diffRoutes } from "./routes/diff";
-import { gitRoutes } from "./routes/git";
-import { fsRoutes } from "./routes/fs";
-import { agentRoutes } from "./routes/agent";
-import { sessionsRoutes } from "./routes/sessions";
-import { settingsRoutes } from "./routes/settings";
-import { keybindingsRoutes } from "./routes/keybindings";
-import { attachmentsRoutes } from "./routes/attachments";
-import { termRoutes } from "./routes/term";
-import { bootState } from "./services/state";
-import { providersRoutes } from "./routes/providers";
+import { bootSettingsStore } from "./services/settings-store";
+import { mountApiRoutes } from "./routes";
 import { log, logError } from "./lib/log";
 
 const app = new Hono();
@@ -42,21 +28,7 @@ app.onError((error, c) => {
 });
 
 app.get("/", (c) => c.text("glib-code server"));
-app.route("/api/readiness", readinessRoutes);
-app.route("/api/health", healthRoutes);
-app.route("/api/auth", authRoutes);
-app.route("/api/projects", projectsRoutes);
-app.route("/api/repo", repoRoutes);
-app.route("/api/diff", diffRoutes);
-app.route("/api/git", gitRoutes);
-app.route("/api/fs", fsRoutes);
-app.route("/api/agent", agentRoutes);
-app.route("/api/sessions", sessionsRoutes);
-app.route("/api/settings", settingsRoutes);
-app.route("/api/keybindings", keybindingsRoutes);
-app.route("/api/attachments", attachmentsRoutes);
-app.route("/api/term", termRoutes);
-app.route("/api/providers", providersRoutes);
+mountApiRoutes(app);
 
 export type AppType = typeof app;
 
@@ -66,7 +38,7 @@ const port = portArg ? Number(portArg.split("=")[1]) : 4173;
 if (import.meta.main) {
   process.on("unhandledRejection", (error) => logError("server", "unhandled rejection", error));
   process.on("uncaughtException", (error) => logError("server", "uncaught exception", error));
-  await bootState();
+  await bootSettingsStore();
   Bun.serve({
     port,
     idleTimeout: 60,

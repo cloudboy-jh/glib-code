@@ -1,14 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getConfigDir, ensureDir, ensureParent } from "../lib/paths";
-
-export type ProjectEntry = {
-  id: string;
-  name: string;
-  path: string;
-  lastOpenedAt: string;
-};
+import { ensureDir, ensureParent, getConfigDir } from "../lib/paths";
 
 export type Settings = {
   themePreset: string;
@@ -27,11 +20,6 @@ export type Settings = {
 export type ProvidersState = {
   defaultProvider: string;
   defaultModel: string;
-};
-
-export type ProjectOverride = {
-  provider?: string;
-  model?: string;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -63,18 +51,6 @@ const DEFAULT_KEYBINDINGS = {
   ]
 };
 
-type Store = {
-  currentProjectId: string | null;
-  projectsById: Map<string, { id: string; name: string; path: string; branch: string; isGitRepo: true }>;
-  projectOverrides: Map<string, ProjectOverride>;
-};
-
-const store: Store = {
-  currentProjectId: null,
-  projectsById: new Map(),
-  projectOverrides: new Map()
-};
-
 function cfg(name: string) {
   return join(getConfigDir(), name);
 }
@@ -96,31 +72,8 @@ async function readJson<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
-export async function bootState() {
+export async function bootSettingsStore() {
   await ensureDir(getConfigDir());
-}
-
-export async function getRecents() {
-  const recents = await readJson<ProjectEntry[]>(cfg("recents.json"), []);
-  return recents.sort((a, b) => +new Date(b.lastOpenedAt) - +new Date(a.lastOpenedAt));
-}
-
-export async function putRecent(entry: Omit<ProjectEntry, "lastOpenedAt">) {
-  const recents = await getRecents();
-  const now = new Date().toISOString();
-  const next = [
-    { ...entry, lastOpenedAt: now },
-    ...recents.filter((r) => r.id !== entry.id)
-  ].slice(0, 20);
-  await writeAtomic(cfg("recents.json"), next);
-  return next;
-}
-
-export async function removeRecent(id: string) {
-  const recents = await getRecents();
-  const next = recents.filter((r) => r.id !== id);
-  await writeAtomic(cfg("recents.json"), next);
-  if (store.currentProjectId === id) store.currentProjectId = null;
 }
 
 export async function getSettings() {
@@ -144,7 +97,7 @@ export async function getProvidersState() {
   return {
     defaultProvider: loaded.defaultProvider ?? DEFAULT_PROVIDERS_STATE.defaultProvider,
     defaultModel: loaded.defaultModel ?? DEFAULT_PROVIDERS_STATE.defaultModel
-  } as ProvidersState;
+  } satisfies ProvidersState;
 }
 
 export async function patchProviderDefaults(partial: { defaultProvider?: string; defaultModel?: string }) {
@@ -170,30 +123,4 @@ export async function setKeybindings(next: unknown) {
 export async function resetKeybindings() {
   await writeAtomic(cfg("keybindings.json"), DEFAULT_KEYBINDINGS);
   return DEFAULT_KEYBINDINGS;
-}
-
-export function setCurrentProject(id: string | null) {
-  store.currentProjectId = id;
-}
-
-export function getCurrentProjectId() {
-  return store.currentProjectId;
-}
-
-export function registerProject(project: { id: string; name: string; path: string; branch: string; isGitRepo: true }) {
-  store.projectsById.set(project.id, project);
-}
-
-export function getProjectById(id: string) {
-  return store.projectsById.get(id) ?? null;
-}
-
-export function setProjectOverride(projectId: string, override: ProjectOverride) {
-  const next = { ...(store.projectOverrides.get(projectId) ?? {}), ...override };
-  store.projectOverrides.set(projectId, next);
-  return next;
-}
-
-export function getProjectOverride(projectId: string) {
-  return store.projectOverrides.get(projectId) ?? null;
 }

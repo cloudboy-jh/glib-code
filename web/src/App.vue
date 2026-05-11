@@ -636,7 +636,7 @@ function connectSessionStream(sessionId: string) {
   if (streamsBySessionId.has(sessionId)) return;
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session?.projectPath) return;
-  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}`);
+  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream`);
   const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
   for (const name of names) {
     stream.addEventListener(name, (evt) => {
@@ -786,6 +786,7 @@ async function hydrateAuth() {
 }
 
 async function updateTheme(theme: ThemePreset) {
+  if (settings.themePreset === theme) return;
   settings.themePreset = theme;
   applyTheme(theme);
   await apiPatch('/settings', { themePreset: theme });
@@ -795,6 +796,7 @@ async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider
   if (key === 'durableProvider' && !['local', 'github'].includes(value)) return;
   if (key === 'ephemeralProvider' && !['local', 'cloudflare-artifacts'].includes(value)) return;
   if (key === 'promoteStrategy' && value !== 'commit') return;
+  if (settings[key] === value) return;
   const saved = await apiPatch<typeof settings>('/settings', { [key]: value });
   settings.durableProvider = saved.durableProvider;
   settings.ephemeralProvider = saved.ephemeralProvider;
@@ -1125,8 +1127,7 @@ async function sendPrompt() {
   try {
     await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, {
       prompt: forms.prompt,
-      context: bundle?.payload,
-      projectPath: session.projectPath
+      context: bundle?.payload
     });
     forms.prompt = '';
   } catch (error) {
@@ -1215,7 +1216,7 @@ async function abortTurn() {
   if (!state.activeSessionId) return;
   const session = activeSession.value;
   if (!session?.projectPath) return;
-  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
+  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn`);
 }
 
 function runTerminal() {

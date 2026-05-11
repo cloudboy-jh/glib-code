@@ -1,6 +1,6 @@
 # Agent Integration
 
-Last updated: 2026-05-08
+Last updated: 2026-05-10
 
 ## Runtime model
 
@@ -23,7 +23,7 @@ Last updated: 2026-05-08
 - Agent writes land in the ephemeral workspace, not the durable repo.
 - Accepted changes move to durable only through explicit promote.
 - GitTrix interfaces/adapters are unchanged by the RPC runtime work.
-- Session-scoped agent actions use the session's explicit `projectPath`; send/stream/abort/delete do not resolve through process-global current project state.
+- Session-scoped agent actions resolve through server-owned `sessionId` metadata. The browser does not provide `projectPath` for send/stream/abort/delete.
 
 ## Pi RPC protocol
 
@@ -65,19 +65,21 @@ Text chunk events use collision-proof part IDs. Do not derive `text_part.partId`
 - Sandbox creation failure: `SANDBOX_START_FAILED` error path.
 - pi binary missing/spawn failure: `SANDBOX_PI_MISSING` when detectable from spawn error text.
 - pi process exits mid-turn: canonical `error` event with `name: "pi_crashed"`.
+- pi process exits between turns: the next turn respawns pi inside the same sandbox path.
 - RPC parse error: logged and skipped; the stream stays alive.
 - stdin write failure: treated as runtime failure for the turn.
 
 ## Restart behavior
 
 - Session metadata and event timelines persist under repo-local `.glib/sessions`.
+- Session ID to durable project path lookup persists in app config at `<configDir>/sessions-index.json`.
 - Live SDK sessions, subprocesses, and sandboxes do not survive server restart.
 - First send after restart creates a fresh runtime for the existing session metadata.
-- Existing session actions continue to target the persisted repo-local session as long as the frontend supplies the session's `projectPath`.
+- Existing session actions continue to target the persisted repo-local session through `sessionId` lookup.
 
 ## Active gaps
 
 - Finish authenticated prompt/abort smoke coverage against an installed pi binary.
-- Add regression coverage for duplicate session creation and project-scoped send/stream behavior.
+- Add regression coverage for duplicate session creation and session-id send/stream behavior.
 - Complete real Cloudflare Sandbox integration once hosted deployment work starts.
 - Add hosted sync between sandbox filesystem and Cloudflare Artifacts before promote, unless a native mount path is verified.

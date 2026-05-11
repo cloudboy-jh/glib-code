@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, broadcast, disposeRuntimeSession, runTurn, subscribe } from "../services/agent-runtime";
-import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/sessions";
-import { getCurrentProjectId, getProjectById, getProjectOverride, getProvidersState, getSettings } from "../services/state";
+import { appendEvents, createSession, deleteSession, getSession, getSessionById, patchSessionMeta } from "../services/session-store";
+import { getProvidersState, getSettings } from "../services/settings-store";
+import { getCurrentProjectId, getProjectById, getProjectOverride } from "../services/project-store";
 import { getPiCapabilities } from "../services/pi-capabilities";
-import * as gittrixService from "../services/gittrix";
+import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
 import { log, logError } from "../lib/log";
 
@@ -16,6 +17,26 @@ function mustProject() {
 
 function requiredProjectPath(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function resolveSession(projectPath: string | null, sessionId: string) {
+  const indexed = await getSessionById(sessionId);
+  if (indexed) return { existing: indexed.doc, projectPath: indexed.projectPath };
+
+  const candidates: string[] = [];
+  if (projectPath) candidates.push(projectPath);
+
+  const project = mustProject();
+  if (project?.path && !candidates.includes(project.path)) candidates.push(project.path);
+
+  for (const candidate of candidates) {
+    const existing = await getSession(candidate, sessionId);
+    if (!existing) continue;
+    log("agent", "resolved legacy session by project path", { sessionId, requestedProjectPath: projectPath, resolvedProjectPath: candidate });
+    return { existing, projectPath: existing.meta.projectPath || candidate };
+  }
+
+  return { existing: null, projectPath: projectPath || project?.path || null };
 }
 
 function sseEncode(event: AgentEvent) {
@@ -122,9 +143,8 @@ export const agentRoutes = new Hono()
   .post("/sessions/:id/send", async (c) => {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => null) as { prompt?: string; context?: string; attachments?: string[]; projectPath?: string } | null;
-    const projectPath = requiredProjectPath(body?.projectPath);
-    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
-    const existing = await getSession(projectPath, id);
+    const requestedProjectPath = requiredProjectPath(body?.projectPath);
+    const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
     if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
 
     const prompt = body?.prompt?.trim();
@@ -174,9 +194,8 @@ export const agentRoutes = new Hono()
   })
   .get("/sessions/:id/stream", async (c) => {
     const id = c.req.param("id");
-    const projectPath = requiredProjectPath(c.req.query("projectPath"));
-    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
-    const existing = await getSession(projectPath, id);
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
     if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
 
     const stream = new ReadableStream({
@@ -229,9 +248,8 @@ export const agentRoutes = new Hono()
   })
   .delete("/sessions/:id/turn", async (c) => {
     const id = c.req.param("id");
-    const projectPath = requiredProjectPath(c.req.query("projectPath"));
-    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
-    const existing = await getSession(projectPath, id);
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
     if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
     const turnId = abortRunningTurn(id);
     if (!turnId) return c.json({ ok: false, message: "no active turn" }, 404);
@@ -242,11 +260,12 @@ export const agentRoutes = new Hono()
   })
   .delete("/sessions/:id", async (c) => {
     const id = c.req.param("id");
-    const projectPath = requiredProjectPath(c.req.query("projectPath"));
-    if (!projectPath) return c.json({ ok: false, message: "projectPath required" }, 400);
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: resolvedSession, projectPath } = await resolveSession(requestedProjectPath, id);
+    if (!projectPath) return c.json({ ok: false, message: "session not found" }, 404);
     abortRunningTurn(id);
     await disposeRuntimeSession(id);
-    const session = await getSession(projectPath, id);
+    const session = resolvedSession ?? await getSession(projectPath, id);
     await deleteSession(projectPath, id);
     if (session?.meta.gittrixSessionId) {
       try {

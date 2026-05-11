@@ -1,5 +1,5 @@
 import { simpleGit } from "simple-git";
-import { getCurrentProjectId, getProjectById } from "./state";
+import { getCurrentProjectId, getProjectById } from "./project-store";
 
 function activeRepo() {
   const current = getCurrentProjectId();

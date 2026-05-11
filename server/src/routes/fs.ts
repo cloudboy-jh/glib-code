@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { getCurrentProjectId, getProjectById } from "../services/state";
+import { getCurrentProjectId, getProjectById } from "../services/project-store";
 import { inRepo } from "../lib/paths";
 
 async function activeProjectPath() {

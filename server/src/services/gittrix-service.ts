@@ -6,7 +6,7 @@ import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, User
 import { GitHubDurableAdapter, CloudflareArtifactsEphemeralAdapter } from "./gittrix-cloud-adapters";
 import { LocalDurableAdapter, LocalEphemeralAdapter } from "./gittrix-local-adapter";
 import { getConfigDir } from "../lib/paths";
-import { getSettings, type Settings } from "./state";
+import { getSettings, type Settings } from "./settings-store";
 
 export type StartGitTrixSessionResult = {
   gittrixSessionId: string;

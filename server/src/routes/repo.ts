@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getCurrentProjectId, getProjectById, setCurrentProject } from "../services/state";
+import { getCurrentProjectId, getProjectById, setCurrentProject } from "../services/project-store";
 
 export const repoRoutes = new Hono()
   .get("/current", (c) => {

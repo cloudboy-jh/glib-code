@@ -37,6 +37,10 @@ const currentAssistantMessageKeyByTurn = new Map<string, string>();
 const streamedTextByMessage = new Map<string, string>();
 const turnHasAssistantText = new Set<string>();
 const errorEmittedByTurn = new Set<string>();
+const toolCallsById = new Map<string, { input: object; tool: string; title: string }>();
+const toolCallIdBySignature = new Map<string, string>();
+const normalizedToolCallIdByRaw = new Map<string, string>();
+const pendingToolCallIdsByTurnTool = new Map<string, string[]>();
 let textPartSeq = 0;
 let sandboxFactory: SandboxFactory | null = null;
 
@@ -165,6 +169,107 @@ function rememberError(turnId: string, message: string): AgentEvent | null {
   };
 }
 
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+}
+
+function hashString(value: string) {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) hash = ((hash << 5) + hash) ^ value.charCodeAt(i);
+  return (hash >>> 0).toString(36);
+}
+
+function toolNameFromEvent(event: AgentSessionEvent | PiEvent) {
+  return String((event as any).toolName ?? (event as any).name ?? (event as any).tool ?? "tool");
+}
+
+function rawToolCallId(event: AgentSessionEvent | PiEvent) {
+  const raw = (event as any).toolCallId ?? (event as any).toolExecutionId ?? (event as any).callId ?? (event as any).id;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : "";
+}
+
+function pendingToolKey(turnId: string, tool: string) {
+  return `${turnId}:${tool}`;
+}
+
+function toolSignature(turnId: string, tool: string, input: object) {
+  return `${turnId}:${tool}:${hashString(stableJson(input))}`;
+}
+
+function toolInputFromEvent(event: AgentSessionEvent | PiEvent) {
+  return (((event as any).args ?? (event as any).input ?? {}) || {}) as object;
+}
+
+function startToolCall(turnId: string, event: AgentSessionEvent | PiEvent) {
+  const tool = toolNameFromEvent(event);
+  const input = toolInputFromEvent(event);
+  const rawId = rawToolCallId(event);
+  const signature = toolSignature(turnId, tool, input);
+  const callId = toolCallIdBySignature.get(signature) || (rawId ? `tool_${rawId}` : `tool_${turnId}_${tool}_${hashString(stableJson(input))}`);
+  toolCallIdBySignature.set(signature, callId);
+  if (rawId) normalizedToolCallIdByRaw.set(`${turnId}:${rawId}`, callId);
+
+  const key = `${turnId}:${callId}`;
+  toolCallsById.set(key, { input, tool, title: tool });
+
+  const pendingKey = pendingToolKey(turnId, tool);
+  const pending = pendingToolCallIdsByTurnTool.get(pendingKey) ?? [];
+  if (!pending.includes(callId)) pending.push(callId);
+  pendingToolCallIdsByTurnTool.set(pendingKey, pending);
+
+  return { callId, tool, title: tool, input };
+}
+
+function endToolCall(turnId: string, event: AgentSessionEvent | PiEvent) {
+  const tool = toolNameFromEvent(event);
+  const rawId = rawToolCallId(event);
+  let callId = rawId ? (normalizedToolCallIdByRaw.get(`${turnId}:${rawId}`) ?? `tool_${rawId}`) : "";
+  if (!callId) {
+    const pendingKey = pendingToolKey(turnId, tool);
+    const pending = pendingToolCallIdsByTurnTool.get(pendingKey) ?? [];
+    callId = pending.shift() ?? "";
+    if (pending.length) pendingToolCallIdsByTurnTool.set(pendingKey, pending);
+    else pendingToolCallIdsByTurnTool.delete(pendingKey);
+  }
+
+  callId ||= `tool_${turnId}_${tool}_${hashString(stableJson((event as any).result ?? {}))}`;
+  const key = `${turnId}:${callId}`;
+  const started = toolCallsById.get(key);
+  toolCallsById.delete(key);
+
+  return {
+    callId,
+    tool: started?.tool ?? tool,
+    title: started?.title ?? tool,
+    input: started?.input ?? toolInputFromEvent(event)
+  };
+}
+
+function cleanupTurnState(turnId: string) {
+  assistantMessageSeqByTurn.delete(turnId);
+  currentAssistantMessageKeyByTurn.delete(turnId);
+  turnHasAssistantText.delete(turnId);
+  errorEmittedByTurn.delete(turnId);
+  for (const key of [...streamedTextByMessage.keys()]) {
+    if (key.startsWith(`${turnId}:`)) streamedTextByMessage.delete(key);
+  }
+  for (const key of [...toolCallsById.keys()]) {
+    if (key.startsWith(`${turnId}:`)) toolCallsById.delete(key);
+  }
+  for (const key of [...toolCallIdBySignature.keys()]) {
+    if (key.startsWith(`${turnId}:`)) toolCallIdBySignature.delete(key);
+  }
+  for (const key of [...normalizedToolCallIdByRaw.keys()]) {
+    if (key.startsWith(`${turnId}:`)) normalizedToolCallIdByRaw.delete(key);
+  }
+  for (const key of [...pendingToolCallIdsByTurnTool.keys()]) {
+    if (key.startsWith(`${turnId}:`)) pendingToolCallIdsByTurnTool.delete(key);
+  }
+}
+
 function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEvent | null {
   if (event.type === "process_exit") {
     return {
@@ -206,14 +311,15 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     return rememberText(turnId, String(text));
   }
   if (event.type === "tool_execution_start") {
+    const toolCall = startToolCall(turnId, event);
     return {
       type: "tool_call",
       turnId,
       stepId: `step_${turnId}`,
-      callId: String((event as any).toolCallId ?? ""),
-      tool: String((event as any).toolName ?? "tool"),
-      title: String((event as any).toolName ?? "tool"),
-      input: (event.args ?? {}) as object,
+      callId: toolCall.callId,
+      tool: toolCall.tool,
+      title: toolCall.title,
+      input: toolCall.input,
       output: "",
       metadata: {},
       durationMs: 0,
@@ -221,14 +327,15 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     };
   }
   if (event.type === "tool_execution_end") {
+    const toolCall = endToolCall(turnId, event);
     return {
       type: "tool_call",
       turnId,
       stepId: `step_${turnId}`,
-      callId: String((event as any).toolCallId ?? ""),
-      tool: String((event as any).toolName ?? "tool"),
-      title: String((event as any).toolName ?? "tool"),
-      input: {},
+      callId: toolCall.callId,
+      tool: toolCall.tool,
+      title: toolCall.title,
+      input: toolCall.input,
       output: JSON.stringify(event.result ?? {}),
       metadata: { isError: event.isError },
       durationMs: 0,
@@ -236,6 +343,30 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     };
   }
   return null;
+}
+
+function logMappedAgentEvent(sessionId: string, event: AgentEvent) {
+  if (event.type === "tool_call") {
+    log("agent", "tool call", {
+      sessionId,
+      turnId: event.turnId,
+      callId: event.callId,
+      tool: event.tool,
+      inputKeys: Object.keys(event.input ?? {}),
+      outputLength: event.output.length,
+      isError: (event.metadata as { isError?: unknown }).isError === true
+    });
+    return;
+  }
+
+  if (event.type === "error") {
+    log("agent", "agent error event", { sessionId, turnId: event.turnId, name: event.name, message: event.message });
+    return;
+  }
+
+  if (event.type === "aborted") {
+    log("agent", "turn aborted", { sessionId, turnId: event.turnId });
+  }
 }
 
 function useRpcRuntime() {
@@ -257,7 +388,17 @@ function providerEnvName(provider: string) {
 
 async function getOrCreateSandboxSession(sessionId: string, cwd: string, provider?: string, modelId?: string) {
   const existing = sandboxSessions.get(sessionId);
-  if (existing && existing.cwd === cwd) return existing;
+  if (existing && existing.cwd === cwd) {
+    const exitCode = await Promise.race([existing.process.exitCode, new Promise<null>((resolve) => setTimeout(() => resolve(null), 0))]);
+    if (exitCode === null) return existing;
+
+    log("agent", "pi rpc exited; respawning in existing sandbox", { sessionId, exitCode });
+    await existing.pi.dispose().catch((error) => logError("agent", "failed to dispose exited pi rpc", error, { sessionId }));
+    const { processHandle, pi } = await spawnPiRpc(existing.sandbox, sessionId, provider, modelId);
+    const next: SandboxSession = { ...existing, process: processHandle, pi };
+    sandboxSessions.set(sessionId, next);
+    return next;
+  }
   if (existing) await disposeRuntimeSession(sessionId);
 
   const { modelRegistry, authStorage } = await getPiCore();
@@ -267,6 +408,19 @@ async function getOrCreateSandboxSession(sessionId: string, cwd: string, provide
 
   sandboxFactory ??= createSandboxFactory();
   const sandbox = await sandboxFactory.create({ sessionId, cwd });
+  try {
+    const { processHandle, pi } = await spawnPiRpc(sandbox, sessionId, provider, modelId);
+    const next: SandboxSession = { sandbox, process: processHandle, pi, cwd };
+    sandboxSessions.set(sessionId, next);
+    return next;
+  } catch (error) {
+    await sandbox.destroy().catch(() => {});
+    throw error;
+  }
+}
+
+async function spawnPiRpc(sandbox: Sandbox, sessionId: string, provider?: string, modelId?: string) {
+  const { authStorage } = await getPiCore();
   const env: Record<string, string> = {};
   if (provider) {
     const key = await authStorage.getApiKey(provider, { includeFallback: true });
@@ -280,7 +434,6 @@ async function getOrCreateSandboxSession(sessionId: string, cwd: string, provide
   try {
     processHandle = await sandbox.spawn({ cmd: PI_RPC_CMD, args, cwd: sandbox.cwd, env });
   } catch (error) {
-    await sandbox.destroy().catch(() => {});
     const message = error instanceof Error ? error.message : String(error);
     const code = /ENOENT|not found/i.test(message) ? "SANDBOX_PI_MISSING" : "SANDBOX_START_FAILED";
     throw new Error(`${code}: ${message}`);
@@ -291,14 +444,13 @@ async function getOrCreateSandboxSession(sessionId: string, cwd: string, provide
   });
   const immediateExit = await Promise.race([processHandle.exitCode, new Promise<null>((resolve) => setTimeout(() => resolve(null), 100))]);
   if (typeof immediateExit === "number") {
-    await sandbox.destroy().catch(() => {});
     const stderr = pi.getStderr();
+    await pi.dispose().catch(() => {});
     const code = /ENOENT|not found|not recognized/i.test(stderr) ? "SANDBOX_PI_MISSING" : "SANDBOX_START_FAILED";
     throw new Error(`${code}: pi exited with code ${immediateExit}${stderr ? `: ${stderr}` : ""}`);
   }
-  const next: SandboxSession = { sandbox, process: processHandle, pi, cwd };
-  sandboxSessions.set(sessionId, next);
-  return next;
+
+  return { processHandle, pi };
 }
 
 async function getOrCreateRuntimeSession(sessionId: string, cwd: string, provider?: string, modelId?: string) {
@@ -349,20 +501,9 @@ export async function runTurn(params: {
     const abortRuntime = "pi" in runtime ? runtime.pi.abort.bind(runtime.pi) : runtime.session.abort.bind(runtime.session);
 
     unsub = subscribeToRuntime(async (evt: AgentSessionEvent | PiEvent) => {
-      const message = (evt as any).message;
-      const assistantMessageEvent = (evt as any).assistantMessageEvent;
-      if (assistantMessageEvent?.type !== "thinking_delta") {
-        log("agent", "pi event", {
-          sessionId: params.sessionId,
-          turnId: params.turnId,
-          type: evt.type,
-          role: message?.role,
-          contentLength: extractMessageText(message).length,
-          assistantEvent: assistantMessageEvent?.type
-        });
-      }
       const mapped = mapPiEvent(params.turnId, evt);
       if (!mapped) return;
+      logMappedAgentEvent(params.sessionId, mapped);
       await params.onEvent(mapped);
       broadcast(params.sessionId, mapped);
     });
@@ -407,11 +548,6 @@ export async function runTurn(params: {
   } finally {
     unsub();
     runningTurns.delete(params.sessionId);
-    const seq = assistantMessageSeqByTurn.get(params.turnId) ?? 0;
-    for (let i = 1; i <= seq; i += 1) streamedTextByMessage.delete(`${params.turnId}:${i}`);
-    assistantMessageSeqByTurn.delete(params.turnId);
-    currentAssistantMessageKeyByTurn.delete(params.turnId);
-    turnHasAssistantText.delete(params.turnId);
-    errorEmittedByTurn.delete(params.turnId);
+    cleanupTurnState(params.turnId);
   }
 }

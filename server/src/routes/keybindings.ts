@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getKeybindings, resetKeybindings, setKeybindings } from "../services/state";
+import { getKeybindings, resetKeybindings, setKeybindings } from "../services/settings-store";
 
 export const keybindingsRoutes = new Hono()
   .get("/", async (c) => c.json(await getKeybindings()))

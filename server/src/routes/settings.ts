@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getSettings, patchSettings, resetSettings } from "../services/state";
+import { getSettings, patchSettings, resetSettings } from "../services/settings-store";
 
 export const settingsRoutes = new Hono()
   .get("/", async (c) => c.json(await getSettings()))

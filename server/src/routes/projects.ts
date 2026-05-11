@@ -8,7 +8,7 @@ import {
   setCurrentProject,
   setProjectOverride,
   getProjectById
-} from "../services/state";
+} from "../services/project-store";
 import { inspectRecentPath } from "../services/projects";
 import { getPiCapabilities } from "../services/pi-capabilities";
 

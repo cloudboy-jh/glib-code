@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getGitHubToken } from "../services/gittrix";
+import { getGitHubToken } from "../services/gittrix-service";
 
 async function getGitHubAccount(token: string) {
   if (!token) return null;

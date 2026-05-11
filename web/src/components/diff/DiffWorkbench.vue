@@ -212,6 +212,10 @@ const state = reactive({
 
 const fileMenuOpen = ref(false);
 const fileMenuRef = ref<HTMLElement | null>(null);
+let loadFilesAndPatchSeq = 0;
+let loadedFilesKey = '';
+let loadedPatchKey = '';
+let loadingPatchKey = '';
 
 function onDocPointerDown(event: PointerEvent) {
   const target = event.target as Node | null;
@@ -268,23 +272,40 @@ async function loadHistory() {
 }
 
 async function loadFilesAndPatch() {
+  const requestSeq = loadFilesAndPatchSeq;
   const source = state.openSource === 'commit' ? 'commits' : 'uncommitted';
+  const filesKey = `${props.currentProject.path}:${source}:${source === 'commits' ? state.selectedCommitRef : ''}`;
   const filesQuery = source === 'commits' && state.selectedCommitRef
     ? `/diff/files?source=commits&ref=${encodeURIComponent(state.selectedCommitRef)}&projectPath=${encodeURIComponent(props.currentProject.path)}`
     : `/diff/files?source=uncommitted&projectPath=${encodeURIComponent(props.currentProject.path)}`;
 
-  const rows = await apiGet<Array<{ file: string; status?: string }>>(filesQuery);
-  state.files = rows.map((row) => ({ path: row.file, stats: row.status ?? '' }));
-  if (!state.files.find((row) => row.path === state.selectedFilePath)) {
-    state.selectedFilePath = state.files[0]?.path ?? '';
+  if (loadedFilesKey !== filesKey) {
+    const rows = await apiGet<Array<{ file: string; status?: string }>>(filesQuery);
+    if (requestSeq !== loadFilesAndPatchSeq) return;
+    state.files = rows.map((row) => ({ path: row.file, stats: row.status ?? '' }));
+    loadedFilesKey = filesKey;
+    loadedPatchKey = '';
+    if (!state.files.find((row) => row.path === state.selectedFilePath)) {
+      state.selectedFilePath = state.files[0]?.path ?? '';
+    }
   }
+
+  const patchKey = `${filesKey}:${state.selectedFilePath}`;
+  if (patchKey === loadedPatchKey || patchKey === loadingPatchKey) return;
+  loadingPatchKey = patchKey;
 
   const payload: Record<string, unknown> = { source };
   payload.projectPath = props.currentProject.path;
   if (source === 'commits' && state.selectedCommitRef) payload.ref = state.selectedCommitRef;
   if (state.selectedFilePath) payload.file = state.selectedFilePath;
-  const packed = await apiPost<{ diff: string }>('/diff/pack', payload);
-  state.patch = truncatePatch(packed.diff ?? '');
+  try {
+    const packed = await apiPost<{ diff: string }>('/diff/pack', payload);
+    if (requestSeq !== loadFilesAndPatchSeq || loadingPatchKey !== patchKey) return;
+    state.patch = truncatePatch(packed.diff ?? '');
+    loadedPatchKey = patchKey;
+  } finally {
+    if (loadingPatchKey === patchKey) loadingPatchKey = '';
+  }
 }
 
 function selectHistoryRow(index: number) {
@@ -293,6 +314,7 @@ function selectHistoryRow(index: number) {
 }
 
 async function openSelectedCommit() {
+  loadFilesAndPatchSeq++;
   state.phase = 'open';
   state.openSource = 'commit';
   state.selectedCommitRef = state.items[state.cursor]?.ref ?? state.selectedCommitRef;
@@ -300,6 +322,7 @@ async function openSelectedCommit() {
 }
 
 async function openWorkingTree() {
+  loadFilesAndPatchSeq++;
   state.phase = 'open';
   state.openSource = 'uncommitted';
   await loadFilesAndPatch();
@@ -336,6 +359,10 @@ function emitStartSessionFromDiff() {
 }
 
 async function resetForProject() {
+  loadFilesAndPatchSeq++;
+  loadedFilesKey = '';
+  loadedPatchKey = '';
+  loadingPatchKey = '';
   state.phase = 'history';
   state.cursor = 0;
   state.openSource = 'commit';

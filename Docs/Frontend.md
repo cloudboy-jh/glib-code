@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-08
+Last updated: 2026-05-10
 
 ## App shell
 
@@ -46,7 +46,7 @@ Agent/session data-plane now API-backed:
 - Timeline streaming through `/api/agent/sessions/:id/stream`
 - Abort through `DELETE /api/agent/sessions/:id/turn`
 - Session diff/promote through `/api/sessions/:id/diff` and `/api/sessions/:id/promote`
-- Session send/stream/abort calls include the active session's `projectPath` to avoid stale global-project 404s.
+- Session send/stream/abort calls use only `sessionId`; the backend resolves durable project and sandbox metadata.
 
 Now API-backed in settings plane:
 
@@ -128,4 +128,4 @@ Current state:
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
 - Add hunk-level session context/promote selection.
-- Add frontend regression coverage for duplicate create prevention and project-scoped session sends.
+- Add frontend regression coverage for duplicate create prevention and session-id-only sends.
