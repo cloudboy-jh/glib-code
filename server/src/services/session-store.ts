@@ -4,6 +4,10 @@ import { join } from "node:path";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { ensureDir, getConfigDir, repoGlibDir } from "../lib/paths";
 
+function normalizeProjectPath(path: string) {
+  return path.replace(/\\/g, "/");
+}
+
 export type SessionMeta = {
   id: string;
   projectId: string;
@@ -31,7 +35,7 @@ function sessionIndexPath() {
 }
 
 function sessionsDir(repoPath: string) {
-  return join(repoGlibDir(repoPath), "sessions");
+  return join(repoGlibDir(normalizeProjectPath(repoPath)), "sessions");
 }
 
 function sessionPath(repoPath: string, sessionId: string) {
@@ -86,6 +90,7 @@ async function writeSessionIndex(index: SessionIndex) {
 }
 
 async function indexSession(sessionId: string, projectPath: string) {
+  projectPath = normalizeProjectPath(projectPath);
   const index = await readSessionIndex();
   if (index[sessionId] === projectPath) return;
   index[sessionId] = projectPath;
@@ -93,6 +98,7 @@ async function indexSession(sessionId: string, projectPath: string) {
 }
 
 async function unindexSession(sessionId: string, projectPath?: string) {
+  if (projectPath) projectPath = normalizeProjectPath(projectPath);
   const index = await readSessionIndex();
   if (!index[sessionId]) return;
   if (projectPath && index[sessionId] !== projectPath) return;
@@ -110,12 +116,13 @@ export async function createSession(params: {
   ephemeralPath?: string;
   baselineSha?: string;
 }) {
+  const projectPath = normalizeProjectPath(params.projectPath);
   const id = newSessionId();
   const now = nowIso();
   const meta: SessionMeta = {
     id,
     projectId: params.projectId,
-    projectPath: params.projectPath,
+    projectPath,
     title: params.title,
     model: params.model,
     provider: params.provider,
@@ -126,8 +133,8 @@ export async function createSession(params: {
     createdAt: now,
     updatedAt: now
   };
-  await writeSessionDoc(params.projectPath, { meta, events: [] });
-  await indexSession(id, params.projectPath);
+  await writeSessionDoc(projectPath, { meta, events: [] });
+  await indexSession(id, projectPath);
   return meta;
 }
 
@@ -147,6 +154,7 @@ export async function listSessions(projectPath: string) {
 }
 
 export async function getSession(projectPath: string, sessionId: string) {
+  projectPath = normalizeProjectPath(projectPath);
   const doc = await readSessionDoc(projectPath, sessionId);
   if (doc) await indexSession(sessionId, doc.meta.projectPath || projectPath);
   return doc;
@@ -165,6 +173,7 @@ export async function getSessionById(sessionId: string) {
 }
 
 export async function appendEvents(projectPath: string, sessionId: string, events: AgentEvent[]) {
+  projectPath = normalizeProjectPath(projectPath);
   const doc = await readSessionDoc(projectPath, sessionId);
   if (!doc) return null;
   doc.events.push(...events);
@@ -178,6 +187,7 @@ export async function patchSessionMeta(
   sessionId: string,
   partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider">>
 ) {
+  projectPath = normalizeProjectPath(projectPath);
   const doc = await readSessionDoc(projectPath, sessionId);
   if (!doc) return null;
   doc.meta = { ...doc.meta, ...partial, updatedAt: nowIso() };
@@ -186,11 +196,13 @@ export async function patchSessionMeta(
 }
 
 export async function deleteSession(projectPath: string, sessionId: string) {
+  projectPath = normalizeProjectPath(projectPath);
   await rm(sessionPath(projectPath, sessionId), { force: true });
   await unindexSession(sessionId, projectPath);
 }
 
 export async function forkSession(projectPath: string, sourceSessionId: string) {
+  projectPath = normalizeProjectPath(projectPath);
   const source = await readSessionDoc(projectPath, sourceSessionId);
   if (!source) return null;
   const id = newSessionId();

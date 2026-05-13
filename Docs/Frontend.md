@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-10
+Last updated: 2026-05-12
 
 ## App shell
 
@@ -46,7 +46,7 @@ Agent/session data-plane now API-backed:
 - Timeline streaming through `/api/agent/sessions/:id/stream`
 - Abort through `DELETE /api/agent/sessions/:id/turn`
 - Session diff/promote through `/api/sessions/:id/diff` and `/api/sessions/:id/promote`
-- Session send/stream/abort calls use only `sessionId`; the backend resolves durable project and sandbox metadata.
+- Session send/stream/abort/hydrate/diff/promote calls include active session `projectPath` so the backend can resolve sessions after reloads, project switches, or stale index state.
 
 Now API-backed in settings plane:
 
@@ -89,12 +89,14 @@ Current behavior:
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
 - Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
+- Diff mode hides the global session header; `DiffWorkbench` owns diff-specific controls.
+- File picker opens as a viewport-safe overlay with internal scrolling.
 
 Not implemented in UI yet:
 
 - multi-source drilldown (`branches`, `prs`) as full UX
-- hunk-level context selection
-- multi-select and selection tray behavior
+- hunk-level context selection; the prior side-panel experiment was removed because it damaged diff readability.
+- multi-select and selection tray behavior needs a better design before implementation.
 
 ## Session surface
 
@@ -113,7 +115,10 @@ Current state:
 - Session create/send/stream flows use backend agent routes.
 - Session creation is guarded so repeated clicks or keyboard actions reuse the in-flight request instead of creating duplicate sessions.
 - Session hydration closes streams for sessions outside the active project.
-- Send failures render as timeline errors instead of silent hangs.
+- Session stream failures are tracked outside the timeline. After repeated failures, the stream closes and the session is marked stale.
+- Session infra/send failures show a compact banner with Reload sessions and New replacement actions instead of polluting the timeline.
+- Composer disables only for stale sessions or in-flight sends and preserves draft text on failures.
+- Sidebar stale sessions show amber status dots.
 - Empty session state explains active model/provider key failures and offers key/model actions.
 
 ## Settings + keybindings
@@ -127,5 +132,5 @@ Current state:
 
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
-- Add hunk-level session context/promote selection.
-- Add frontend regression coverage for duplicate create prevention and session-id-only sends.
+- Add hunk-level session context/promote selection after a redesigned, non-invasive diff selection UX exists.
+- Add frontend regression coverage for duplicate create prevention, stale stream handling, session recovery actions, and projectPath-scoped sends.

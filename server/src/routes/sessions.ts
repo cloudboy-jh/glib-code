@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
 import { getCurrentProjectId, getProjectById } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
+import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -16,9 +17,8 @@ export const sessionsRoutes = new Hono()
     return c.json(await listSessions(project.path));
   })
   .get("/:id", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
-    const doc = await getSession(project.path, c.req.param("id"));
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc } = await resolveSession(requestedProjectPath, c.req.param("id"));
     if (!doc) return c.json({ ok: false, message: "not found" }, 404);
     return c.json(doc);
   })
@@ -30,14 +30,15 @@ export const sessionsRoutes = new Hono()
     return c.json(forked.meta, 201);
   })
   .delete("/:id", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
     const id = c.req.param("id");
-    const doc = await getSession(project.path, id);
-    await deleteSession(project.path, id);
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, id);
+    if (!projectPath) return c.json({ ok: false, message: "not found" }, 404);
+    await deleteSession(projectPath, id);
     if (doc?.meta.gittrixSessionId) {
       try {
-        await gittrixService.evict(project.path, doc.meta.gittrixSessionId, project.branch);
+        const project = getProjectById(doc.meta.projectId);
+        await gittrixService.evict(projectPath, doc.meta.gittrixSessionId, project?.branch ?? "main");
       } catch {
         // best effort
       }
@@ -45,20 +46,20 @@ export const sessionsRoutes = new Hono()
     return c.json({ ok: true });
   })
   .get("/:id/diff", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
-    const doc = await getSession(project.path, c.req.param("id"));
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
     if (!doc) return c.json({ ok: false, message: "not found" }, 404);
     if (!doc.meta.gittrixSessionId) return c.json({ ok: false, message: "session has no gittrix mapping" }, 400);
-    const patch = await gittrixService.diff(project.path, doc.meta.gittrixSessionId, project.branch);
+    const project = getProjectById(doc.meta.projectId);
+    const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
     return c.json({ diff: patch });
   })
   .post("/:id/promote", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
-    const doc = await getSession(project.path, c.req.param("id"));
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
     if (!doc) return c.json({ ok: false, message: "not found" }, 404);
     if (!doc.meta.gittrixSessionId) return c.json({ ok: false, message: "session has no gittrix mapping" }, 400);
+    const project = getProjectById(doc.meta.projectId);
 
     const body = await c.req.json().catch(() => null) as {
       selector?: { mode: "all" } | { mode: "files"; files: string[] };
@@ -70,10 +71,10 @@ export const sessionsRoutes = new Hono()
 
     try {
       const result = await gittrixService.promote(
-        project.path,
+        projectPath!,
         doc.meta.gittrixSessionId,
         { selector: body.selector, strategy: body.strategy, message: body.message },
-        project.branch
+        project?.branch ?? "main"
       );
       return c.json(result);
     } catch (error) {
@@ -93,19 +94,20 @@ export const sessionsRoutes = new Hono()
     }
   })
   .post("/:id/evict", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
-    const doc = await getSession(project.path, c.req.param("id"));
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
     if (!doc) return c.json({ ok: false, message: "not found" }, 404);
     if (!doc.meta.gittrixSessionId) return c.json({ ok: false, message: "session has no gittrix mapping" }, 400);
-    await gittrixService.evict(project.path, doc.meta.gittrixSessionId, project.branch);
+    const project = getProjectById(doc.meta.projectId);
+    await gittrixService.evict(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
     return c.json({ ok: true });
   })
   .patch("/:id", async (c) => {
-    const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
+    if (!projectPath) return c.json({ ok: false, message: "not found" }, 404);
     const body = await c.req.json().catch(() => null) as { title?: string; status?: "idle" | "running" | "aborted" | "error" | "done"; model?: string; provider?: string } | null;
-    const patched = await patchSessionMeta(project.path, c.req.param("id"), {
+    const patched = await patchSessionMeta(projectPath, c.req.param("id"), {
       title: body?.title,
       status: body?.status,
       model: body?.model,

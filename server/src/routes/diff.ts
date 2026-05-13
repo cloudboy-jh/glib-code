@@ -5,8 +5,8 @@ export const diffRoutes = new Hono()
   .get("/sources", (c) => c.json([
     { id: "uncommitted", label: "Uncommitted", enabled: true },
     { id: "commits", label: "Commits", enabled: true },
-    { id: "branches", label: "Branches", enabled: true },
-    { id: "prs", label: "Pull requests", enabled: true }
+    { id: "branches", label: "Branches", enabled: false, reason: "Requires branch compare/source-control support." },
+    { id: "prs", label: "Pull requests", enabled: false, reason: "Requires branch compare/source-control support." }
   ]))
   .get("/items", async (c) => {
     const source = c.req.query("source") ?? "uncommitted";

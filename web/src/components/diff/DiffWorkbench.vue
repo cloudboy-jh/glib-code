@@ -84,6 +84,7 @@
           <span class="ml-auto" />
           <button
             class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18"
+            :disabled="!state.files.length"
             @click="emitStartSessionFromDiff"
           >
             Start session from diff
@@ -106,25 +107,28 @@
               <ChevronDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
 
-            <div
-              v-if="fileMenuOpen"
-              class="fixed left-1/2 top-1/2 z-30 w-[520px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40"
-            >
-              <div class="border-b border-border/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
-              <div class="max-h-[280px] overflow-auto p-1">
-                <button
-                  v-for="file in state.files"
-                  :key="file.path"
-                  type="button"
-                  :class="[
-                    'block w-full truncate rounded px-2 py-1.5 text-left text-[11px]',
-                    file.path === state.selectedFilePath ? 'bg-primary/20 text-primary' : 'text-foreground hover:bg-muted/70'
-                  ]"
-                  :title="file.path"
-                  @click="selectFileFromMenu(file.path)"
-                >
-                  {{ file.path }}
-                </button>
+            <div v-if="fileMenuOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-4" @click.self="fileMenuOpen = false">
+              <div class="flex max-h-[min(72vh,560px)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+                <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
+                  <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
+                  <div class="text-[11px] text-muted-foreground">{{ state.files.length }} files</div>
+                </div>
+                <div class="min-h-0 overflow-auto p-1">
+                  <button
+                    v-for="file in state.files"
+                    :key="file.path"
+                    type="button"
+                    :class="[
+                      'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px]',
+                      file.path === state.selectedFilePath ? 'bg-primary/20 text-primary' : 'text-foreground hover:bg-muted/70'
+                    ]"
+                    :title="file.path"
+                    @click="selectFileFromMenu(file.path)"
+                  >
+                    <span class="w-7 shrink-0 rounded border border-border/70 px-1 text-center text-[10px] text-muted-foreground">{{ file.status }}</span>
+                    <span class="min-w-0 flex-1 truncate">{{ file.path }}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -151,9 +155,16 @@
           </div>
         </div>
 
-        <div class="mb-3 flex items-center text-xs text-muted-foreground">
+        <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{{ state.files.length }} changed files</span>
           <span class="mx-2">·</span>
+          <span>{{ diffStats.hunks }} hunks</span>
+          <span class="mx-2">·</span>
+          <span class="text-emerald-300/85">+{{ diffStats.additions }}</span>
+          <span class="text-red-300/85">-{{ diffStats.deletions }}</span>
+          <span class="mx-2">·</span>
+          <span v-if="truncationCount" class="rounded border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-200">{{ truncationCount }} lines truncated</span>
+          <span v-if="truncationCount" class="mx-2">·</span>
           <span class="truncate">{{ state.selectedFilePath || 'No file selected' }}</span>
         </div>
 
@@ -175,7 +186,7 @@ const MAX_PATCH_LINES = 12000;
 const diffsWordmarkSrc = diffsWordmark;
 
 type DiffItem = { id: string; ref: string; title: string; shortRef: string };
-type DiffFile = { path: string; stats: string };
+type DiffFile = { path: string; status: string };
 
 function truncatePatch(patch: string) {
   const lines = patch.split('\n');
@@ -237,6 +248,12 @@ const visibleStart = computed(() => {
 
 const visibleItems = computed(() => state.items.slice(visibleStart.value, visibleStart.value + 7));
 const currentFileIndex = computed(() => state.files.findIndex((row) => row.path === state.selectedFilePath));
+const diffStats = computed(() => ({
+  hunks: (state.patch.match(/^@@/gm) ?? []).length,
+  additions: (state.patch.match(/^\+[^+]/gm) ?? []).length,
+  deletions: (state.patch.match(/^-[^-]/gm) ?? []).length
+}));
+const truncationCount = computed(() => Number(state.patch.match(/diff truncated \((\d+) lines hidden\)/)?.[1] ?? 0));
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
@@ -282,7 +299,7 @@ async function loadFilesAndPatch() {
   if (loadedFilesKey !== filesKey) {
     const rows = await apiGet<Array<{ file: string; status?: string }>>(filesQuery);
     if (requestSeq !== loadFilesAndPatchSeq) return;
-    state.files = rows.map((row) => ({ path: row.file, stats: row.status ?? '' }));
+    state.files = rows.map((row) => ({ path: row.file, status: row.status ?? '' }));
     loadedFilesKey = filesKey;
     loadedPatchKey = '';
     if (!state.files.find((row) => row.path === state.selectedFilePath)) {

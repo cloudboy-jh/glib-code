@@ -64,7 +64,7 @@
               ]"
               @click="$emit('select', s.id)"
             >
-              <span class="h-2 w-2 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
+              <span class="h-2 w-2 rounded-full" :class="statusDotClass(s.status)" />
             </button>
           </div>
         </template>
@@ -109,7 +109,7 @@
                     ]"
                     @click="$emit('select', s.id)"
                   >
-                    <span class="h-2 w-2 shrink-0 rounded-full" :class="s.status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400'" />
+                    <span class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(s.status)" />
                     <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
                     <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
                   </button>
@@ -168,7 +168,7 @@ type SessionRow = {
   id: string;
   title: string;
   time: string;
-  status: 'Working' | 'Completed';
+  status: 'Working' | 'Completed' | 'Stale';
   repo: string;
   project: string;
   projectPath: string;
@@ -244,6 +244,11 @@ function toggleProject(projectKey: string) {
   if (next.has(projectKey)) next.delete(projectKey);
   else next.add(projectKey);
   collapsedProjects.value = next;
+}
+
+function statusDotClass(status: SessionRow['status']) {
+  if (status === 'Stale') return 'bg-amber-400';
+  return status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400';
 }
 
 function normalizeRepoLabel(repo: string) {

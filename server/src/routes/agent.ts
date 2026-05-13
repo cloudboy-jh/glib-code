@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, broadcast, disposeRuntimeSession, runTurn, subscribe } from "../services/agent-runtime";
-import { appendEvents, createSession, deleteSession, getSession, getSessionById, patchSessionMeta } from "../services/session-store";
+import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/session-store";
 import { getProvidersState, getSettings } from "../services/settings-store";
 import { getCurrentProjectId, getProjectById, getProjectOverride } from "../services/project-store";
+import { requiredProjectPath, resolveAgentCwd, resolveSession } from "../services/session-resolver";
 import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
@@ -13,30 +14,6 @@ function mustProject() {
   const projectId = getCurrentProjectId();
   if (!projectId) return null;
   return getProjectById(projectId);
-}
-
-function requiredProjectPath(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-async function resolveSession(projectPath: string | null, sessionId: string) {
-  const indexed = await getSessionById(sessionId);
-  if (indexed) return { existing: indexed.doc, projectPath: indexed.projectPath };
-
-  const candidates: string[] = [];
-  if (projectPath) candidates.push(projectPath);
-
-  const project = mustProject();
-  if (project?.path && !candidates.includes(project.path)) candidates.push(project.path);
-
-  for (const candidate of candidates) {
-    const existing = await getSession(candidate, sessionId);
-    if (!existing) continue;
-    log("agent", "resolved legacy session by project path", { sessionId, requestedProjectPath: projectPath, resolvedProjectPath: candidate });
-    return { existing, projectPath: existing.meta.projectPath || candidate };
-  }
-
-  return { existing: null, projectPath: projectPath || project?.path || null };
 }
 
 function sseEncode(event: AgentEvent) {
@@ -171,12 +148,14 @@ export const agentRoutes = new Hono()
     broadcast(id, userEvent);
     await patchSessionMeta(projectPath, id, { status: "running" });
 
-    const agentPrompt = await buildAgentPrompt(prompt, body?.context, projectPath);
+    const agentCwd = resolveAgentCwd(projectPath, existing.meta.ephemeralPath);
+    const sessionContext = `Session repo metadata:\n- durable repo: ${projectPath}\n- agent cwd: ${agentCwd}\n- gittrix ephemeral workspace: ${existing.meta.ephemeralPath || "none"}\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
+    const agentPrompt = await buildAgentPrompt(`${sessionContext}\n\n${prompt}`, body?.context, projectPath);
 
     void runTurn({
       sessionId: id,
       turnId,
-      cwd: existing.meta.ephemeralPath || projectPath,
+      cwd: agentCwd,
       prompt: agentPrompt,
       model: existing.meta.model,
       provider: existing.meta.provider,

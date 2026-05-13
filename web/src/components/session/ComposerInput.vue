@@ -3,10 +3,11 @@
     <textarea
       ref="textareaRef"
       :value="modelValue"
+      :disabled="disabled"
       :rows="expanded ? 10 : 5"
       :placeholder="placeholderText"
       :class="[
-        'w-full resize-none border-0 bg-transparent px-3 pb-2 pt-3 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none',
+        'w-full resize-none border-0 bg-transparent px-3 pb-2 pt-3 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-60',
         expanded ? 'min-h-[240px]' : 'min-h-[132px]'
       ]"
       @input="onInput"
@@ -44,7 +45,7 @@ import { Maximize2, Minimize2 } from 'lucide-vue-next';
 import ComposerCommandDialog from './ComposerCommandDialog.vue';
 import ComposerCommandMenu from './ComposerCommandMenu.vue';
 
-const props = defineProps<{ modelValue: string; context?: string }>();
+const props = defineProps<{ modelValue: string; context?: string; disabled?: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string]; send: []; executeCommand: [value: string] }>();
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
@@ -125,6 +126,7 @@ function onKeydown(event: KeyboardEvent) {
 
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
+    if (props.disabled) return;
     if (commandMenuOpen.value) {
       const item = filteredCommands.value[highlightedIndex.value];
       if (item) selectCommand(item.value);
@@ -136,6 +138,7 @@ function onKeydown(event: KeyboardEvent) {
 
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
     event.preventDefault();
+    if (props.disabled) return;
     if (props.modelValue.trim()) emit('send');
     return;
   }

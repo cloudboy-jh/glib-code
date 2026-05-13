@@ -3,7 +3,7 @@
     <div class="grid h-full grid-cols-[auto_1fr]">
       <div class="relative h-full border-r border-border/60 bg-card" :style="{ width: `${sidebarWidth}px` }">
         <SessionSidebar
-          :sessions="sessions"
+          :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
           :collapsed="state.sidebarCollapsed"
           :logo-wordmark-src="logoWordmarkSrc"
@@ -24,9 +24,9 @@
         />
       </div>
 
-      <section :class="['grid h-full min-h-0 min-w-0', currentProject ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
+      <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
         <SessionHeader
-          v-if="currentProject"
+          v-if="currentProject && state.mode === 'session'"
           :title="activeSession?.title ?? 'No active session'"
           :project="currentProject.name"
           :branch="currentProject.branch"
@@ -73,8 +73,26 @@
                     @remove="removeActiveContext"
                     @back-to-diffs="state.mode = 'diff'"
                   />
+                  <div v-if="activeSessionNotice" class="mx-auto mt-2 w-full max-w-5xl px-3 sm:px-5">
+                    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                      <span class="font-medium">{{ activeSessionNotice }}</span>
+                      <span class="ml-auto" />
+                      <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="reloadActiveSessions">Reload sessions</button>
+                      <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="createReplacementSession">New replacement</button>
+                    </div>
+                  </div>
                   <Timeline :entries="activeTimeline" />
-                  <Composer :context="contextLabel" :prompt="forms.prompt" :meta="selectedModelLabel" @update:prompt="forms.prompt = $event" @send="sendPrompt" @execute-command="runComposerCommand" />
+                  <Composer
+                    :context="contextLabel"
+                    :prompt="forms.prompt"
+                    :meta="selectedModelLabel"
+                    :context-chips="activeContextChips"
+                    :disabled="composerDisabled"
+                    @update:prompt="forms.prompt = $event"
+                    @send="sendPrompt"
+                    @execute-command="runComposerCommand"
+                    @remove-context-chip="removeContextChip"
+                  />
                 </div>
               </template>
 
@@ -296,10 +314,13 @@ type Session = {
   id: string;
   title: string;
   time: string;
-  status: 'Working' | 'Completed';
+  status: 'Working' | 'Completed' | 'Stale';
   repo: string;
   project: string;
   projectPath: string;
+  gittrixSessionId?: string;
+  ephemeralPath?: string;
+  baselineSha?: string;
 };
 
 type SessionMetaApi = {
@@ -309,6 +330,9 @@ type SessionMetaApi = {
   title: string;
   model: string;
   provider: string;
+  gittrixSessionId?: string;
+  ephemeralPath?: string;
+  baselineSha?: string;
   status: 'idle' | 'running' | 'aborted' | 'error' | 'done';
   createdAt: string;
   updatedAt: string;
@@ -321,6 +345,9 @@ type ContextBundle = {
   sourceType: 'commit' | 'uncommitted' | 'selection';
   sourceRef?: string;
   selectedFile?: string;
+  selectedFiles?: string[];
+  selectedHunks?: Array<{ id: string; file: string; header: string; startLine: number }>;
+  payloadByFile?: Record<string, string>;
   fileCount: number;
   charCount: number;
   payload: string;
@@ -442,6 +469,7 @@ const paletteCommands = [
 ];
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
+const sidebarSessions = computed(() => sessions.map((session) => ({ ...session, status: staleSessionIds.has(session.id) ? 'Stale' as const : session.status })));
 const activeContextBundle = computed(() => (state.activeSessionId ? contextBundleBySessionId[state.activeSessionId] : undefined));
 const activeContextSummary = computed(() => {
   const ctx = activeContextBundle.value;
@@ -452,12 +480,34 @@ const activeContextSummary = computed(() => {
   return `${source} · ${fileMeta} · ${sizeMeta}`;
 });
 
+const activeContextChips = computed(() => {
+  const ctx = activeContextBundle.value;
+  if (!ctx) return [];
+  const chips: Array<{ id: string; label: string }> = [];
+  const source = ctx.sourceType === 'commit' && ctx.sourceRef ? `commit ${ctx.sourceRef.slice(0, 7)}` : ctx.sourceType === 'uncommitted' ? 'working tree' : 'selection';
+  chips.push({ id: 'source', label: source });
+  for (const file of ctx.selectedFiles?.length ? ctx.selectedFiles : ctx.selectedFile ? [ctx.selectedFile] : []) {
+    chips.push({ id: `file:${file}`, label: file });
+  }
+  for (const hunk of ctx.selectedHunks ?? []) {
+    chips.push({ id: `hunk:${hunk.id}`, label: `${hunk.file} · ${hunk.header}` });
+  }
+  if (chips.length === 1) chips.push({ id: 'files', label: `${ctx.fileCount} file${ctx.fileCount === 1 ? '' : 's'}` });
+  return chips.slice(0, 12);
+});
+
 const activeTimeline = computed(() => {
   if (!state.activeSessionId) return [];
   return timelineBySessionId[state.activeSessionId] ?? [];
 });
 
 const activeProvider = computed(() => providerCapabilities.providers.find((provider) => provider.id === settings.defaultProvider));
+const activeSessionBaselineSha = computed(() => activeSession.value?.baselineSha ?? '');
+const activeWorkspaceState = computed(() => {
+  const session = activeSession.value;
+  if (!session?.gittrixSessionId) return state.mode === 'diff' ? 'reviewing durable repo' : 'no GitTrix workspace yet';
+  return session.ephemeralPath ? `session workspace ${session.gittrixSessionId.slice(0, 8)}` : `GitTrix session ${session.gittrixSessionId.slice(0, 8)}`;
+});
 const activeProviderConnected = computed(() => activeProvider.value?.hasAuth === true);
 const compatibleUsableModel = computed(() => {
   if (activeProviderConnected.value) return null;
@@ -494,9 +544,16 @@ const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n
 const sidebarWidth = computed(() => (state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
 const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();
+const staleSessionIds = reactive(new Set<string>());
+const sessionNoticeById = reactive<Record<string, string | undefined>>({});
+const streamErrorCountBySessionId = new Map<string, number>();
+const sendingSessionIds = reactive(new Set<string>());
 
 let stopSidebarResize: (() => void) | null = null;
 let creatingSession: Promise<Session | null> | null = null;
+
+const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
+const composerDisabled = computed(() => Boolean(state.activeSessionId && (staleSessionIds.has(state.activeSessionId) || sendingSessionIds.has(state.activeSessionId))));
 
 
 function eventKey(event: AgentEvent) {
@@ -621,12 +678,17 @@ function mapApiSession(meta: SessionMetaApi): Session {
     status: meta.status === 'done' ? 'Completed' : 'Working',
     repo: repoName,
     project: repoName,
-    projectPath: normalizedPath
+    projectPath: normalizedPath,
+    gittrixSessionId: meta.gittrixSessionId,
+    ephemeralPath: meta.ephemeralPath,
+    baselineSha: meta.baselineSha
   };
 }
 
 async function hydrateSessionDoc(sessionId: string) {
-  const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}`);
+  const session = sessions.find((entry) => entry.id === sessionId);
+  const query = session?.projectPath ? `?projectPath=${encodeURIComponent(session.projectPath)}` : '';
+  const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}${query}`);
   timelineBySessionId[sessionId] = [];
   seenEventKeysBySessionId.set(sessionId, new Set<string>());
   for (const evt of doc.events) reduceAgentEventToTimeline(sessionId, evt);
@@ -636,10 +698,13 @@ function connectSessionStream(sessionId: string) {
   if (streamsBySessionId.has(sessionId)) return;
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session?.projectPath) return;
-  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream`);
+  if (staleSessionIds.has(sessionId)) return;
+  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}`);
   const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
   for (const name of names) {
     stream.addEventListener(name, (evt) => {
+      streamErrorCountBySessionId.set(sessionId, 0);
+      if (!staleSessionIds.has(sessionId)) sessionNoticeById[sessionId] = undefined;
       const message = evt as MessageEvent<string>;
       try {
         const parsed = JSON.parse(message.data) as AgentEvent;
@@ -650,7 +715,9 @@ function connectSessionStream(sessionId: string) {
     });
   }
   stream.onerror = () => {
-    // browser will auto-retry
+    const count = (streamErrorCountBySessionId.get(sessionId) ?? 0) + 1;
+    streamErrorCountBySessionId.set(sessionId, count);
+    if (count >= 3) markSessionStale(sessionId, 'Session stream disconnected. Reload sessions or start a replacement session.');
   };
   streamsBySessionId.set(sessionId, stream);
 }
@@ -660,6 +727,33 @@ function disconnectSessionStream(sessionId: string) {
   if (!stream) return;
   stream.close();
   streamsBySessionId.delete(sessionId);
+  streamErrorCountBySessionId.delete(sessionId);
+}
+
+function markSessionStale(sessionId: string, message: string) {
+  if (staleSessionIds.has(sessionId)) return;
+  staleSessionIds.add(sessionId);
+  sessionNoticeById[sessionId] = message;
+  disconnectSessionStream(sessionId);
+}
+
+async function reloadActiveSessions() {
+  const activeId = state.activeSessionId;
+  await hydrateSessions().catch(() => undefined);
+  if (activeId && sessions.some((session) => session.id === activeId)) {
+    staleSessionIds.delete(activeId);
+    sessionNoticeById[activeId] = undefined;
+    connectSessionStream(activeId);
+  } else if (activeId) {
+    staleSessionIds.add(activeId);
+    sessionNoticeById[activeId] = 'Session unavailable after reload. Start a replacement session.';
+  }
+}
+
+async function createReplacementSession() {
+  const previousPrompt = forms.prompt;
+  const created = await createSession({ title: 'Replacement Session' });
+  if (created) forms.prompt = previousPrompt;
 }
 
 async function hydrateSessions() {
@@ -1047,7 +1141,9 @@ async function createSessionInner(options?: { title?: string; context?: string; 
     return null;
   }
   const mapped = mapApiSession(created);
-  sessions.unshift(mapped);
+    sessions.unshift(mapped);
+    staleSessionIds.delete(mapped.id);
+    sessionNoticeById[mapped.id] = undefined;
   timelineBySessionId[mapped.id] = [];
   sessionContextById[mapped.id] = options?.context ?? '';
   state.activeSessionId = mapped.id;
@@ -1061,23 +1157,42 @@ async function createSessionInner(options?: { title?: string; context?: string; 
   return mapped;
 }
 
-async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }) {
+async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }> }) {
   if (!currentProject.value) return;
-  const packBody: Record<string, unknown> = { source: payload.source === 'commit' ? 'commits' : 'uncommitted', projectPath: currentProject.value.path };
-  if (payload.source === 'commit' && payload.ref) packBody.ref = payload.ref;
-  if (payload.file) packBody.file = payload.file;
-  const packed = await apiPost<{ diff: string }>('/diff/pack', packBody);
+  const source = payload.source === 'commit' ? 'commits' : 'uncommitted';
+  const scopedFiles = payload.files?.length ? payload.files : payload.file ? [payload.file] : [];
+  const hunkFiles = [...new Set((payload.hunks ?? []).map((hunk) => hunk.file))];
+  const filesToPack = scopedFiles.length ? scopedFiles : hunkFiles.length ? hunkFiles : [];
+  async function packFile(file?: string) {
+    const packBody: Record<string, unknown> = { source, projectPath: currentProject.value!.path };
+    if (payload.source === 'commit' && payload.ref) packBody.ref = payload.ref;
+    if (file) packBody.file = file;
+    const packed = await apiPost<{ diff: string }>('/diff/pack', packBody);
+    return packed.diff ?? '';
+  }
+  const payloadByFile: Record<string, string> = {};
+  let diff = '';
+  if (filesToPack.length) {
+    const chunks = await Promise.all(filesToPack.map(async (file) => {
+      const chunk = await packFile(file);
+      payloadByFile[file] = chunk;
+      return chunk;
+    }));
+    diff = chunks.join('\n').trim() || 'No diff context available.';
+  } else {
+    diff = (await packFile()).trim() || 'No diff context available.';
+  }
   const context = payload.source === 'commit' && payload.ref
     ? `commit ${payload.ref.slice(0, 7)}`
     : 'working tree changes';
-  const diff = packed.diff?.trim() || 'No diff context available.';
+  const selectedHunkCopy = payload.hunks?.length ? ` · ${payload.hunks.length} hunks` : '';
   const created = await createSession({
     title: `Session from ${context}`,
     context,
     initialEntries: [{
       id: 'e1',
       kind: 'System',
-      text: `Context attached: ${context} · ${payload.file ? 1 : 'selected'} file scope`,
+      text: `Context attached: ${context} · ${filesToPack.length || 'selected'} file scope${selectedHunkCopy}`,
       time: 'now',
       level: 'info'
     }]
@@ -1093,10 +1208,41 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
       sourceType: payload.source,
       sourceRef: payload.ref,
       selectedFile: payload.file,
-      fileCount: payload.file ? 1 : Math.max(1, (diff.match(/^diff --git /gm) ?? []).length),
+      selectedFiles: filesToPack,
+      selectedHunks: payload.hunks ?? [],
+      payloadByFile,
+      fileCount: filesToPack.length || Math.max(1, (diff.match(/^diff --git /gm) ?? []).length),
       charCount: diff.length,
       payload: diff
     };
+  }
+}
+
+function removeContextChip(id: string) {
+  const ctx = activeContextBundle.value;
+  if (!ctx || !state.activeSessionId) return;
+  if (id === 'source' || id === 'files') {
+    removeActiveContext();
+    return;
+  }
+  if (id.startsWith('file:')) {
+    const file = id.slice(5);
+    ctx.selectedFiles = (ctx.selectedFiles ?? []).filter((entry) => entry !== file);
+    ctx.selectedHunks = (ctx.selectedHunks ?? []).filter((hunk) => hunk.file !== file);
+  }
+  if (id.startsWith('hunk:')) {
+    const hunkId = id.slice(5);
+    ctx.selectedHunks = (ctx.selectedHunks ?? []).filter((hunk) => hunk.id !== hunkId);
+  }
+  const remainingFiles = new Set([...(ctx.selectedFiles ?? []), ...(ctx.selectedHunks ?? []).map((hunk) => hunk.file)]);
+  if (!remainingFiles.size) {
+    removeActiveContext();
+    return;
+  }
+  if (ctx.payloadByFile && Object.keys(ctx.payloadByFile).length) {
+    ctx.payload = [...remainingFiles].map((file) => ctx.payloadByFile?.[file] ?? '').filter(Boolean).join('\n').trim() || ctx.payload;
+    ctx.fileCount = remainingFiles.size;
+    ctx.charCount = ctx.payload.length;
   }
 }
 
@@ -1121,23 +1267,29 @@ function selectSessionFromSidebar(sessionId: string) {
 
 async function sendPrompt() {
   if (!state.activeSessionId || !forms.prompt.trim()) return;
+  const sessionId = state.activeSessionId;
+  if (staleSessionIds.has(sessionId)) return;
+  if (sendingSessionIds.has(sessionId)) return;
   const session = activeSession.value;
   if (!session?.projectPath) return;
-  const bundle = contextBundleBySessionId[state.activeSessionId];
+  const bundle = contextBundleBySessionId[sessionId];
+  sendingSessionIds.add(sessionId);
   try {
-    await apiPost(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/send`, {
+    await apiPost(`/agent/sessions/${encodeURIComponent(sessionId)}/send`, {
       prompt: forms.prompt,
-      context: bundle?.payload
+      context: bundle?.payload,
+      projectPath: session.projectPath
     });
     forms.prompt = '';
   } catch (error) {
-    appendTimelineEvent(state.activeSessionId, {
-      id: `${state.activeSessionId}-${Date.now()}-send-err`,
-      kind: 'Error',
-      text: error instanceof Error ? error.message : 'Failed to send prompt',
-      time: 'now',
-      level: 'error'
-    });
+    const message = error instanceof Error ? error.message : 'Failed to send prompt';
+    if (message.toLowerCase().includes('session not found')) {
+      markSessionStale(sessionId, 'Session not found. Reload sessions or start a replacement session.');
+      return;
+    }
+    sessionNoticeById[sessionId] = message;
+  } finally {
+    sendingSessionIds.delete(sessionId);
   }
 }
 
@@ -1151,10 +1303,12 @@ function removeActiveContext() {
 
 async function runPromote() {
   if (!state.activeSessionId) return;
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
   state.promoteDialogOpen = true;
   promote.loading = true;
   try {
-    const payload = await apiGet<{ diff: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff`);
+    const payload = await apiGet<{ diff: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
     promote.diff = payload.diff ?? '';
     promote.selectedFiles = filesFromPatch(promote.diff);
   } catch (error) {
@@ -1173,10 +1327,12 @@ async function runPromote() {
 
 async function confirmPromote() {
   if (!state.activeSessionId) return;
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
   const files = promote.selectedFiles;
   const selector = files.length === filesFromPatch(promote.diff).length ? { mode: 'all' as const } : { mode: 'files' as const, files };
   try {
-    const result = await apiPost<{ sha: string; branch: string; prUrl?: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/promote`, {
+    const result = await apiPost<{ sha: string; branch: string; prUrl?: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/promote?projectPath=${encodeURIComponent(session.projectPath)}`, {
       selector,
       strategy: 'commit'
     });
@@ -1216,7 +1372,7 @@ async function abortTurn() {
   if (!state.activeSessionId) return;
   const session = activeSession.value;
   if (!session?.projectPath) return;
-  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn`);
+  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
 }
 
 function runTerminal() {

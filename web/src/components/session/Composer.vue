@@ -5,12 +5,27 @@
         ref="composerInputRef"
         :context="context"
         :model-value="prompt"
+        :disabled="disabled"
         @update:model-value="$emit('update:prompt', $event)"
         @send="$emit('send')"
         @execute-command="$emit('executeCommand', $event)"
       />
 
-      <ComposerFooter :meta="meta" @send="$emit('send')" @open-commands="composerInputRef?.openCommandDialog()" />
+      <div v-if="contextChips.length" class="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+        <button
+          v-for="chip in contextChips"
+          :key="chip.id"
+          type="button"
+          class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] text-primary hover:bg-primary/15"
+          :title="chip.label"
+          @click="$emit('removeContextChip', chip.id)"
+        >
+          <span class="truncate">{{ chip.label }}</span>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <ComposerFooter :meta="meta" :disabled="disabled" @send="$emit('send')" @open-commands="composerInputRef?.openCommandDialog()" />
     </div>
   </div>
 </template>
@@ -27,11 +42,13 @@ const props = withDefaults(
     context: string;
     prompt: string;
     meta?: string;
+    contextChips?: Array<{ id: string; label: string }>;
+    disabled?: boolean;
   }>(),
-  { meta: 'GPT-5.3 Codex · High · Full access' }
+  { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], disabled: false }
 );
 
-const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string] }>();
+const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string]; removeContextChip: [id: string] }>();
 
 function emitSend() {
   if (!props.prompt.trim()) return;

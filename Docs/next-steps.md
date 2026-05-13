@@ -1,27 +1,27 @@
 # Next Steps
 
-Last updated: 2026-05-10
+Last updated: 2026-05-12
 
 ## Current shipped local loop
 
 - Open/clone a local git repo.
 - Review uncommitted or commit diffs without a provider key.
 - Add provider API keys explicitly inside glib-code.
-- Start pi-backed agent sessions in GitTrix ephemeral workspaces pre-hydrated from the durable repo.
+- Start pi-backed agent sessions paired with GitTrix metadata. Runtime cwd falls back to the durable repo when the ephemeral workspace is not git-backed.
 - Stream user/assistant/error/tool-call timeline events over SSE.
-- Keep session send/stream/abort actions scoped to server-owned `sessionId` metadata so reloads, project switches, and other tabs do not strand valid sessions.
+- Keep session send/stream/abort/hydrate/diff/promote actions scoped to `sessionId` plus active `projectPath` so reloads, project switches, and stale index state do not strand valid sessions.
 - Preserve streamed assistant text chunks with collision-proof event IDs.
 - Review session diffs and promote selected files back to the durable repo.
 
 ## Immediate priority order
 
-1. Sandbox + pi RPC runtime parity.
-2. Server consolidation: session domain service and state-store split follow-through.
-3. Terminal WebSocket transport (`/api/term`).
-4. Attachments API + frontend integration (`/api/attachments`).
-5. Git mutation route completion under `/api/git`.
-6. Hunk-level context/promote selection.
-7. Reliability pass: route tests, restart behavior, multi-tab behavior, and dev/Electron parity.
+1. Git-backed GitTrix ephemeral workspaces for local sessions.
+2. Session reliability tests: route lookup, stream stale handling, restart behavior, and project switching.
+3. Sandbox + pi RPC runtime parity.
+4. Terminal WebSocket transport (`/api/term`).
+5. Attachments API + frontend integration (`/api/attachments`).
+6. Git mutation route completion under `/api/git`.
+7. Redesigned hunk/file context selection that does not compromise diff readability.
 8. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
 
 ## Completed recently
@@ -47,6 +47,11 @@ Last updated: 2026-05-10
 - Added session-id routing and app-level session indexing for agent send/stream/abort/delete so valid sessions do not 404 after global project changes.
 - Split server app state into focused settings and project stores.
 - Added frontend guards against duplicate session creation and stale session EventSource streams.
+- Added projectPath-scoped session hydrate/send/stream/diff/promote routing and shared backend session resolver.
+- Moved session stream/send infrastructure failures out of the timeline and into a recovery banner.
+- Added durable repo cwd fallback when GitTrix ephemeral workspace is not a git repo.
+- Restored full-width diff reading after removing the hunk side-panel experiment.
+- Fixed uncommitted diff packing for staged tracked files and untracked file content.
 - Confirmed pi RPC CLI invocation (`pi --mode rpc --no-session`) and abort command schema (`{ type: "abort", id }` -> response event).
 
 ## 1) Sandbox + pi RPC runtime
@@ -82,8 +87,8 @@ Last updated: 2026-05-10
 ## 6) Reliability pass
 
 - Standardize error payloads across route groups.
-- Add integration-level route tests for provider auth, session create/send/stream, diff, and promote.
-- Add multi-tab and reload regression coverage for session-id-scoped actions.
+- Add integration-level route tests for provider auth, session create/send/stream, diff, promote, and session resolver fallback.
+- Add multi-tab and reload regression coverage for session-id plus projectPath-scoped actions.
 - Validate behavior across both hosts: Vite dev web and Electron shell.
 - Add restart/recovery checks for session metadata, timeline persistence, and GitTrix workspace mapping.
 

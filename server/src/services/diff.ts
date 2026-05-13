@@ -1,4 +1,6 @@
 import { simpleGit } from "simple-git";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { getCurrentProjectId, getProjectById } from "./project-store";
 
 function repoPath(projectPath?: string) {
@@ -15,6 +17,24 @@ async function gitRaw(args: string[], projectPath?: string) {
   const code = await proc.exited;
   const out = await new Response(proc.stdout).text();
   return code === 0 ? out : null;
+}
+
+async function isUntracked(file: string, projectPath?: string) {
+  const out = await gitRaw(["status", "--porcelain", "--", file], projectPath);
+  return out?.split("\n").some((line) => line.startsWith("?? ")) ?? false;
+}
+
+async function untrackedFileDiff(file: string, projectPath?: string) {
+  const repo = repoPath(projectPath);
+  if (!repo) return null;
+  try {
+    const content = await readFile(join(repo, file), "utf8");
+    const lines = content.split("\n");
+    const body = lines.map((line) => `+${line}`).join("\n");
+    return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..0000000\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${body}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function diffItems(source: string, limit = 50, projectPath?: string) {
@@ -73,7 +93,7 @@ export async function diffFiles(source: string, ref?: string, projectPath?: stri
 export async function diffHunks(source: string, file: string, ref?: string, projectPath?: string) {
   const args = source === "commits" && ref
     ? ["show", ref, "--", file]
-    : ["diff", "--", file];
+    : ["diff", "HEAD", "--", file];
 
   const out = await gitRaw(args, projectPath);
   if (out == null) return null;
@@ -94,7 +114,20 @@ export async function packDiff(source: string, ref?: string, file?: string, proj
   if (source === "commits" && ref) {
     args = file ? ["show", ref, "--", file] : ["show", ref];
   } else {
-    args = file ? ["diff", "--", file] : ["diff"];
+    if (file && await isUntracked(file, projectPath)) {
+      const diff = await untrackedFileDiff(file, projectPath);
+      if (diff == null) return null;
+      return {
+        diff,
+        stats: {
+          files: 1,
+          hunks: 1,
+          additions: (diff.match(/^\+[^+]/gm) || []).length,
+          deletions: 0
+        }
+      };
+    }
+    args = file ? ["diff", "HEAD", "--", file] : ["diff", "HEAD"];
   }
   const diff = await gitRaw(args, projectPath);
   if (diff == null) return null;
