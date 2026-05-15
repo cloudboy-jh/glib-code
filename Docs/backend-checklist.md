@@ -59,14 +59,15 @@ Last updated: 2026-05-10
 
 - [ ] Move current project state to a client/session scoped model (not single process-global value).
 - [ ] Harden FS read/tree for large repos and binary files.
-- [ ] Add consistent error envelopes for route failures.
+- [x] Add consistent error envelopes for handled session/agent route failures.
 - [x] Return explicit GitTrix startup errors and Cloudflare preflight error codes/messages.
 - [x] Split settings/provider/keybinding persistence from project selection/recents state.
 
 ## GitTrix workspace behavior
 
-- [x] Pre-hydrate ephemeral workspace from durable repo files on session start.
-- [ ] Add opt-out/size guard for very large repo hydration.
+- [x] Use git-backed local GitTrix worktrees with clone fallback for new local sessions.
+- [x] Persist `isGitBacked` and `workspaceKind` on session metadata.
+- [x] Remove large repo copy hydration from the local session path.
 
 ## Readiness/auth
 

@@ -30,7 +30,7 @@ type PromptWaiter = {
 };
 
 function isTurnEnd(event: PiEvent) {
-  return event.type === "agent_end" || event.type === "turn_end" || event.type === "aborted" || event.type === "error" || event.type === "process_exit";
+  return event.type === "agent_end" || event.type === "aborted" || event.type === "error" || event.type === "process_exit";
 }
 
 function eventError(event: PiEvent) {

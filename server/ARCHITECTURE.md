@@ -62,9 +62,10 @@ Keep live runtime separate from persisted session state:
 ## Session Invariants
 
 - `sessionId` is the authority for agent session routes.
-- Stored session metadata owns durable project path, GitTrix session ID, sandbox path, baseline SHA, provider, and model.
-- Agent turns always run in the stored sandbox path.
+- Stored session metadata owns durable project path, GitTrix session ID, ephemeral path, baseline SHA, git-backed/workspace-kind flags, provider, and model.
+- Agent turns run in the GitTrix ephemeral path only when it is git-backed and present; old/non-git sessions fall back to durable cwd.
 - Pi can exit and respawn inside the same sandbox without deleting the session.
+- RPC prompt completion is keyed to `agent_end`; `turn_end` is only one model/tool cycle.
 - Sandbox destruction happens only on explicit delete/evict.
 - SSE replay comes from the persisted event log.
 - Diff/promote resolve through stored session metadata, not browser project state.
@@ -75,3 +76,4 @@ Keep live runtime separate from persisted session state:
 2. Extract current-project helpers from repeated route code.
 3. Move session/GitTrix orchestration behind a single session-domain service.
 4. Add lifecycle tests for create, multi-turn send, stream replay, pi respawn, diff, promote, abort, and delete.
+5. Run `Docs/session-smoke-test.md` before calling local sessions ready.

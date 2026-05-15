@@ -89,6 +89,7 @@ Current behavior:
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
 - Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
+- Session promote modal uses a full-width diff surface, optional header file picker for multi-file diffs, and `Commit all` / `Commit selected` actions.
 - Diff mode hides the global session header; `DiffWorkbench` owns diff-specific controls.
 - File picker opens as a viewport-safe overlay with internal scrolling.
 
@@ -111,6 +112,7 @@ Current state:
 
 - Session shell/layout is in place.
 - Timeline renders user/assistant/error entries plus compact expandable tool-call cards.
+- Tool-call cards classify diff/code/json/terminal/error output, hide raw payloads under Inspect, and render unified diffs with `DiffView.vue` / `@pierre/diffs`.
 - Composer sends real prompts and supports `/stop`/`/abort` command handling.
 - Session create/send/stream flows use backend agent routes.
 - Session creation is guarded so repeated clicks or keyboard actions reuse the in-flight request instead of creating duplicate sessions.
@@ -118,7 +120,8 @@ Current state:
 - Session stream failures are tracked outside the timeline. After repeated failures, the stream closes and the session is marked stale.
 - Session infra/send failures show a compact banner with Reload sessions and New replacement actions instead of polluting the timeline.
 - Composer disables only for stale sessions or in-flight sends and preserves draft text on failures.
-- Sidebar stale sessions show amber status dots.
+- Composer drafts are scoped per session.
+- Header/sidebar show compact session states: connected, connecting, disconnected, stale, running.
 - Empty session state explains active model/provider key failures and offers key/model actions.
 
 ## Settings + keybindings

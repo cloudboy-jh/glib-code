@@ -39,7 +39,10 @@ async function buildDiffsContext(prompt: string, projectPath?: string) {
 }
 
 async function buildAgentPrompt(prompt: string, context?: string, projectPath?: string) {
-  const chunks = [prompt];
+  const chunks = [
+    "Response rules: after using tools, always provide a concise final answer. Do not dump raw tool JSON, full diffs, or secret values into prose; summarize results and refer to files/changes by path.",
+    prompt
+  ];
   const trimmedContext = context?.trim();
   if (trimmedContext) chunks.push(`Attached context:\n\n${trimmedContext}`);
   const diffsContext = await buildDiffsContext(prompt, projectPath).catch(() => "");
@@ -54,21 +57,25 @@ function missingCloudflareConfig() {
   return missing;
 }
 
+function routeError(message: string, code: string, retryable = false) {
+  return { ok: false, code, message, retryable };
+}
+
 export const agentRoutes = new Hono()
   .post("/sessions", async (c) => {
     const project = mustProject();
-    if (!project) return c.json({ ok: false, message: "no project open" }, 400);
+    if (!project) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 400);
     const body = await c.req.json().catch(() => null) as { title?: string; model?: string; provider?: string } | null;
     const [providerState, capabilities] = await Promise.all([getProvidersState(), getPiCapabilities()]);
-    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
+    if (!capabilities.ok) return c.json(routeError(capabilities.error ?? "pi provider discovery failed", "PI_CAPABILITIES_FAILED", true), 503);
     const projectOverride = getProjectOverride(project.id);
     const requestedProvider = body?.provider || projectOverride?.provider || providerState.defaultProvider;
     const providerConfig = capabilities.providers.find((p) => p.id === requestedProvider);
-    if (!providerConfig) return c.json({ ok: false, message: `provider "${requestedProvider}" is not available` }, 400);
-    if (!providerConfig.hasAuth) return c.json({ ok: false, message: `provider "${requestedProvider}" needs a usable API key` }, 400);
+    if (!providerConfig) return c.json(routeError(`provider "${requestedProvider}" is not available`, "PROVIDER_NOT_AVAILABLE"), 400);
+    if (!providerConfig.hasAuth) return c.json(routeError(`provider "${requestedProvider}" needs a usable API key`, "PROVIDER_AUTH_REQUIRED"), 400);
     const requestedModel = body?.model || projectOverride?.model || providerState.defaultModel;
     if (providerConfig.modelIds.length > 0 && !providerConfig.modelIds.includes(requestedModel)) {
-      return c.json({ ok: false, message: "model not supported by provider" }, 400);
+      return c.json(routeError("model not supported by provider", "MODEL_NOT_SUPPORTED"), 400);
     }
 
     const runtimeSettings = await getSettings();
@@ -83,7 +90,7 @@ export const agentRoutes = new Hono()
       }
     }
 
-    let gittrixMeta: { gittrixSessionId: string; ephemeralPath: string; baselineSha: string };
+    let gittrixMeta: { gittrixSessionId: string; ephemeralPath: string; baselineSha: string; isGitBacked: boolean; workspaceKind: "worktree" | "clone" | "copy" | "remote" };
     try {
       gittrixMeta = await gittrixService.startSession({
         projectPath: project.path,
@@ -104,7 +111,9 @@ export const agentRoutes = new Hono()
       provider: requestedProvider,
       gittrixSessionId: gittrixMeta.gittrixSessionId,
       ephemeralPath: gittrixMeta.ephemeralPath,
-      baselineSha: gittrixMeta.baselineSha
+      baselineSha: gittrixMeta.baselineSha,
+      isGitBacked: gittrixMeta.isGitBacked,
+      workspaceKind: gittrixMeta.workspaceKind
     });
     const start: AgentEvent = {
       type: "session_start",
@@ -122,16 +131,16 @@ export const agentRoutes = new Hono()
     const body = await c.req.json().catch(() => null) as { prompt?: string; context?: string; attachments?: string[]; projectPath?: string } | null;
     const requestedProjectPath = requiredProjectPath(body?.projectPath);
     const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
-    if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
+    if (!existing) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
 
     const prompt = body?.prompt?.trim();
-    if (!prompt) return c.json({ ok: false, message: "prompt required" }, 400);
+    if (!prompt) return c.json(routeError("prompt required", "PROMPT_REQUIRED"), 400);
     const capabilities = await getPiCapabilities();
-    if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
+    if (!capabilities.ok) return c.json(routeError(capabilities.error ?? "pi provider discovery failed", "PI_CAPABILITIES_FAILED", true), 503);
     const provider = capabilities.providers.find((p) => p.id === existing.meta.provider && p.hasAuth);
-    if (!provider) return c.json({ ok: false, message: `session provider "${existing.meta.provider}" needs a usable API key` }, 400);
+    if (!provider) return c.json(routeError(`session provider "${existing.meta.provider}" needs a usable API key`, "PROVIDER_AUTH_REQUIRED"), 400);
     if (provider.modelIds.length > 0 && !provider.modelIds.includes(existing.meta.model)) {
-      return c.json({ ok: false, message: "session model is no longer available for provider" }, 400);
+      return c.json(routeError("session model is no longer available for provider", "MODEL_NOT_AVAILABLE"), 400);
     }
 
     const turnId = `turn_${Date.now().toString(36)}`;
@@ -148,8 +157,8 @@ export const agentRoutes = new Hono()
     broadcast(id, userEvent);
     await patchSessionMeta(projectPath, id, { status: "running" });
 
-    const agentCwd = resolveAgentCwd(projectPath, existing.meta.ephemeralPath);
-    const sessionContext = `Session repo metadata:\n- durable repo: ${projectPath}\n- agent cwd: ${agentCwd}\n- gittrix ephemeral workspace: ${existing.meta.ephemeralPath || "none"}\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
+    const agentCwd = resolveAgentCwd(projectPath, existing.meta.ephemeralPath, existing.meta.isGitBacked);
+    const sessionContext = `Session repo metadata:\n- durable repo: ${projectPath}\n- agent cwd: ${agentCwd}\n- gittrix ephemeral workspace: ${existing.meta.ephemeralPath || "none"}\n- gittrix workspace kind: ${existing.meta.workspaceKind || "unknown"}\n- gittrix git-backed: ${existing.meta.isGitBacked === true ? "yes" : "no"}\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
     const agentPrompt = await buildAgentPrompt(`${sessionContext}\n\n${prompt}`, body?.context, projectPath);
 
     void runTurn({
@@ -175,7 +184,7 @@ export const agentRoutes = new Hono()
     const id = c.req.param("id");
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
     const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
-    if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
+    if (!existing) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
 
     const stream = new ReadableStream({
       start(controller) {
@@ -229,9 +238,9 @@ export const agentRoutes = new Hono()
     const id = c.req.param("id");
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
     const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
-    if (!existing) return c.json({ ok: false, message: "session not found" }, 404);
+    if (!existing) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
     const turnId = abortRunningTurn(id);
-    if (!turnId) return c.json({ ok: false, message: "no active turn" }, 404);
+    if (!turnId) return c.json(routeError("no active turn", "NO_ACTIVE_TURN"), 404);
     const evt: AgentEvent = { type: "aborted", turnId, at: new Date().toISOString() };
     await appendEvents(projectPath, id, [evt, { type: "turn_end", turnId, reason: "aborted", at: new Date().toISOString() }]);
     await patchSessionMeta(projectPath, id, { status: "aborted" });
@@ -241,7 +250,7 @@ export const agentRoutes = new Hono()
     const id = c.req.param("id");
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
     const { existing: resolvedSession, projectPath } = await resolveSession(requestedProjectPath, id);
-    if (!projectPath) return c.json({ ok: false, message: "session not found" }, 404);
+    if (!projectPath) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
     abortRunningTurn(id);
     await disposeRuntimeSession(id);
     const session = resolvedSession ?? await getSession(projectPath, id);

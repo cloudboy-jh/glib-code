@@ -31,8 +31,8 @@ export async function resolveSession(projectPath: string | null, sessionId: stri
   return { existing: null, projectPath: normalizedRequestPath || normalizeProjectPath(project?.path) };
 }
 
-export function resolveAgentCwd(projectPath: string, ephemeralPath?: string) {
+export function resolveAgentCwd(projectPath: string, ephemeralPath?: string, isGitBacked?: boolean) {
   const normalizedEphemeral = normalizeProjectPath(ephemeralPath);
-  if (normalizedEphemeral && existsSync(`${normalizedEphemeral}/.git`)) return normalizedEphemeral;
+  if (isGitBacked === true && normalizedEphemeral && existsSync(`${normalizedEphemeral}/.git`)) return normalizedEphemeral;
   return normalizeProjectPath(projectPath) ?? projectPath;
 }

@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { parseLocalRefUri } from "gittrix/packages/core/src/ref.js";
 import type { AdapterCapabilities, DurableAdapter, EphemeralAdapter, ListEntry } from "gittrix/packages/core/src/types.js";
 
 type GitResult = { stdout: string; stdoutBytes: Uint8Array };
@@ -83,12 +84,28 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
   }
 
   public capabilities(): AdapterCapabilities {
-    return { git: false, push: false, fetch: false, history: false, ttl: false, latencyClass: "local" };
+    return { git: true, push: false, fetch: false, history: true, ttl: false, latencyClass: "local" };
   }
 
-  public async initWorkspace(sessionId: string): Promise<void> {
-    await mkdir(this.sessionPath(sessionId), { recursive: true });
+  public async initWorkspace(sessionId: string, baseline: { durableRef: string; sha: string }): Promise<void> {
+    const durable = parseLocalRefUri(baseline.durableRef);
+    const durablePath = resolve(durable.path);
+    const workspacePath = this.sessionPath(sessionId);
+    await mkdir(this.sessionDir(sessionId), { recursive: true });
+    await rm(workspacePath, { recursive: true, force: true });
+
+    let workspaceKind: "worktree" | "clone" = "worktree";
+    try {
+      await runGit(["worktree", "add", "--detach", workspacePath, baseline.sha], durablePath);
+    } catch {
+      workspaceKind = "clone";
+      await rm(workspacePath, { recursive: true, force: true });
+      await runGit(["clone", "--no-checkout", durablePath, workspacePath], durablePath);
+      await runGit(["checkout", "--detach", baseline.sha], workspacePath);
+    }
+
     await this.saveTouched(sessionId, []);
+    await this.saveWorkspaceMetadata(sessionId, { durablePath, workspacePath, workspaceKind });
   }
 
   public async read(sessionId: string, path: string): Promise<Uint8Array> {
@@ -121,19 +138,48 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
   }
 
   public async touchedFiles(sessionId: string): Promise<string[]> {
-    return this.loadTouched(sessionId);
+    const touched = new Set(await this.loadTouched(sessionId));
+    await this.addGitChangedFiles(sessionId, touched);
+    return [...touched].sort((a, b) => a.localeCompare(b));
   }
 
   public async destroy(sessionId: string): Promise<void> {
-    await rm(this.sessionPath(sessionId), { recursive: true, force: true });
+    const info = await this.loadWorkspaceMetadata(sessionId);
+    const workspacePath = this.sessionPath(sessionId);
+    if (info?.workspaceKind === "worktree") {
+      try {
+        await runGit(["worktree", "remove", "--force", workspacePath], info.durablePath);
+      } catch {
+        await rm(workspacePath, { recursive: true, force: true });
+      }
+      try {
+        await runGit(["worktree", "prune"], info.durablePath);
+      } catch {
+        // Best-effort cleanup: stale worktree metadata should not block eviction.
+      }
+    } else {
+      await rm(workspacePath, { recursive: true, force: true });
+    }
+  }
+
+  private sessionDir(sessionId: string): string {
+    return resolve(this.sessionsRootDir, sessionId);
   }
 
   private sessionPath(sessionId: string): string {
-    return resolve(this.sessionsRootDir, sessionId, "workspace");
+    return resolve(this.sessionDir(sessionId), "workspace");
   }
 
   private touchedPath(sessionId: string): string {
+    return join(this.sessionDir(sessionId), "touched.json");
+  }
+
+  private legacyTouchedPath(sessionId: string): string {
     return join(this.sessionPath(sessionId), ".gittrix-touched.json");
+  }
+
+  private workspaceMetadataPath(sessionId: string): string {
+    return join(this.sessionDir(sessionId), "workspace.json");
   }
 
   private async loadTouched(sessionId: string): Promise<string[]> {
@@ -142,11 +188,18 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
       const data = JSON.parse(raw) as { files?: unknown };
       return Array.isArray(data.files) ? data.files.filter((v): v is string => typeof v === "string") : [];
     } catch {
-      return [];
+      try {
+        const raw = await readFile(this.legacyTouchedPath(sessionId), "utf8");
+        const data = JSON.parse(raw) as { files?: unknown };
+        return Array.isArray(data.files) ? data.files.filter((v): v is string => typeof v === "string") : [];
+      } catch {
+        return [];
+      }
     }
   }
 
   private async saveTouched(sessionId: string, files: string[]): Promise<void> {
+    await mkdir(this.sessionDir(sessionId), { recursive: true });
     await writeFile(this.touchedPath(sessionId), JSON.stringify({ files }, null, 2), "utf8");
   }
 
@@ -155,6 +208,56 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
     if (!touched.includes(path)) {
       touched.push(path);
       await this.saveTouched(sessionId, touched);
+    }
+  }
+
+  private async addGitChangedFiles(sessionId: string, touched: Set<string>): Promise<void> {
+    const workspacePath = this.sessionPath(sessionId);
+    await this.addGitOutput(touched, await runGit(["diff", "--name-only", "HEAD", "--"], workspacePath));
+    await this.addGitOutput(touched, await runGit(["diff", "--cached", "--name-only", "--"], workspacePath));
+    await this.addGitOutput(touched, await runGit(["ls-files", "--others", "--exclude-standard"], workspacePath));
+  }
+
+  private async addGitOutput(touched: Set<string>, result: Awaited<ReturnType<typeof runGit>>): Promise<void> {
+    for (const line of result.stdout.split("\n")) {
+      const path = line.trim();
+      if (path && !path.startsWith(".git/") && path !== ".gittrix-touched.json" && !path.startsWith(".glib/")) {
+        touched.add(normalizePath(path));
+      }
+    }
+  }
+
+  private async saveWorkspaceMetadata(
+    sessionId: string,
+    metadata: { durablePath: string; workspacePath: string; workspaceKind: "worktree" | "clone" }
+  ): Promise<void> {
+    await writeFile(
+      this.workspaceMetadataPath(sessionId),
+      JSON.stringify(
+        {
+          durablePath: normalizePath(metadata.durablePath),
+          workspacePath: normalizePath(metadata.workspacePath),
+          workspaceKind: metadata.workspaceKind
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+  }
+
+  private async loadWorkspaceMetadata(sessionId: string): Promise<null | { durablePath: string; workspaceKind: "worktree" | "clone" | "copy" | "remote" }> {
+    try {
+      const raw = await readFile(this.workspaceMetadataPath(sessionId), "utf8");
+      const parsed = JSON.parse(raw) as { durablePath?: unknown; workspaceKind?: unknown };
+      if (typeof parsed.durablePath !== "string") return null;
+      const workspaceKind =
+        parsed.workspaceKind === "worktree" || parsed.workspaceKind === "clone" || parsed.workspaceKind === "copy" || parsed.workspaceKind === "remote"
+          ? parsed.workspaceKind
+          : "copy";
+      return { durablePath: parsed.durablePath, workspaceKind };
+    } catch {
+      return null;
     }
   }
 }

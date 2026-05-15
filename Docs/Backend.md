@@ -161,7 +161,7 @@ Stored in config dir `keybindings.json`.
 | `DELETE` | `/api/agent/sessions/:id/turn?projectPath=...` | Abort the active turn. |
 | `GET` | `/api/sessions` | List active sessions for the current project. Joins glib session metadata with `gittrix.listSessions()`. |
 | `GET` | `/api/sessions/:id?projectPath=...` | Get session detail and metadata. |
-| `GET` | `/api/sessions/:id/diff?projectPath=...` | Return full unified diff from GitTrix ephemeral vs durable baseline. |
+| `GET` | `/api/sessions/:id/diff?projectPath=...` | Return full unified diff plus changed file metadata from GitTrix ephemeral vs durable baseline. |
 | `POST` | `/api/sessions/:id/promote?projectPath=...` | Promote selected changes to durable. On baseline drift, returns 409 with structured conflict payload. |
 | `POST` | `/api/sessions/:id/evict` | Force-evict the GitTrix session workspace. |
 
@@ -174,13 +174,13 @@ Responsibilities:
 - Create and hold singleton `GitTrix` instances keyed by project, branch, durable provider, and ephemeral provider.
 - Initialize local session root under `<configDir>/gittrix-sessions` or Cloudflare working root under `<configDir>/gittrix-cloudflare-ephemeral`.
 - Expose service API: `startSession`, `getSession`, `diff`, `promote`, `evict`.
-- Persist mapping on `SessionMeta` (`gittrixSessionId`, `ephemeralPath`, `baselineSha`).
+- Persist mapping on `SessionMeta` (`gittrixSessionId`, `ephemeralPath`, `baselineSha`, `isGitBacked`, `workspaceKind`).
 
 ## Surface -> adapter wiring defaults
 
 - Self-host
   - durable: local repo adapter behavior pointed at the user repo
-  - ephemeral: local workspace adapter behavior under `<configDir>/gittrix-sessions/<id>/workspace`
+  - ephemeral: git-backed local worktree under `<configDir>/gittrix-sessions/<id>/workspace`, with clone fallback
   - optional durable: GitHub adapter using the opened repo's `origin` and `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`
   - optional ephemeral: Cloudflare Artifacts adapter using `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 - Desktop (Electron)
@@ -199,12 +199,13 @@ Responsibilities:
 ## Agent integration point
 
 - Agent runtime uses pi RPC subprocesses by default; set `GLIB_PI_RUNTIME=sdk` to use the temporary in-process SDK fallback.
-- `runTurn` executes with cwd set to the session's GitTrix ephemeral path only if it is a git repo; otherwise it falls back to the durable repo path.
+- `runTurn` executes with cwd set to the session's GitTrix ephemeral path only when session metadata says it is git-backed and `.git` exists; otherwise it falls back to the durable repo path.
 - Agent prompts include repo/session metadata so the model can distinguish durable repo, actual cwd, GitTrix ephemeral workspace, and baseline SHA.
 - `/api/agent/*` routes stay thin; `agent-runtime.ts` owns runtime/sandbox lifecycle.
 - If the pi RPC process exits between turns, `agent-runtime.ts` respawns pi inside the existing sandbox path.
 - No tool-call interception route is required for file writes.
 - pi events are normalized into shared `AgentEvent` records for timeline replay and SSE.
+- RPC prompt completion waits for `agent_end`; `turn_end` is only one model/tool cycle and does not end the glib turn.
 - Text chunk `partId`s are monotonic per server process, not wall-clock based, so same-millisecond pi deltas are not dropped by frontend dedupe.
 - Assistant error messages from pi are surfaced as canonical `error` events.
 

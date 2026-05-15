@@ -5,6 +5,10 @@
       <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
         <span class="rounded-md border border-border/80 bg-background/55 px-1.5 py-0.5 text-[10px]">{{ project }}</span>
         <span>{{ branch }}</span>
+        <span class="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background/45 px-1.5 py-0.5 text-[10px]">
+          <span :class="['h-1.5 w-1.5 rounded-full', statusDotClass]" />
+          {{ status }}
+        </span>
       </div>
     </div>
 
@@ -50,11 +54,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { ChevronDown, CloudUpload, GitCompare, List } from 'lucide-vue-next';
 
-defineProps<{ title: string; project: string; branch: string; model: string }>();
+const props = defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' }>();
 const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: [] }>();
+
+const statusDotClass = computed(() => {
+  if (props.status === 'stale') return 'bg-amber-400';
+  if (props.status === 'running') return 'bg-sky-400';
+  if (props.status === 'connecting') return 'bg-violet-400';
+  if (props.status === 'disconnected') return 'bg-zinc-500';
+  return 'bg-emerald-400';
+});
 
 const diffMenuOpen = ref(false);
 const diffMenuRoot = ref<HTMLElement | null>(null);

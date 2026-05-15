@@ -168,7 +168,7 @@ type SessionRow = {
   id: string;
   title: string;
   time: string;
-  status: 'Working' | 'Completed' | 'Stale';
+  status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
   repo: string;
   project: string;
   projectPath: string;
@@ -247,8 +247,11 @@ function toggleProject(projectKey: string) {
 }
 
 function statusDotClass(status: SessionRow['status']) {
-  if (status === 'Stale') return 'bg-amber-400';
-  return status === 'Working' ? 'bg-sky-400' : 'bg-emerald-400';
+  if (status === 'stale') return 'bg-amber-400';
+  if (status === 'running') return 'bg-sky-400';
+  if (status === 'connecting') return 'bg-violet-400';
+  if (status === 'disconnected') return 'bg-zinc-500';
+  return 'bg-emerald-400';
 }
 
 function normalizeRepoLabel(repo: string) {

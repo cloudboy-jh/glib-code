@@ -18,6 +18,8 @@ export type SessionMeta = {
   gittrixSessionId?: string;
   ephemeralPath?: string;
   baselineSha?: string;
+  isGitBacked?: boolean;
+  workspaceKind?: "worktree" | "clone" | "copy" | "remote";
   status: "idle" | "running" | "aborted" | "error" | "done";
   createdAt: string;
   updatedAt: string;
@@ -115,6 +117,8 @@ export async function createSession(params: {
   gittrixSessionId?: string;
   ephemeralPath?: string;
   baselineSha?: string;
+  isGitBacked?: boolean;
+  workspaceKind?: "worktree" | "clone" | "copy" | "remote";
 }) {
   const projectPath = normalizeProjectPath(params.projectPath);
   const id = newSessionId();
@@ -129,6 +133,8 @@ export async function createSession(params: {
     gittrixSessionId: params.gittrixSessionId,
     ephemeralPath: params.ephemeralPath,
     baselineSha: params.baselineSha,
+    isGitBacked: params.isGitBacked,
+    workspaceKind: params.workspaceKind,
     status: "idle",
     createdAt: now,
     updatedAt: now

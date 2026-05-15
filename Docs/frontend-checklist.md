@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-05-06
+Last updated: 2026-05-15
 
 ## API wiring cleanup
 
@@ -29,9 +29,10 @@ Last updated: 2026-05-06
 
 - [x] Fetch and render `/api/sessions/:id/diff` via `@pierre/diffs`.
 - [ ] Add hunk selection UI for promote selectors.
-- [x] Add file selection UI for promote selectors.
+- [x] Add compact header file picker for promote selectors.
 - [x] Trigger `POST /api/sessions/:id/promote` from session UI.
 - [x] Handle 409 baseline conflict response with dedicated modal/state.
+- [x] Keep commit-all available when backend file metadata is missing but diff exists.
 
 ## Diff → session context flow
 
@@ -47,6 +48,7 @@ Last updated: 2026-05-06
 - [x] Stream events via `/api/agent/sessions/:id/stream`.
 - [x] Reduce streamed events into timeline entries.
 - [x] Render tool calls as compact expandable cards.
+- [x] Hide raw tool payloads behind Inspect and render diff outputs with `@pierre/diffs`.
 - [x] Implement abort action using `DELETE /api/agent/sessions/:id/turn`.
 - [x] Differentiate agent setup errors vs GitTrix setup errors in session-start UI.
 - [x] Add quick fallback action to switch GitTrix providers to local/local.
@@ -62,6 +64,7 @@ Last updated: 2026-05-06
 - [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
 - [x] Keep multi-turn streaming stable beyond first turn (no clipped second-turn tail in normal flows).
+- [x] Preserve final assistant answer after tool calls by waiting for pi `agent_end` server-side.
 
 ## Picker home controls
 

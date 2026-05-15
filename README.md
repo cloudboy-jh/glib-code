@@ -34,8 +34,9 @@ Current product surface:
 - Session workspace with timeline, composer, streamed assistant text, errors, and tool-call cards.
 - Agent sessions backed by pi RPC and GitTrix ephemeral workspaces.
 - Provider key management and model selection in Settings.
-- Session diff review before promote.
-- File-level promote from ephemeral workspace back to durable repo.
+- Git-backed local session workspaces using GitTrix worktrees with clone fallback.
+- Session diff review before promote, rendered with `@pierre/diffs`.
+- Commit-all or file-selected promote from ephemeral workspace back to durable repo.
 - Theme and basic app settings.
 
 Planned product surface:
@@ -72,6 +73,7 @@ Runtime boundaries:
 - pi owns provider/model discovery and agent execution.
 - Sandbox owns where pi runs.
 - GitTrix owns durable/ephemeral storage boundaries and promote behavior.
+- pi RPC prompts complete on `agent_end`; glib keeps listening across tool cycles so final assistant text arrives after tool execution.
 
 Provider keys are stored under glib-code's app config, not in the repo:
 

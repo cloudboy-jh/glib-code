@@ -17,9 +17,9 @@ glib-code is an isolated AI coding workspace centered on this loop:
 
 ## Current reality
 
-- Agent runtime is moving to pi as an RPC subprocess in a sandbox. The in-process SDK path is a temporary parity fallback.
-- Session isolation is handled by GitTrix local workspaces.
-- Agent session routes resolve by server-owned `sessionId` metadata, not browser-provided project paths.
+- Agent runtime uses pi as an RPC subprocess in a sandbox. The in-process SDK path remains a temporary fallback.
+- Session isolation is handled by GitTrix local worktree/clone workspaces.
+- Agent session routes resolve by stored `sessionId` metadata plus explicit `projectPath` fallback, not process-global project state alone.
 - Provider/model capability authority is pi.
 - glib-code stores user-entered provider keys in its own app config dir, not another tool's auth store.
 - Promote is explicit via session APIs and returns structured conflicts on baseline drift.
@@ -93,7 +93,7 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 - Settings + keybindings persistence
 - Model picker + provider key management
 - Session timeline with streamed assistant text, errors, and compact tool-call cards
-- Session diff review and file-level promote
+- Session diff review and commit-all/file-selected promote
 - Readiness and health endpoints
 
 ## Source of truth docs
@@ -110,12 +110,12 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitT
 
 ## Build order
 
-1. Sandbox + pi RPC runtime parity.
+1. Live session smoke validation (`Docs/session-smoke-test.md`).
 2. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
 3. Attachments API and frontend upload/reference flow.
 4. Git mutation routes parity (`stage/unstage/commit/push/pull/checkout`).
 5. Hunk-level session promote selection.
-6. Reliability pass: route tests, error envelopes, restart recovery checks.
+6. Reliability pass: live-agent tests, restart recovery checks, multi-tab behavior.
 7. Cloudflare Artifacts adapter hardening once GitTrix backend support lands.
 
 ## Out of scope (v1)

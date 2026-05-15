@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { cp, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { GitTrix } from "gittrix/packages/core/src/gittrix.js";
 import { BaselineConflictError } from "gittrix/packages/core/src/errors.js";
 import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, UserSession } from "gittrix/packages/core/src/types.js";
@@ -12,6 +12,8 @@ export type StartGitTrixSessionResult = {
   gittrixSessionId: string;
   ephemeralPath: string;
   baselineSha: string;
+  isGitBacked: boolean;
+  workspaceKind: "worktree" | "clone" | "copy" | "remote";
 };
 
 export type BaselineConflict = {
@@ -123,24 +125,22 @@ function ephemeralWorkspacePath(provider: Settings["ephemeralProvider"], session
   return join(provider === "local" ? sessionsRoot() : cloudflareEphemeralRoot(), sessionId, provider === "local" ? "workspace" : "");
 }
 
-async function hydrateEphemeralWorkspace(projectPath: string, ephemeralPath: string) {
-  await mkdir(ephemeralPath, { recursive: true });
-  await cp(projectPath, ephemeralPath, {
-    recursive: true,
-    force: true,
-    errorOnExist: false,
-    filter: (source) => {
-      const normalized = source.replace(/\\/g, "/");
-      if (normalized.endsWith("/.git") || normalized.includes("/.git/")) return false;
-      if (normalized.endsWith("/.glib") || normalized.includes("/.glib/")) return false;
-      return true;
-    }
-  });
-}
-
 async function getUserSession(projectPath: string, gittrixSessionId: string, branch?: string): Promise<UserSession> {
   const rt = await getRuntime(projectPath, branch);
   return rt.getSession(gittrixSessionId);
+}
+
+async function readLocalWorkspaceKind(sessionId: string): Promise<"worktree" | "clone" | "copy" | "remote"> {
+  try {
+    const raw = await readFile(join(sessionsRoot(), sessionId, "workspace.json"), "utf8");
+    const parsed = JSON.parse(raw) as { workspaceKind?: unknown };
+    if (parsed.workspaceKind === "worktree" || parsed.workspaceKind === "clone" || parsed.workspaceKind === "copy" || parsed.workspaceKind === "remote") {
+      return parsed.workspaceKind;
+    }
+  } catch {
+    // Older/non-local sessions do not have local workspace metadata.
+  }
+  return "copy";
 }
 
 export async function startSession(params: { projectPath: string; task: string; branch?: string }): Promise<StartGitTrixSessionResult> {
@@ -150,11 +150,13 @@ export async function startSession(params: { projectPath: string; task: string; 
   const all = await rt.listSessions();
   const meta = all.find((item) => item.id === session.id);
   const fallbackPath = ephemeralWorkspacePath(settings.ephemeralProvider, session.id);
-  await hydrateEphemeralWorkspace(params.projectPath, fallbackPath);
+  const workspaceKind = settings.ephemeralProvider === "local" ? await readLocalWorkspaceKind(session.id) : "remote";
   return {
     gittrixSessionId: session.id,
     ephemeralPath: fallbackPath || normalizeLocalRef(meta?.ephemeralRef),
-    baselineSha: meta?.baselineSha ?? ""
+    baselineSha: meta?.baselineSha ?? "",
+    isGitBacked: settings.ephemeralProvider === "local" ? workspaceKind === "worktree" || workspaceKind === "clone" : false,
+    workspaceKind
   };
 }
 

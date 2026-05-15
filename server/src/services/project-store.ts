@@ -104,3 +104,9 @@ export function setProjectOverride(projectId: string, override: ProjectOverride)
 export function getProjectOverride(projectId: string) {
   return store.projectOverrides.get(projectId) ?? null;
 }
+
+export function resetProjectStoreForTests() {
+  store.currentProjectId = null;
+  store.projectsById.clear();
+  store.projectOverrides.clear();
+}

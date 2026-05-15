@@ -6,41 +6,37 @@
 - Backend session lookup is centralized in `server/src/services/session-resolver.ts`.
 - Stream/send infrastructure errors are shown as session notices instead of repeated timeline cards.
 - Stale sessions get a recovery banner with Reload sessions and New replacement actions.
-- Agent cwd falls back to the durable repo when the GitTrix ephemeral workspace is not a git repo.
+- New local sessions use a git-backed GitTrix ephemeral workspace for agent cwd; old/non-git sessions still fall back to durable repo cwd.
+
+## Completed For This Pass
+
+- Replaced `.git`-less local GitTrix ephemeral copies with git-backed workspaces.
+  - Prefer local git worktree.
+  - Fall back to local clone per session.
+  - Agent cwd returns to the ephemeral workspace only when session metadata says it is git-backed and `.git` exists.
+- Added session resolver regression coverage for index lookup, explicit `projectPath`, stale index cleanup, and agent cwd fallback.
+- Added route coverage for explicit `projectPath` resolution on session get/patch/send/abort/diff/promote/evict paths.
+- Added clearer client session states and per-session composer drafts.
+- Stream disconnects now verify session availability before marking a session stale.
+- Standardized session/agent route error envelopes with `ok`, `code`, `message`, and `retryable` fields on handled failures.
+- Fixed pi RPC prompt completion to wait for `agent_end` instead of `turn_end`, preserving final assistant text after tool calls.
+- Updated promote diff API/UI so changed file metadata comes from the backend and users can commit all or selected files from the modal.
 
 ## Remaining P0
 
-- Replace `.git`-less local GitTrix ephemeral copies with git-backed workspaces.
-  - Prefer local git worktree if compatible with GitTrix promote semantics.
-  - Otherwise use a local clone per session.
-  - Agent cwd should return to the ephemeral workspace only when git commands work there.
-- Add server regression tests for session resolver behavior:
-  - resolve by session index
-  - resolve by explicit `projectPath`
-  - recover when index is missing/stale
-  - return one clean 404 for truly missing sessions
-- Add stream lifecycle tests/manual checks:
+- Add stream lifecycle manual checks:
   - refresh app during an active session
   - restart backend and send again
   - switch project and return
   - verify stream replay and no duplicate timeline entries
-- Add route tests for send/stream/abort/diff/promote with `projectPath` query/body.
+- Add full live-agent route validation for successful send/stream/abort/diff/promote with `projectPath` query/body.
 
 ## Remaining P1
 
-- Promote session status from local UI state into a clearer model:
-  - connected
-  - connecting
-  - disconnected
-  - stale
-  - running
-- Show compact session status in `SessionHeader` and sidebar rows.
 - Add recovery behavior for backend restart:
   - reconnect stream after hydrate
   - keep active session if metadata exists
   - clear active session only when resolver confirms it is gone
-- Keep composer draft per session, not globally.
-- Standardize route error payloads across `/api/agent/*` and `/api/sessions/*`.
 
 ## Remaining P2
 
@@ -68,6 +64,8 @@
 - Do not route git-aware agent turns into `.git`-less ephemeral directories.
 
 ## Validation Checklist
+
+Short version lives in `Docs/session-smoke-test.md`.
 
 - Create a session from a repo and ask `git status` / `git remote -v`.
 - Refresh the app and send another message to the same session.

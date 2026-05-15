@@ -78,5 +78,10 @@ No hosted browser OAuth sign-in/onboarding path should be documented as shipped 
 ## GitTrix session storage
 
 - Ephemeral session workspaces live under `<configDir>/gittrix-sessions/`.
-- Agent writes stay in the ephemeral workspace until the user promotes selected changes.
+- Local ephemeral session workspaces are git-backed worktrees with clone fallback.
+- Agent writes stay in the ephemeral workspace until the user commits all or selected changes through promote.
 - Hosted sandboxes install pi inside the sandbox automatically; hosted deployment/sync is not shipped yet.
+
+## Local session validation
+
+Before calling local sessions ready, run the short checklist in `Docs/session-smoke-test.md`.

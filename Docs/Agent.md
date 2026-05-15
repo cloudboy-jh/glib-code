@@ -1,10 +1,10 @@
 # Agent Integration
 
-Last updated: 2026-05-12
+Last updated: 2026-05-15
 
 ## Runtime model
 
-- Agent execution is moving to pi RPC over LF-delimited JSONL instead of calling pi as an in-process SDK.
+- Agent execution uses pi RPC over LF-delimited JSONL by default instead of calling pi as an in-process SDK.
 - `server/src/services/agent-runtime.ts` owns runtime turn execution and SSE fanout.
 - `server/src/services/session-resolver.ts` owns hardened session-id plus project-path lookup for agent/session routes.
 - `server/src/services/pi-rpc.ts` owns pi's stdin/stdout protocol only.
@@ -20,10 +20,10 @@ Last updated: 2026-05-12
 ## Session isolation model
 
 - Each glib session is paired with a GitTrix session.
-- GitTrix returns `ephemeralPath`; local RPC sessions run pi there only when that path is a git repo.
-- Until local ephemeral workspaces are git-backed, agent cwd falls back to the durable repo path so shell git commands do not fail with `not a git repository`.
-- Agent prompts include session repo metadata: durable path, actual cwd, GitTrix ephemeral workspace, and baseline SHA.
-- Agent writes may currently land in the durable repo when cwd falls back. GitTrix promote still owns the accepted-change path; git-backed ephemeral workspaces are the remaining architecture fix.
+- GitTrix returns `ephemeralPath`; local RPC sessions run pi there only when session metadata says it is git-backed and `.git` exists.
+- Local GitTrix ephemeral workspaces are git-backed using detached worktrees with clone fallback.
+- Old/non-git sessions still fall back to the durable repo path so shell git commands do not fail with `not a git repository`.
+- Agent prompts include session repo metadata: durable path, actual cwd, GitTrix ephemeral workspace, workspace kind, git-backed state, and baseline SHA.
 - Accepted changes move to durable only through explicit promote.
 - GitTrix interfaces/adapters are unchanged by the RPC runtime work.
 - Session-scoped agent actions resolve through `sessionId` plus the active session `projectPath`. The session index is still used first, but project path is sent to prevent stream/send 404s after reloads, project switches, or stale index state.
@@ -35,6 +35,8 @@ Last updated: 2026-05-12
 - Unicode line/paragraph separator characters inside JSON strings do not split events.
 - Commands are written to stdin as JSONL through a serialized write queue.
 - Current default invocation is `pi --mode rpc --no-session`; override with `GLIB_PI_RPC_CMD` and `GLIB_PI_RPC_ARGS` if needed.
+- `pi-rpc.ts` treats `agent_end` as the completion signal for a prompt. `turn_end` is only one model/tool cycle and must not resolve the prompt early.
+- `agent-runtime.ts` also extracts final assistant text from `agent_end.messages` if streaming deltas did not deliver it.
 
 ## Provider auth flow
 
@@ -83,7 +85,6 @@ Text chunk events use collision-proof part IDs. Do not derive `text_part.partId`
 ## Active gaps
 
 - Finish authenticated prompt/abort smoke coverage against an installed pi binary.
-- Add regression coverage for duplicate session creation, session stream reconnect/stale behavior, and session-id plus project-path lookup.
-- Replace `.git`-less ephemeral copies with git-backed local worktrees/clones so agent cwd can return to the GitTrix workspace without breaking git tools.
+- Add regression coverage for duplicate session creation and session stream reconnect/stale behavior.
 - Complete real Cloudflare Sandbox integration once hosted deployment work starts.
 - Add hosted sync between sandbox filesystem and Cloudflare Artifacts before promote, unless a native mount path is verified.

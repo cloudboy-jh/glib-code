@@ -156,6 +156,22 @@ function suffixFromFinal(streamed: string, finalText: string) {
   return finalText.slice(i);
 }
 
+function extractLastAssistantText(messages: unknown) {
+  if (!Array.isArray(messages)) return "";
+  for (const message of [...messages].reverse()) {
+    const text = extractMessageText(message);
+    if (text.trim()) return text;
+  }
+  return "";
+}
+
+function redactSecrets(value: string) {
+  return value
+    .replace(/([A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTH)[A-Z0-9_]*\s*[=:]\s*)(["']?)[^"'\s]+\2/gi, "$1$2[redacted]$2")
+    .replace(/\b(?:sk|pk|rk|ghp|gho|github_pat|glpat|xox[baprs])-[A-Za-z0-9_\-]{12,}\b/g, "[redacted]")
+    .replace(/\b[A-Za-z0-9_\-]{32,}\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}\b/g, "[redacted]");
+}
+
 function rememberError(turnId: string, message: string): AgentEvent | null {
   if (errorEmittedByTurn.has(turnId)) return null;
   errorEmittedByTurn.add(turnId);
@@ -293,6 +309,14 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     if (errorMessage) return rememberError(turnId, errorMessage);
     return null;
   }
+  if (event.type === "agent_end") {
+    const finalText = extractLastAssistantText((event as any).messages);
+    if (!finalText) return null;
+    const key = currentMessageKey(turnId);
+    const streamed = streamedTextByMessage.get(key) ?? "";
+    const delta = suffixFromFinal(streamed, finalText);
+    return delta ? rememberText(turnId, delta, key) : null;
+  }
   if (event.type === "message_start") {
     const message = (event as any).message;
     if (!isAssistantMessage(message)) return null;
@@ -305,6 +329,7 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     const finalText = extractMessageText((event as any).message);
     const key = currentMessageKey(turnId);
     const streamed = streamedTextByMessage.get(key) ?? "";
+    if (streamed) return null;
     const delta = suffixFromFinal(streamed, finalText);
     return delta ? rememberText(turnId, delta, key) : null;
   }
@@ -340,7 +365,7 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
       tool: toolCall.tool,
       title: toolCall.title,
       input: toolCall.input,
-      output: JSON.stringify(event.result ?? {}),
+      output: redactSecrets(JSON.stringify(event.result ?? {})),
       metadata: { isError: event.isError },
       durationMs: 0,
       at: nowIso()
