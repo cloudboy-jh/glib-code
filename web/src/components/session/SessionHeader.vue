@@ -47,7 +47,7 @@
       </button>
       <button class="header-button header-button-primary" @click="$emit('gitAction')">
         <CloudUpload class="header-icon" />
-        <span>Commit + Push</span>
+        <span>{{ gitActionLabel }}</span>
       </button>
     </div>
   </header>
@@ -58,7 +58,9 @@ import { computed } from 'vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { ChevronDown, CloudUpload, GitCompare, List } from 'lucide-vue-next';
 
-const props = defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' }>();
+const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string }>(), {
+  gitActionLabel: 'Commit'
+});
 const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: [] }>();
 
 const statusDotClass = computed(() => {

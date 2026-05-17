@@ -40,7 +40,7 @@ async function buildDiffsContext(prompt: string, projectPath?: string) {
 
 async function buildAgentPrompt(prompt: string, context?: string, projectPath?: string) {
   const chunks = [
-    "Response rules: after using tools, always provide a concise final answer. Do not dump raw tool JSON, full diffs, or secret values into prose; summarize results and refer to files/changes by path.",
+    "Response rules: after using tools, always provide a concise final answer. Do not dump raw tool JSON, full diffs, or secret values into prose; summarize results and refer to files/changes by path. When editing files, do not add provenance comments, signatures, branding markers, or notes like \"edited by glib-code/gittrix/session\" unless the user explicitly asks for that text.",
     prompt
   ];
   const trimmedContext = context?.trim();

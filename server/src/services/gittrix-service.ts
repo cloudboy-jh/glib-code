@@ -7,6 +7,7 @@ import { GitHubDurableAdapter, CloudflareArtifactsEphemeralAdapter } from "./git
 import { LocalDurableAdapter, LocalEphemeralAdapter } from "./gittrix-local-adapter";
 import { getConfigDir } from "../lib/paths";
 import { getSettings, type Settings } from "./settings-store";
+import { getStoredGitHubToken } from "./github-auth";
 
 export type StartGitTrixSessionResult = {
   gittrixSessionId: string;
@@ -104,6 +105,8 @@ async function getRemoteUrl(projectPath: string) {
 }
 
 export async function getGitHubToken() {
+  const storedToken = await getStoredGitHubToken();
+  if (storedToken) return storedToken;
   const envToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (envToken) return envToken;
   const proc = Bun.spawn({ cmd: ["gh", "auth", "token"], stdout: "pipe", stderr: "pipe" });

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
-import { gitBranches, gitLog, gitStatus } from "../services/git";
+import { gitBranches, gitLog, gitPush, gitStash, gitStatus } from "../services/git";
 
 const notImplemented = (c: any) => c.json({ ok: false, message: "not implemented" }, 501);
+const routeError = (message: string, code: string, retryable = false) => ({ ok: false, code, message, retryable });
 
 export const gitRoutes = new Hono()
   .get("/status", async (c) => {
@@ -13,7 +14,28 @@ export const gitRoutes = new Hono()
   .post("/unstage", notImplemented)
   .post("/discard", notImplemented)
   .post("/commit", notImplemented)
-  .post("/push", notImplemented)
+  .post("/push", async (c) => {
+    try {
+      const result = await gitPush();
+      if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
+      return c.json(result);
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code;
+      if (code === "NO_UPSTREAM") return c.json(routeError(error instanceof Error ? error.message : "no upstream", "NO_UPSTREAM"), 409);
+      if (code === "DETACHED_HEAD") return c.json(routeError(error instanceof Error ? error.message : "detached head", "DETACHED_HEAD"), 409);
+      return c.json(routeError(error instanceof Error ? error.message : "push failed", "PUSH_FAILED", true), 500);
+    }
+  })
+  .post("/stash", async (c) => {
+    const body = await c.req.json().catch(() => null) as { message?: string } | null;
+    try {
+      const result = await gitStash(body?.message);
+      if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
+      return c.json(result);
+    } catch (error) {
+      return c.json(routeError(error instanceof Error ? error.message : "stash failed", "STASH_FAILED", true), 500);
+    }
+  })
   .post("/pull", notImplemented)
   .get("/branches", async (c) => {
     const branches = await gitBranches();

@@ -3,6 +3,8 @@ import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta 
 import { getCurrentProjectId, getProjectById } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
+import { logError } from "../lib/log";
+import { getSettings } from "../services/settings-store";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -22,6 +24,28 @@ function filesFromPatch(patch: string) {
     if (file && file !== "/dev/null") files.add(file);
   }
   return [...files].filter(Boolean);
+}
+
+async function durableDirtyFiles(projectPath: string) {
+  const proc = Bun.spawn({ cmd: ["git", "status", "--porcelain=v1"], cwd: projectPath, stdout: "pipe", stderr: "pipe" });
+  const code = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+  if (code !== 0) return null;
+  const files = new Set<string>();
+  for (const line of stdout.split("\n")) {
+    if (!line.trim()) continue;
+    const raw = line.slice(3).trim();
+    const renamed = raw.includes(" -> ") ? raw.split(" -> ").pop() : raw;
+    const normalized = renamed?.replace(/\\/g, "/");
+    if (normalized && normalized !== ".glib" && !normalized.startsWith(".glib/")) files.add(normalized);
+  }
+  return [...files].sort((a, b) => a.localeCompare(b));
+}
+
+function dirtyFilesForSelector(files: string[], selector: { mode: "all" } | { mode: "files"; files: string[] }) {
+  if (selector.mode === "all") return files;
+  const selected = new Set(selector.files.map((file) => file.replace(/\\/g, "/")));
+  return files.filter((file) => selected.has(file));
 }
 
 export const sessionsRoutes = new Hono()
@@ -65,8 +89,19 @@ export const sessionsRoutes = new Hono()
     if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
     if (!doc.meta.gittrixSessionId) return c.json(routeError("session has no gittrix mapping", "SESSION_NO_GITTRIX_MAPPING"), 400);
     const project = getProjectById(doc.meta.projectId);
-    const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
-    return c.json({ diff: patch, files: filesFromPatch(patch) });
+    try {
+      const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
+      return c.json({ diff: patch, files: filesFromPatch(patch) });
+    } catch (error) {
+      logError("server", "session diff failed", error, {
+        sessionId: doc.meta.id,
+        gittrixSessionId: doc.meta.gittrixSessionId,
+        projectPath,
+        ephemeralPath: doc.meta.ephemeralPath,
+        workspaceKind: doc.meta.workspaceKind
+      });
+      return c.json(routeError(error instanceof Error ? error.message : "session diff failed", "DIFF_FAILED", true), 500);
+    }
   })
   .post("/:id/promote", async (c) => {
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
@@ -82,6 +117,26 @@ export const sessionsRoutes = new Hono()
     } | null;
 
     if (!body?.selector) return c.json(routeError("selector required", "SELECTOR_REQUIRED"), 400);
+
+    const settings = await getSettings();
+    if (settings.durableProvider === "local") {
+      const dirty = await durableDirtyFiles(projectPath!);
+      const blockedFiles = dirty ? dirtyFilesForSelector(dirty, body.selector) : [];
+      if (blockedFiles.length) {
+        return c.json(
+          {
+            ok: false,
+            code: "DURABLE_REPO_DIRTY",
+            message: body.selector.mode === "all"
+              ? "durable repo has uncommitted changes; stash or commit them before committing session changes"
+              : "selected files have uncommitted durable repo changes; stash or commit them before committing session changes",
+            files: blockedFiles,
+            retryable: true
+          },
+          409
+        );
+      }
+    }
 
     try {
       const result = await gittrixService.promote(
@@ -106,6 +161,13 @@ export const sessionsRoutes = new Hono()
           409
         );
       }
+      logError("server", "session promote failed", error, {
+        sessionId: doc.meta.id,
+        gittrixSessionId: doc.meta.gittrixSessionId,
+        projectPath,
+        ephemeralPath: doc.meta.ephemeralPath,
+        workspaceKind: doc.meta.workspaceKind
+      });
       return c.json(routeError(error instanceof Error ? error.message : "promote failed", "PROMOTE_FAILED", true), 500);
     }
   })

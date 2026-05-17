@@ -134,6 +134,26 @@
 
             <div class="rounded-xl border border-border/70 bg-background/35 p-4">
               <SettingsOptionGroup title="Durable provider" :options="durableOptions" @select="(id) => $emit('update:gittrix-provider', 'durableProvider', id)" />
+              <div class="mt-3 rounded-lg border border-border/60 bg-background/45 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <img v-if="githubConnected && githubAvatarUrl" :src="githubAvatarUrl" alt="" class="h-9 w-9 rounded-full border border-border/70" />
+                    <div v-else class="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-background/60 text-xs font-semibold text-muted-foreground">GH</div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium">GitHub account</p>
+                      <p class="mt-1 truncate text-xs text-muted-foreground">{{ githubConnected ? `Signed in as ${githubAccount || 'GitHub user'}` : 'Sign in to commit and push with GitHub.' }}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <UiButton v-if="!githubConnected" size="sm" variant="outline" :disabled="githubSigningIn" @click="$emit('connect-github')">{{ githubSigningIn ? 'Signing in…' : 'Sign in with GitHub' }}</UiButton>
+                    <UiButton v-else size="sm" variant="outline" @click="$emit('disconnect-github')">Disconnect</UiButton>
+                  </div>
+                </div>
+                <div v-if="githubUserCode" class="mt-3 rounded-md border border-border/60 bg-background/50 p-2 text-xs text-muted-foreground">
+                  Enter <span class="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-semibold tracking-wide text-foreground">{{ githubUserCode }}</span> at <a class="underline underline-offset-2" :href="githubVerificationUri" target="_blank" rel="noreferrer">{{ githubVerificationUri }}</a>.
+                </div>
+                <div v-if="githubError" class="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">{{ githubError }}</div>
+              </div>
               <SettingsOptionGroup class="mt-5" title="Ephemeral provider" :options="ephemeralOptions" @select="(id) => $emit('update:gittrix-provider', 'ephemeralProvider', id)" />
               <SettingsOptionGroup class="mt-5" title="Promote strategy" :options="promoteOptions" @select="(id) => $emit('update:gittrix-provider', 'promoteStrategy', id)" />
             </div>
@@ -192,6 +212,11 @@ const props = defineProps<{
   providers: Provider[];
   githubConnected: boolean;
   githubAccount?: string;
+  githubAvatarUrl?: string;
+  githubSigningIn?: boolean;
+  githubUserCode?: string;
+  githubVerificationUri?: string;
+  githubError?: string;
   defaultOpenMode: 'diff' | 'session';
   initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
 }>();
@@ -212,7 +237,7 @@ const sortedProviders = computed(() => [...props.providers].sort((a, b) => Numbe
 
 const durableOptions = computed<GitTrixOption[]>(() => [
   { id: 'local', label: 'Local repo', available: true, selected: props.settings.durableProvider === 'local' },
-  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github', detail: [`Account: ${props.githubConnected ? (props.githubAccount ? `@${props.githubAccount}` : 'Connected account unknown') : 'Not connected'}`, 'Auth source: gh auth, GITHUB_TOKEN, or GH_TOKEN.'] },
+  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github', detail: [props.githubConnected ? `Signed in as ${props.githubAccount || 'GitHub user'}` : 'Sign in below to enable GitHub commits and pushes.'] },
   { id: 'gitlab', label: 'GitLab', available: false, selected: false },
   { id: 'git-remote', label: 'Git remote', available: false, selected: false },
   { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
@@ -245,6 +270,7 @@ const emit = defineEmits<{
   'update:open-mode': [value: 'diff' | 'session'];
   'update:gittrix-provider': [key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string];
   'connect-github': [];
+  'disconnect-github': [];
   'open-gittrix': [];
   'open-model-picker': [];
   'provider:add-auth': [providerId: string, apiKey: string];
@@ -277,7 +303,7 @@ const SettingsOptionGroup = defineComponent({
           ]),
           h('span', { class: ['shrink-0 text-[11px]', option.selected ? 'text-primary' : 'text-muted-foreground'] }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming soon')
         ]),
-        option.selected && option.detail?.length ? h('div', { class: 'ml-11 grid gap-1 rounded-md border border-border/60 bg-background/45 p-2 text-[11px] text-muted-foreground' }, option.detail.map((line) => h('div', { class: 'font-mono' }, line))) : null
+        option.selected && option.detail?.length ? h('div', { class: 'ml-11 grid gap-1 rounded-md border border-border/60 bg-background/45 p-2 text-[11px] text-muted-foreground' }, option.detail.map((line) => h('div', line))) : null
       ]));
 
       return h('div', { class: 'space-y-2' }, [

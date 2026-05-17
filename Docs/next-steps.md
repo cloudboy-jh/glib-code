@@ -1,6 +1,6 @@
 # Next Steps
 
-Last updated: 2026-05-15
+Last updated: 2026-05-17
 
 ## Current shipped local loop
 
@@ -12,15 +12,17 @@ Last updated: 2026-05-15
 - Keep session send/stream/abort/hydrate/diff/promote actions scoped to `sessionId` plus active `projectPath` so reloads, project switches, and stale index state do not strand valid sessions.
 - Preserve streamed assistant text chunks with collision-proof event IDs.
 - Review session diffs and commit all or selected files back to the durable repo.
+- Sign in with GitHub via device OAuth, select GitHub durable storage, and promote session changes as pushed commits.
+- Local durable promote supports dirty-repo protection, stash-and-continue, and local push when the branch has an upstream.
 
 ## Immediate priority order
 
-1. Live session smoke validation across create/send/tool/final-answer/diff/promote/reload/restart.
-2. Terminal WebSocket transport (`/api/term`).
-3. Attachments API + frontend integration (`/api/attachments`).
-4. Git mutation route completion under `/api/git`.
-5. Redesigned hunk/file context selection that does not compromise diff readability.
-6. GitTrix provider credential UX inside Settings cards (GitHub connect + Cloudflare inputs).
+1. UI/UX polish for the commit modal and Settings → GitTrix cards now that the GitHub durable smoke path works.
+2. Finish live session smoke validation for reload/restart recovery after successful GitHub durable promote.
+3. Terminal WebSocket transport (`/api/term`).
+4. Attachments API + frontend integration (`/api/attachments`).
+5. Remaining git mutation routes under `/api/git` (stage/unstage/discard/pull/checkout).
+6. Redesigned hunk/file context selection that does not compromise diff readability.
 
 ## Completed recently
 
@@ -57,6 +59,13 @@ Last updated: 2026-05-15
 - Added session resolver and session route regression coverage for explicit `projectPath` and stale index behavior.
 - Updated promote diff API to return changed file metadata and updated the modal to support full-width review plus commit-all/selected flows.
 - Added `Docs/session-smoke-test.md` as the short live validation checklist.
+- Added GitHub device OAuth sign-in from Settings and app-managed GitHub token storage.
+- Updated GitHub durable promote to use the app-managed token before env/`gh` fallbacks.
+- Fixed GitHub durable + local ephemeral session start by fetching the remote baseline SHA before creating the local worktree/clone.
+- Completed the live GitHub durable smoke path through session start, README edit, diff review, commit, push, and GitHub verification.
+- Added structured session diff/promote errors and dirty durable repo blockers.
+- Added local stash-and-continue plus local push support for upstream-backed local repos.
+- Added route coverage for session promote errors, dirty repo blocking, git stash/push, and GitHub auth config failures.
 
 ## 1) Sandbox + pi RPC runtime
 
@@ -78,7 +87,8 @@ Last updated: 2026-05-15
 
 ## 4) Git mutations
 
-- Complete missing stage/unstage/discard/commit/push/pull/checkout endpoints.
+- Complete remaining stage/unstage/discard/pull/checkout endpoints.
+- Keep local commit/push behavior routed through GitTrix promote for session changes.
 - Align frontend command actions to real route behavior.
 - Ensure destructive actions have explicit confirmation/error surfaces.
 
@@ -99,4 +109,10 @@ Last updated: 2026-05-15
 ## 7) Cloudflare Artifacts adapter
 
 - Harden Cloudflare Artifacts error UX around missing account/token environment.
-- Add hosted browser OAuth for GitHub instead of relying on local `gh`/token auth.
+
+## 8) GitTrix UI polish
+
+- Replace the current commit success overlay with a cleaner success receipt and clearer next action.
+- Refine GitHub account/settings visuals now that avatar/account data is available.
+- Make provider combinations and capabilities obvious before session start.
+- Improve copy around local stash, local push, GitHub durable push, and no-upstream states.

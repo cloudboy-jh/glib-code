@@ -32,6 +32,7 @@
           :branch="currentProject.branch"
           :model="selectedModelLabel"
           :status="activeSession?.status ?? 'disconnected'"
+          :git-action-label="promoteActionLabel"
           @diff-current="openCurrentSessionDiff"
           @diff-commits="openCommitsListDiff"
           @open-model="state.modelPickerOpen = true"
@@ -157,6 +158,11 @@
       :providers="providerCapabilities.providers"
       :github-connected="authState.githubConnected"
       :github-account="authState.githubAccount"
+      :github-avatar-url="authState.githubAvatarUrl"
+      :github-signing-in="authState.githubSigningIn"
+      :github-user-code="authState.githubUserCode"
+      :github-verification-uri="authState.githubVerificationUri"
+      :github-error="authState.githubError"
       :default-open-mode="settings.defaultOpenMode"
       :initial-tab="state.settingsTab"
       @close="state.settingsOpen = false"
@@ -167,6 +173,7 @@
                 @update:open-mode="settings.defaultOpenMode = $event"
                 @update:gittrix-provider="updateGitTrixProvider"
                 @connect-github="connectGitHub"
+                @disconnect-github="disconnectGitHub"
                 @open-gittrix="openGitTrixFromSettings"
                 @open-model-picker="state.modelPickerOpen = true"
                 @provider:add-auth="saveProviderAuth"
@@ -235,8 +242,8 @@
       <div class="flex h-full max-h-[calc(100vh-2rem)] w-full max-w-[min(1500px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40 sm:max-h-[calc(100vh-3rem)]">
         <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
           <div>
-            <div class="text-sm font-medium">Session diff and promote</div>
-            <div class="mt-0.5 text-[11px] text-muted-foreground">{{ promoteSelectionLabel }} · Local repo → Local workspace · Commit promote</div>
+            <div class="text-sm font-medium">Session diff and commit</div>
+            <div class="mt-0.5 text-[11px] text-muted-foreground">{{ promoteSelectionLabel }} · {{ promoteFlowLabel }}</div>
           </div>
           <div class="flex items-center gap-2">
             <div v-if="promote.files.length > 1" ref="promoteFileMenuRef" class="relative">
@@ -264,16 +271,34 @@
         </div>
         <div class="min-h-0 flex-1 overflow-hidden p-3">
             <div v-if="promote.loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
+            <div v-else-if="promote.error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">
+              <div class="max-w-xl">
+                <div>{{ promote.error }}</div>
+                <div v-if="promote.dirtyFiles.length" class="mt-3 max-h-40 overflow-auto rounded border border-red-200/20 bg-black/15 p-2 text-left font-mono text-[11px] text-red-50/85">
+                  <div v-for="file in promote.dirtyFiles" :key="file" class="truncate">{{ file }}</div>
+                </div>
+                <button v-if="promote.dirtyFiles.length" class="mt-4 rounded-md border border-red-200/30 bg-red-100/10 px-3 py-1.5 text-xs font-semibold text-red-50 hover:bg-red-100/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="promote.stashing" @click="stashAndRetryPromote">
+                  {{ promote.stashing ? 'Stashing…' : 'Stash and continue' }}
+                </button>
+              </div>
+            </div>
+            <div v-else-if="promote.result" class="grid h-full place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-sm text-emerald-100">
+              <div>
+                <div class="font-medium">{{ promoteResultTitle }}</div>
+                <div class="mt-1 text-xs text-emerald-100/75">{{ promote.result.branch }} @ {{ promote.result.sha.slice(0, 7) }}</div>
+                <div v-if="promote.pushResult" class="mt-1 text-xs text-emerald-100/75">Pushed {{ promote.pushResult.upstream }} @ {{ promote.pushResult.sha.slice(0, 7) }}</div>
+              </div>
+            </div>
             <div v-else-if="!promote.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
             <DiffView v-else :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
         </div>
         <div class="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card/98 px-4 py-3">
           <div class="text-xs text-muted-foreground">
-            {{ promote.loading ? 'Loading session diff…' : promoteSelectionLabel }}
+            {{ promoteStatusLabel }}
           </div>
           <div class="flex items-center gap-2">
           <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.promoteDialogOpen = false">Cancel</button>
-            <button class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promote.loading || !promote.diff.trim()" @click="confirmPromote">{{ promoteCommitLabel }}</button>
+            <button class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promoteCommitDisabled" @click="confirmPromote">{{ promoteCommitLabel }}</button>
           </div>
         </div>
       </div>
@@ -431,7 +456,19 @@ const settings = reactive({
 
 const authState = reactive({
   githubConnected: false,
-  githubAccount: ''
+  githubAccount: '',
+  githubAvatarUrl: '',
+  githubSigningIn: false,
+  githubUserCode: '',
+  githubVerificationUri: '',
+  githubError: ''
+});
+
+const gitState = reactive({
+  canPush: false,
+  upstream: '',
+  remote: '',
+  branch: ''
 });
 
 const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: ProviderCapability[] }>({
@@ -472,6 +509,13 @@ const state = reactive({
 const promote = reactive({
   diff: '',
   loading: false,
+  submitting: false,
+  stashing: false,
+  pushing: false,
+  error: '',
+  dirtyFiles: [] as string[],
+  result: null as null | { sha: string; branch: string; prUrl?: string },
+  pushResult: null as null | { remote: string; branch: string; upstream: string; sha: string },
   files: [] as string[],
   selectedFiles: [] as string[],
   fileMenuOpen: false
@@ -597,8 +641,34 @@ const promoteSelectionButtonLabel = computed(() => {
   return `${promote.selectedFiles.length} selected`;
 });
 const promoteCommitLabel = computed(() => {
+  if (promote.pushing) return 'Pushing…';
+  if (promote.submitting) return 'Committing…';
+  if (promote.result) return promote.pushResult ? 'Committed and pushed' : 'Committed';
   if (!promoteHasExplicitFiles.value || promote.selectedFiles.length === promote.files.length) return 'Commit all';
   return 'Commit selected';
+});
+const promoteShouldPush = computed(() => settings.durableProvider === 'github' || (settings.durableProvider === 'local' && gitState.canPush));
+const promoteActionLabel = computed(() => promoteShouldPush.value ? 'Commit + Push' : 'Commit');
+const promoteFlowLabel = computed(() => {
+  if (settings.durableProvider === 'github') return 'GitHub durable repo -> pushed branch';
+  if (gitState.canPush) return `Local repo -> ${gitState.upstream}`;
+  return 'Local repo -> local commit';
+});
+const promoteResultTitle = computed(() => promote.pushResult || settings.durableProvider === 'github' ? 'Committed and pushed' : 'Committed locally');
+const promoteCommitDisabled = computed(() => {
+  if (promote.loading || promote.submitting || promote.pushing || promote.result) return true;
+  if (promote.error || !promote.diff.trim()) return true;
+  return promote.files.length > 0 && promote.selectedFiles.length === 0;
+});
+const promoteStatusLabel = computed(() => {
+  if (promote.loading) return 'Loading session diff…';
+  if (promote.submitting) return 'Committing selected changes…';
+  if (promote.pushing) return `Pushing to ${gitState.upstream || 'upstream'}…`;
+  if (promote.error) return promote.error;
+  if (promote.result) return promote.pushResult
+    ? `${promoteResultTitle.value}: ${promote.pushResult.upstream} @ ${promote.pushResult.sha.slice(0, 7)}`
+    : `${promoteResultTitle.value}: ${promote.result.branch} @ ${promote.result.sha.slice(0, 7)}`;
+  return promoteSelectionLabel.value;
 });
 
 
@@ -932,19 +1002,33 @@ function openGitTrixFromSettings() {
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw await readApiError(response);
   }
   return response.json() as Promise<T>;
 }
 
+class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+  payload?: unknown;
+
+  constructor(status: number, message: string, code?: string, payload?: unknown) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+    this.payload = payload;
+  }
+}
+
 async function readApiError(response: Response) {
   const detail = await response.text().catch(() => '');
-  if (!detail) return `request failed: ${response.status}`;
+  if (!detail) return new ApiRequestError(response.status, `request failed: ${response.status}`);
   try {
     const parsed = JSON.parse(detail) as { message?: string; error?: string; code?: string };
-    return parsed.message || parsed.error || parsed.code || detail;
+    return new ApiRequestError(response.status, parsed.message || parsed.error || parsed.code || detail, parsed.code, parsed);
   } catch {
-    return detail;
+    return new ApiRequestError(response.status, detail);
   }
 }
 
@@ -955,7 +1039,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw await readApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -963,7 +1047,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
 async function apiDelete(path: string): Promise<void> {
   const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw await readApiError(response);
   }
 }
 
@@ -974,7 +1058,7 @@ async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw await readApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -1019,9 +1103,19 @@ async function hydrateSettings() {
 }
 
 async function hydrateAuth() {
-  const session = await apiGet<{ github?: { connected?: boolean; account?: { login?: string; name?: string; email?: string } | null } }>('/auth/session');
+  const session = await apiGet<{ github?: { connected?: boolean; account?: { login?: string; name?: string; email?: string; avatarUrl?: string } | null } }>('/auth/session');
   authState.githubConnected = session.github?.connected === true;
   authState.githubAccount = session.github?.account?.login ?? '';
+  authState.githubAvatarUrl = session.github?.account?.avatarUrl ?? '';
+}
+
+async function hydrateGitStatus() {
+  if (!currentProject.value) return;
+  const status = await apiGet<{ current?: string; upstream?: string; remote?: string; canPush?: boolean }>('/git/status');
+  gitState.canPush = status.canPush === true;
+  gitState.upstream = status.upstream ?? '';
+  gitState.remote = status.remote ?? '';
+  gitState.branch = status.current ?? '';
 }
 
 async function updateTheme(theme: ThemePreset) {
@@ -1035,6 +1129,10 @@ async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider
   if (key === 'durableProvider' && !['local', 'github'].includes(value)) return;
   if (key === 'ephemeralProvider' && !['local', 'cloudflare-artifacts'].includes(value)) return;
   if (key === 'promoteStrategy' && value !== 'commit') return;
+  if (key === 'durableProvider' && value === 'github' && !authState.githubConnected) {
+    await connectGitHub();
+    if (!authState.githubConnected) return;
+  }
   if (settings[key] === value) return;
   const saved = await apiPatch<typeof settings>('/settings', { [key]: value });
   settings.durableProvider = saved.durableProvider;
@@ -1043,9 +1141,44 @@ async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider
 }
 
 async function connectGitHub() {
-  const result = await apiPost<{ connected: boolean; account?: { login?: string } | null }>('/auth/github', {});
-  authState.githubConnected = result.connected;
-  authState.githubAccount = result.account?.login ?? '';
+  authState.githubError = '';
+  authState.githubSigningIn = true;
+  try {
+    const started = await apiPost<{ device_code: string; user_code: string; verification_uri: string; interval?: number }>('/auth/github/device/start', {});
+    authState.githubUserCode = started.user_code;
+    authState.githubVerificationUri = started.verification_uri;
+    window.open(started.verification_uri, '_blank', 'noopener,noreferrer');
+    const intervalMs = Math.max(1000, (started.interval ?? 5) * 1000);
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      const polled = await apiPost<{ pending?: boolean; connected?: boolean; account?: { login?: string; avatarUrl?: string } | null }>('/auth/github/device/poll', { deviceCode: started.device_code });
+      if (polled.pending) continue;
+      authState.githubConnected = polled.connected === true;
+      authState.githubAccount = polled.account?.login ?? '';
+      authState.githubAvatarUrl = polled.account?.avatarUrl ?? '';
+      authState.githubUserCode = '';
+      authState.githubVerificationUri = '';
+      break;
+    }
+  } catch (error) {
+    authState.githubError = error instanceof Error ? error.message : 'GitHub sign-in failed';
+  } finally {
+    authState.githubSigningIn = false;
+  }
+}
+
+async function disconnectGitHub() {
+  await apiDelete('/auth/github');
+  authState.githubConnected = false;
+  authState.githubAccount = '';
+  authState.githubAvatarUrl = '';
+  authState.githubUserCode = '';
+  authState.githubVerificationUri = '';
+  authState.githubError = '';
+  if (settings.durableProvider === 'github') {
+    const saved = await apiPatch<typeof settings>('/settings', { durableProvider: 'local' });
+    settings.durableProvider = saved.durableProvider;
+  }
 }
 
 async function useLocalGitTrix() {
@@ -1451,21 +1584,32 @@ async function runPromote() {
   if (!session?.projectPath) return;
   state.promoteDialogOpen = true;
   promote.loading = true;
+  promote.submitting = false;
+  promote.stashing = false;
+  promote.pushing = false;
+  promote.error = '';
+  promote.dirtyFiles = [];
+  promote.result = null;
+  promote.pushResult = null;
+  promote.diff = '';
+  promote.files = [];
+  promote.selectedFiles = [];
+  promote.fileMenuOpen = false;
   try {
     const payload = await apiGet<{ diff: string; files?: string[] }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
     promote.diff = payload.diff ?? '';
     promote.files = payload.files?.length ? payload.files : filesFromPatch(promote.diff);
     promote.selectedFiles = [...promote.files];
-    promote.fileMenuOpen = false;
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to load session diff';
+    promote.error = message;
     appendTimelineEvent(state.activeSessionId, {
       id: `${state.activeSessionId}-${Date.now()}-promote-open-err`,
       kind: 'Promote',
-      text: error instanceof Error ? error.message : 'Failed to load session diff',
+      text: message,
       time: 'now',
       level: 'error'
     });
-    state.promoteDialogOpen = false;
   } finally {
     promote.loading = false;
   }
@@ -1475,35 +1619,50 @@ async function confirmPromote() {
   if (!state.activeSessionId) return;
   const session = activeSession.value;
   if (!session?.projectPath) return;
+  if (promoteCommitDisabled.value) return;
   const files = promote.selectedFiles;
   const selector = !promote.files.length || files.length === promote.files.length ? { mode: 'all' as const } : { mode: 'files' as const, files };
+  promote.submitting = true;
+  promote.pushing = false;
+  promote.error = '';
+  promote.dirtyFiles = [];
+  promote.pushResult = null;
   try {
     const result = await apiPost<{ sha: string; branch: string; prUrl?: string }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/promote?projectPath=${encodeURIComponent(session.projectPath)}`, {
       selector,
-      strategy: 'commit'
+      strategy: 'commit',
+      message: promoteCommitMessage(session)
     });
-    state.promoteDialogOpen = false;
+    promote.result = result;
+    if (promoteShouldPush.value && settings.durableProvider === 'local') {
+      promote.submitting = false;
+      promote.pushing = true;
+      promote.pushResult = await apiPost<{ remote: string; branch: string; upstream: string; sha: string }>('/git/push', {});
+    }
     appendTimelineEvent(state.activeSessionId, {
       id: `${state.activeSessionId}-${Date.now()}-promote`,
       kind: 'Promote',
-      text: `Promoted to ${result.branch} @ ${result.sha.slice(0, 7)}`,
+      text: promote.pushResult
+        ? `Committed and pushed: ${promote.pushResult.upstream} @ ${promote.pushResult.sha.slice(0, 7)}`
+        : `${promoteResultTitle.value}: ${result.branch} @ ${result.sha.slice(0, 7)}`,
       time: 'now',
       level: 'info'
     });
+    void hydrateGitStatus().catch(() => undefined);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Promote failed';
-    try {
-      const parsed = JSON.parse(message) as { code?: string; conflictingFiles?: string[]; durableSha?: string; baselineSha?: string };
-      if (parsed.code === 'BASELINE_CONFLICT') {
-        conflict.conflictingFiles = parsed.conflictingFiles ?? [];
-        conflict.durableSha = parsed.durableSha ?? '';
-        conflict.baselineSha = parsed.baselineSha ?? '';
-        state.conflictDialogOpen = true;
-        return;
-      }
-    } catch {
-      // non-json error
+    const payload = error instanceof ApiRequestError ? error.payload as { code?: string; conflictingFiles?: string[]; durableSha?: string; baselineSha?: string; files?: string[] } | undefined : undefined;
+    if (payload?.code === 'BASELINE_CONFLICT') {
+      conflict.conflictingFiles = payload.conflictingFiles ?? [];
+      conflict.durableSha = payload.durableSha ?? '';
+      conflict.baselineSha = payload.baselineSha ?? '';
+      state.conflictDialogOpen = true;
+      return;
     }
+    if (payload?.code === 'DURABLE_REPO_DIRTY') {
+      promote.dirtyFiles = payload.files ?? [];
+    }
+    promote.error = message;
     appendTimelineEvent(state.activeSessionId, {
       id: `${state.activeSessionId}-${Date.now()}-promote-err`,
       kind: 'Promote',
@@ -1511,6 +1670,29 @@ async function confirmPromote() {
       time: 'now',
       level: 'error'
     });
+  } finally {
+    promote.submitting = false;
+    promote.pushing = false;
+  }
+}
+
+function promoteCommitMessage(session: Session) {
+  const title = session.title?.trim() || 'Session changes';
+  return `glib-code: ${title}\n\nGenerated-by: glib-code\nSession-id: ${session.id}`;
+}
+
+async function stashAndRetryPromote() {
+  if (!promote.dirtyFiles.length) return;
+  promote.stashing = true;
+  promote.error = '';
+  try {
+    await apiPost('/git/stash', { message: `glib-code stash before session commit ${new Date().toISOString()}` });
+    promote.dirtyFiles = [];
+    await confirmPromote();
+  } catch (error) {
+    promote.error = error instanceof Error ? error.message : 'Stash failed';
+  } finally {
+    promote.stashing = false;
   }
 }
 
@@ -1742,6 +1924,7 @@ watch(
   (next) => {
     if (!next) return;
     void hydrateSessions().catch(() => undefined);
+    void hydrateGitStatus().catch(() => undefined);
   }
 );
 

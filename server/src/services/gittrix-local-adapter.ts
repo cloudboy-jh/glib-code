@@ -94,6 +94,8 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
     await mkdir(this.sessionDir(sessionId), { recursive: true });
     await rm(workspacePath, { recursive: true, force: true });
 
+    await ensureShaAvailable(durablePath, baseline.sha);
+
     let workspaceKind: "worktree" | "clone" = "worktree";
     try {
       await runGit(["worktree", "add", "--detach", workspacePath, baseline.sha], durablePath);
@@ -282,6 +284,18 @@ async function listFilesRecursive(path: string, root: string): Promise<ListEntry
     }
   }
   return entries;
+}
+
+async function ensureShaAvailable(repoPath: string, sha: string): Promise<void> {
+  try {
+    await runGit(["cat-file", "-e", `${sha}^{commit}`], repoPath);
+    return;
+  } catch {
+    // GitHub durable may resolve a remote commit the local repo has not fetched yet.
+  }
+
+  await runGit(["fetch", "--all", "--prune"], repoPath);
+  await runGit(["cat-file", "-e", `${sha}^{commit}`], repoPath);
 }
 
 function normalizePath(path: string): string {

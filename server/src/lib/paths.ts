@@ -4,6 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import os from "node:os";
 
 export function getConfigDir() {
+  if (process.env.GLIB_CONFIG_DIR) return process.env.GLIB_CONFIG_DIR;
+
   if (process.platform === "win32") {
     const appData = process.env.APPDATA;
     if (!appData) throw new Error("APPDATA not set");
