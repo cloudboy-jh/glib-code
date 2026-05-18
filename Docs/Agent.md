@@ -2,6 +2,8 @@
 
 Last updated: 2026-05-18
 
+For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers pi/sandbox/session runtime details.
+
 ## Runtime model
 
 - Agent execution uses pi RPC over LF-delimited JSONL by default instead of calling pi as an in-process SDK.

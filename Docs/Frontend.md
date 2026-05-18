@@ -2,6 +2,8 @@
 
 Last updated: 2026-05-18
 
+For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers the current frontend implementation.
+
 ## App shell
 
 - Entry: `web/src/App.vue`

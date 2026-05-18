@@ -101,6 +101,7 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 
 ## Source of truth docs
 
+- `Docs/Architecture.md`
 - `Docs/Frontend.md`
 - `Docs/Backend.md`
 - `Docs/Agent.md`
