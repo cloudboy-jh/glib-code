@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-10
+Last updated: 2026-05-18
 
 glib-code is an isolated AI coding workspace centered on this loop:
 
@@ -57,6 +57,7 @@ Hono server (server/)
 - backend stores defaults and validates selections against pi capability state.
 - provider API keys are saved under glib-code app config (`<configDir>/pi/auth.json`).
 - unsupported OAuth credentials do not count as usable auth for agent sessions.
+- GitHub durable auth can use app-managed device OAuth tokens at `<configDir>/auth/github.json`, then `GITHUB_TOKEN`/`GH_TOKEN`, then `gh auth token`.
 
 ## Monorepo layout
 
@@ -92,8 +93,10 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 - Session workspace shell (sidebar/header/timeline/composer)
 - Settings + keybindings persistence
 - Model picker + provider key management
+- GitHub account/device auth for GitHub durable promote
 - Session timeline with streamed assistant text, errors, and compact tool-call cards
 - Session diff review and commit-all/file-selected promote
+- Local dirty-repo stash-and-continue plus local upstream push after promote
 - Readiness and health endpoints
 
 ## Source of truth docs
@@ -105,15 +108,17 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 - `Docs/next-steps.md`
 - `Docs/frontend-checklist.md`
 - `Docs/backend-checklist.md`
+- `Docs/session-smoke-test.md`
+- `Docs/T3_UI_PARITY_CHECKLIST.md`
 
 GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitTrix as a library and does not redefine its API.
 
 ## Build order
 
-1. Live session smoke validation (`Docs/session-smoke-test.md`).
+1. Finish reload/restart validation after successful GitHub durable promote (`Docs/session-smoke-test.md`).
 2. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
 3. Attachments API and frontend upload/reference flow.
-4. Git mutation routes parity (`stage/unstage/commit/push/pull/checkout`).
+4. Remaining git mutation routes parity (`stage/unstage/discard/pull/checkout`).
 5. Hunk-level session promote selection.
 6. Reliability pass: live-agent tests, restart recovery checks, multi-tab behavior.
 7. Cloudflare Artifacts adapter hardening once GitTrix backend support lands.

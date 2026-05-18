@@ -34,16 +34,18 @@ Current product surface:
 - Session workspace with timeline, composer, streamed assistant text, errors, and tool-call cards.
 - Agent sessions backed by pi RPC and GitTrix ephemeral workspaces.
 - Provider key management and model selection in Settings.
+- GitHub device sign-in for GitHub durable promote flows.
 - Git-backed local session workspaces using GitTrix worktrees with clone fallback.
 - Session diff review before promote, rendered with `@pierre/diffs`.
 - Commit-all or file-selected promote from ephemeral workspace back to durable repo.
+- Local stash-and-continue plus local push for upstream-backed repos.
 - Theme and basic app settings.
 
 Planned product surface:
 
 - Terminal transport connected to project or session workspace.
 - Composer attachments.
-- Full git mutation routes: stage, unstage, commit, push, pull, checkout, branch.
+- Remaining git mutation routes: stage, unstage, discard, pull, checkout, branch.
 - Hunk-level context selection and hunk-level promote.
 - Hosted and remote workspace adapters.
 
@@ -192,6 +194,7 @@ web/      Vue frontend, diff workbench, session UI, settings
 desktop/  Electron shell for packaged local app
 shared/   Shared types, schemas, theme presets, event contracts
 Docs/     Product, backend, frontend, agent, and planning docs
+suitener-results/  Committed external validation run artifacts
 ```
 
 ## Development Notes
@@ -200,6 +203,7 @@ Docs/     Product, backend, frontend, agent, and planning docs
 - Use `Docs/next-steps.md` for planning and current priorities.
 - Use focused docs under `Docs/` for implementation details.
 - Run `bun run check` before shipping code changes.
+- `suitener-results/latest.json` points at the latest committed external validation run when those artifacts are included.
 
 ## Docs
 

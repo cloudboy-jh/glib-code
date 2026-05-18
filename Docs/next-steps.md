@@ -1,6 +1,6 @@
 # Next Steps
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 
 ## Current shipped local loop
 
@@ -14,6 +14,8 @@ Last updated: 2026-05-17
 - Review session diffs and commit all or selected files back to the durable repo.
 - Sign in with GitHub via device OAuth, select GitHub durable storage, and promote session changes as pushed commits.
 - Local durable promote supports dirty-repo protection, stash-and-continue, and local push when the branch has an upstream.
+- Settings → GitTrix exposes Local/GitHub durable choices, Local/Cloudflare Artifacts ephemeral choices, and the commit promote strategy; unsupported choices stay guarded by config/auth checks.
+- Diff → session context currently packs the opened file or whole diff. Hunk/multi-file context payload plumbing exists in app state, but no active selector UI is wired into the current diff workbench.
 
 ## Immediate priority order
 
@@ -22,7 +24,7 @@ Last updated: 2026-05-17
 3. Terminal WebSocket transport (`/api/term`).
 4. Attachments API + frontend integration (`/api/attachments`).
 5. Remaining git mutation routes under `/api/git` (stage/unstage/discard/pull/checkout).
-6. Redesigned hunk/file context selection that does not compromise diff readability.
+6. Redesigned hunk/multi-file context selection that wires into the current full-width diff workbench without compromising readability.
 
 ## Completed recently
 
@@ -66,6 +68,7 @@ Last updated: 2026-05-17
 - Added structured session diff/promote errors and dirty durable repo blockers.
 - Added local stash-and-continue plus local push support for upstream-backed local repos.
 - Added route coverage for session promote errors, dirty repo blocking, git stash/push, and GitHub auth config failures.
+- Captured the latest external validation run under `suitener-results/`.
 
 ## 1) Sandbox + pi RPC runtime
 
@@ -94,7 +97,8 @@ Last updated: 2026-05-17
 
 ## 5) Hunk-level context/promote
 
-- Extend diff selection from file-level to hunk-level.
+- Wire selection UI back into the current full-width diff workbench. `HunkList`/`SelectionTray` components and hunk-aware context payloads exist, but the active workbench only starts sessions from the opened file or whole diff.
+- Extend diff selection from file-level to hunk-level without restoring the old side-panel that damaged readability.
 - Reuse the same selection primitive for context packing and session promote selectors.
 - Keep file-level promote as the fallback for large or unsupported patches.
 

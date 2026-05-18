@@ -15,7 +15,7 @@ Instead of letting an agent write directly into your working tree, glib-code ope
 4. Chat with a pi-powered coding agent.
 5. Agent writes happen in an isolated GitTrix local workspace.
 6. Review the session diff.
-7. Promote selected files back to the durable repo.
+7. Promote selected files back to the durable repo, optionally pushing through GitHub durable mode or local upstream push.
 
 ## Why glib-code exists
 
@@ -54,11 +54,11 @@ It supports:
 - Commit history diffs.
 - Changed-file navigation.
 - Patch rendering through `@pierre/diffs`.
-- Starting sessions from selected diff context.
+- Starting sessions from the opened file or whole diff context.
 
 Planned next step:
 
-- Hunk-level context selection.
+- Hunk/multi-file context selection wired into the current full-width workbench.
 
 ### Agent sessions
 
@@ -87,9 +87,9 @@ Current local MVP mode:
 
 | Layer | Mode |
 | --- | --- |
-| Durable | Local repo |
-| Ephemeral | Local workspace |
-| Promote | Commit |
+| Durable | Local repo or GitHub durable adapter |
+| Ephemeral | Local GitTrix worktree/clone workspace; Cloudflare Artifacts adapter is guarded by backend config |
+| Promote | Commit; GitHub durable pushes, local durable can push when upstream-backed |
 
 Agent work runs inside a GitTrix ephemeral workspace under:
 
@@ -109,6 +109,8 @@ Current behavior:
 - Render session diff with `@pierre/diffs`.
 - Select files for promote.
 - Promote with `POST /api/sessions/:id/promote`.
+- Block overlapping dirty durable files, with stash-and-continue for local durable repos.
+- Push local commits when the branch has an upstream; GitHub durable promotes push through the GitHub adapter.
 - Surface baseline conflicts with structured conflict state.
 
 If the durable branch moved and overlaps with selected files, the backend returns a `409 BASELINE_CONFLICT` payload and the UI shows a conflict modal.
@@ -145,30 +147,33 @@ glib-code does not read opencode or other app auth files.
 
 ### pi agent runtime
 
-glib-code uses `@mariozechner/pi-coding-agent` as an in-process library.
+glib-code runs pi as an RPC subprocess inside a sandbox by default. The old in-process SDK path remains only as a temporary parity fallback behind `GLIB_PI_RUNTIME=sdk`.
 
 Runtime details:
 
-- No subprocess stdout parser layer.
+- LF-delimited JSONL RPC over stdin/stdout.
+- Prompt completion waits for `agent_end`; `turn_end` is only one model/tool cycle.
 - pi owns model/provider execution.
 - glib-code normalizes pi events into shared `AgentEvent` records.
 - Assistant runtime errors are surfaced as canonical error events.
 - Tool execution is preserved as structured timeline data.
-- Agent cwd is the GitTrix ephemeral workspace for that session.
+- Agent cwd is the GitTrix ephemeral workspace when it is git-backed and present; old/non-git sessions fall back to the durable repo cwd.
 
 ### Settings
 
 Settings includes:
 
 - Models: active model, provider keys, provider status.
-- GitTrix: local MVP mode and future mode visibility.
+- GitTrix: Local/GitHub durable modes, Local/Cloudflare Artifacts ephemeral modes, and commit promote strategy.
+- GitHub account: device sign-in, account display, and disconnect for GitHub durable promote.
 - Appearance: theme selection.
 - Keybindings: keyboard shortcut editor.
 
-Unavailable GitTrix modes are visible but disabled as `Coming Soon`, including:
+Guarded or unavailable GitTrix modes include:
 
-- Cloudflare Artifacts.
-- GitHub/GitLab durable providers.
+- Cloudflare Artifacts when account/token environment is missing.
+- GitHub durable mode when no GitHub auth is connected.
+- GitLab durable providers.
 - GitFork.
 - Branch/PR/Patch promote strategies.
 
@@ -195,11 +200,10 @@ Vue 3 + Vite frontend
         ▼
 Bun + Hono backend
         │
-        ├── pi coding agent runtime
-        │
-        └── GitTrix local session isolation
-              ├── durable local repo
-              └── ephemeral local workspace
+        ├── pi RPC subprocess in sandbox
+        └── GitTrix session isolation
+              ├── durable local/GitHub repo boundary
+              └── ephemeral local worktree/clone workspace
 ```
 
 ## Monorepo layout
@@ -231,8 +235,8 @@ glib-code/
 | --- | --- | --- |
 | `POST` | `/api/agent/sessions` | Create agent session and GitTrix workspace. |
 | `POST` | `/api/agent/sessions/:id/send` | Send a prompt. |
-| `GET` | `/api/agent/sessions/:id/stream` | Replay + stream session events over SSE. |
-| `DELETE` | `/api/agent/sessions/:id/turn` | Abort active turn. |
+| `GET` | `/api/agent/sessions/:id/stream?projectPath=...` | Replay + stream session events over SSE. |
+| `DELETE` | `/api/agent/sessions/:id/turn?projectPath=...` | Abort active turn. |
 | `DELETE` | `/api/agent/sessions/:id` | Delete session. |
 
 ### Sessions and promote
@@ -240,9 +244,9 @@ glib-code/
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/sessions` | List project sessions. |
-| `GET` | `/api/sessions/:id` | Read session metadata and events. |
-| `GET` | `/api/sessions/:id/diff` | Diff ephemeral workspace against durable baseline. |
-| `POST` | `/api/sessions/:id/promote` | Promote selected changes. |
+| `GET` | `/api/sessions/:id?projectPath=...` | Read session metadata and events. |
+| `GET` | `/api/sessions/:id/diff?projectPath=...` | Diff ephemeral workspace against durable baseline. |
+| `POST` | `/api/sessions/:id/promote?projectPath=...` | Promote selected changes. |
 | `POST` | `/api/sessions/:id/evict` | Evict session workspace. |
 
 ### Diff
@@ -255,12 +259,28 @@ glib-code/
 | `GET` | `/api/diff/hunks` | List hunks. |
 | `POST` | `/api/diff/pack` | Pack selected diff context. |
 
+### Git and GitHub auth
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/git/status` | Current branch, upstream, dirty state, push capability. |
+| `GET` | `/api/git/branches` | Local branches. |
+| `GET` | `/api/git/log` | Commit log. |
+| `POST` | `/api/git/stash` | Stash dirty local durable changes. |
+| `POST` | `/api/git/push` | Push current branch to its upstream. |
+| `GET` | `/api/auth/session` | GitHub auth/account state. |
+| `POST` | `/api/auth/github/device/start` | Start GitHub device OAuth. |
+| `POST` | `/api/auth/github/device/poll` | Poll and store GitHub device OAuth token. |
+| `DELETE` | `/api/auth/github` | Clear app-managed GitHub auth. |
+
 ## Local development
 
 Requirements:
 
 - Bun 1.x
 - Git
+- pi CLI/runtime for agent sessions
+- Provider API key for agent sessions
 
 Install dependencies:
 
@@ -283,6 +303,7 @@ Useful scripts:
 
 ```bash
 bun run dev         # server + web with prefixed logs
+bun run dev:desktop # server + web + Electron desktop shell
 bun run dev:server  # backend only
 bun run dev:web     # frontend only
 bun run build       # build all workspaces
@@ -295,11 +316,11 @@ The local review-first loop works, but these areas are still in progress:
 
 - Terminal WebSocket transport (`/api/term`).
 - Attachments API and composer attachment UX (`/api/attachments`).
-- Git mutation endpoints under `/api/git` beyond status/log/branches.
+- Git mutation endpoints under `/api/git` beyond status/log/branches/stash/push.
 - Hunk-level context and promote selection.
-- Project-scoped provider/model overrides.
-- Standardized route error envelopes.
-- Cloudflare Artifacts adapter.
+- Project-scoped provider/model override frontend UX and durable persistence.
+- Standardized route error envelopes outside the hardened session/agent paths.
+- Hosted/cloud deployment and sandbox-to-Artifacts sync.
 
 ## Roadmap
 
@@ -307,10 +328,10 @@ Near-term priority order:
 
 1. Terminal WebSocket transport.
 2. Attachments API and frontend integration.
-3. Git mutation route completion.
+3. Remaining git mutation route completion.
 4. Hunk-level context/promote selection.
-5. Reliability pass: structured errors, route tests, restart behavior, Electron parity.
-6. Cloudflare Artifacts adapter once backend support lands.
+5. Reliability pass: restart/reload behavior, multi-tab behavior, Electron parity.
+6. Cloudflare Artifacts adapter hardening once hosted work resumes.
 
 ## Product principles
 

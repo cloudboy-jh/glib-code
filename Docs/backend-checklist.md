@@ -1,6 +1,6 @@
 # Backend Checklist
 
-Last updated: 2026-05-10
+Last updated: 2026-05-18
 
 ## Core route completion
 
@@ -11,7 +11,9 @@ Last updated: 2026-05-10
 - [x] Implement `/api/sessions/:id/evict`.
 - [ ] Implement `/api/term` WebSocket transport.
 - [ ] Implement `/api/attachments` upload/read/delete routes.
-- [ ] Implement git mutation routes under `/api/git` (stage/commit/push/etc).
+- [x] Implement `/api/git/push`.
+- [x] Implement `/api/git/stash`.
+- [ ] Implement remaining git mutation routes under `/api/git` (stage/unstage/discard/commit/pull/checkout/create-branch/get-commit).
 - [ ] Implement `/api/diff/branch-compare`.
 
 ## Agent runtime
@@ -49,6 +51,7 @@ Last updated: 2026-05-10
 - [x] Expose discovery-backed `/api/providers`.
 - [x] Add provider auth key routes (`POST/DELETE /api/providers/:id/auth`).
 - [x] Validate provider/model defaults and project overrides against discovered capabilities.
+- [ ] Persist project provider/model overrides beyond the current server process or remove them from the contract.
 - [x] Validate session create/send against discovered capabilities.
 - [x] Remove backend static provider/model catalogs.
 - [x] Store glib-managed provider keys under `<configDir>/pi/auth.json`.
@@ -72,8 +75,8 @@ Last updated: 2026-05-10
 ## Readiness/auth
 
 - [ ] Keep readiness checks fast and cached while preserving actionable errors.
-- [ ] Either implement auth endpoints or mark them explicitly local-only in API contract.
-- [x] Add local GitHub auth status/connect check through `gh` or token environment.
+- [x] Implement local GitHub auth endpoints and mark the flow as local/desktop scoped.
+- [x] Add local GitHub auth status/connect check through app-managed auth, `gh`, or token environment.
 
 ## Definition of done (backend)
 

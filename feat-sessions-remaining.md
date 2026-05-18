@@ -1,4 +1,4 @@
-# Session Reliability Remaining Work - 2026-05-12
+# Session Reliability Remaining Work - 2026-05-18
 
 ## Current State
 
@@ -7,6 +7,8 @@
 - Stream/send infrastructure errors are shown as session notices instead of repeated timeline cards.
 - Stale sessions get a recovery banner with Reload sessions and New replacement actions.
 - New local sessions use a git-backed GitTrix ephemeral workspace for agent cwd; old/non-git sessions still fall back to durable repo cwd.
+- GitHub durable smoke has completed through session start, README edit, diff review, commit, push, and GitHub verification.
+- Local promote now blocks overlapping dirty durable files, supports stash-and-continue, and can push when the current branch has an upstream.
 
 ## Completed For This Pass
 
@@ -21,6 +23,8 @@
 - Standardized session/agent route error envelopes with `ok`, `code`, `message`, and `retryable` fields on handled failures.
 - Fixed pi RPC prompt completion to wait for `agent_end` instead of `turn_end`, preserving final assistant text after tool calls.
 - Updated promote diff API/UI so changed file metadata comes from the backend and users can commit all or selected files from the modal.
+- Added GitHub device OAuth and app-managed GitHub token storage for GitHub durable promote.
+- Added session promote error coverage, dirty durable repo blockers, local stash/push coverage, and GitHub auth config failure coverage.
 
 ## Remaining P0
 
@@ -29,6 +33,7 @@
   - restart backend and send again
   - switch project and return
   - verify stream replay and no duplicate timeline entries
+- Finish live reload/restart validation after successful GitHub durable promote.
 - Add full live-agent route validation for successful send/stream/abort/diff/promote with `projectPath` query/body.
 
 ## Remaining P1

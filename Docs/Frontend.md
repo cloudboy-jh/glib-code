@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-12
+Last updated: 2026-05-18
 
 ## App shell
 
@@ -30,13 +30,14 @@ Home surface controls in Picker now include:
 Real API-backed:
 
 - Recents list + recents status (`/projects/recents`, `/projects/recents/status`)
-- Open/init/create/forget/remove project actions
+- Project candidate search and open/init/create/forget/remove project actions
 - Diff history/files/patch loading (`/diff/items`, `/diff/files`, `/diff/pack`)
 
 Still local/mock in frontend state:
 
-- Terminal output text
-- Some project/session transitions are still UI-driven fallbacks
+- Terminal drawer output text; `/api/term` exists only as a 501 stub.
+- Diff context bundles/chips are frontend-local until sent as prompt context.
+- Project provider/model override UX is not wired even though the backend route exists.
 
 Agent/session data-plane now API-backed:
 
@@ -47,6 +48,7 @@ Agent/session data-plane now API-backed:
 - Abort through `DELETE /api/agent/sessions/:id/turn`
 - Session diff/promote through `/api/sessions/:id/diff` and `/api/sessions/:id/promote`
 - Session send/stream/abort/hydrate/diff/promote calls include active session `projectPath` so the backend can resolve sessions after reloads, project switches, or stale index state.
+- Local promote can stash dirty durable changes and push when the active branch has an upstream.
 
 Now API-backed in settings plane:
 
@@ -54,6 +56,7 @@ Now API-backed in settings plane:
 - Default provider/model updates via `/api/providers/defaults`
 - Provider auth key write/remove via `/api/providers/:id/auth`
 - Active-provider key actions in Settings and session empty state
+- GitHub device auth for GitHub durable mode via `/api/auth/github/device/start` and `/api/auth/github/device/poll`
 
 ## Picker flow
 
@@ -88,6 +91,7 @@ Current behavior:
 - File picker for changed files
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
+- The active workbench starts sessions from the currently opened file or the whole diff. Hunk/multi-file payload handling exists above the component, but the current selector UI is not wired in.
 - Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
 - Session promote modal uses a full-width diff surface, optional header file picker for multi-file diffs, and `Commit all` / `Commit selected` actions.
 - Diff mode hides the global session header; `DiffWorkbench` owns diff-specific controls.
@@ -96,8 +100,7 @@ Current behavior:
 Not implemented in UI yet:
 
 - multi-source drilldown (`branches`, `prs`) as full UX
-- hunk-level context selection; the prior side-panel experiment was removed because it damaged diff readability.
-- multi-select and selection tray behavior needs a better design before implementation.
+- hunk-level and multi-file context selection in the active diff workbench; stale `HunkList`/`SelectionTray` components are not currently mounted.
 
 ## Session surface
 
@@ -128,12 +131,13 @@ Current state:
 
 - Settings modal and theme picker are wired to local reactive settings and shared presets.
 - Models tab manages provider keys and active model selection.
-- GitTrix tab lets users select Local/GitHub durable modes, Local/Cloudflare Artifacts ephemeral modes, and the Commit promote strategy. Coming-soon durable/ephemeral/promote options stay visible but disabled.
+- GitTrix tab lets users select Local/GitHub durable modes, Local/Cloudflare Artifacts ephemeral modes, and the Commit promote strategy. GitHub durable mode requires GitHub sign-in; Cloudflare ephemeral mode is guarded by backend environment preflight.
+- GitHub account card supports device sign-in, displays avatar/account when connected, and disconnects app-managed auth.
 - Keybindings editor exists; backend keybindings API exists but full parity behavior still needs cleanup.
 
 ## Known frontend debts
 
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
-- Add hunk-level session context/promote selection after a redesigned, non-invasive diff selection UX exists.
+- Wire hunk/multi-file session context selection into the current full-width diff workbench without restoring the old side-panel.
 - Add frontend regression coverage for duplicate create prevention, stale stream handling, session recovery actions, and projectPath-scoped sends.

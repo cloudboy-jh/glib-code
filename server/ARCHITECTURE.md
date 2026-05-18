@@ -42,7 +42,7 @@ Routes should do HTTP work only: parse request data, call services, and shape re
 
 - Current-project lookup is duplicated in multiple routes/services.
 - `agent` and `sessions` routes both know pieces of session/GitTrix lifecycle.
-- Session operations historically accepted `projectPath` from the client, which created split-brain lookup bugs. Agent routes now resolve by `sessionId` first.
+- Session operations historically treated browser `projectPath` as authoritative, which created split-brain lookup bugs. Agent/session routes now resolve by `sessionId` and stored metadata first, with explicit `projectPath` only as a scoped fallback.
 - Turn status and session status are still conflated. A completed turn should not make the session terminal.
 
 ## Target Boundaries
@@ -61,7 +61,7 @@ Keep live runtime separate from persisted session state:
 
 ## Session Invariants
 
-- `sessionId` is the authority for agent session routes.
+- `sessionId` plus stored session metadata is the authority for agent/session routes; explicit `projectPath` is a fallback to recover from reloads, project switches, or stale index state.
 - Stored session metadata owns durable project path, GitTrix session ID, ephemeral path, baseline SHA, git-backed/workspace-kind flags, provider, and model.
 - Agent turns run in the GitTrix ephemeral path only when it is git-backed and present; old/non-git sessions fall back to durable cwd.
 - Pi can exit and respawn inside the same sandbox without deleting the session.

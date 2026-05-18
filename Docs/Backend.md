@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-12
+Last updated: 2026-05-18
 
 ## Server entry
 
@@ -61,12 +61,14 @@ Behavior:
 ### Projects
 
 - `GET /api/projects/recents`
+- `GET /api/projects/candidates?q=...`
 - `GET /api/projects/recents/status`
 - `POST /api/projects/open`
 - `POST /api/projects/init`
 - `POST /api/projects/create`
 - `DELETE /api/projects/recents/:id`
 - `POST /api/projects/recents/:id/forget`
+- `PATCH /api/projects/:id/provider`
 
 Behavior:
 
@@ -74,6 +76,8 @@ Behavior:
 - Project id = SHA1 hash of resolved path (12 chars).
 - `open` returns `{ needsInit: true }` if no `.git`.
 - `create` writes a starter `.gitignore` and creates `.glib/.gitignore`.
+- `candidates` searches likely local project paths for picker autocomplete.
+- Project provider/model overrides are validated against pi capabilities and stored in process memory for session creation. Frontend override UX is not wired yet.
 
 ### Repo
 
@@ -106,10 +110,18 @@ Implemented:
 - `GET /api/git/status`
 - `GET /api/git/branches`
 - `GET /api/git/log`
+- `POST /api/git/push`
+- `POST /api/git/stash`
+
+Behavior:
+
+- `status` includes upstream, ahead/behind, dirty file buckets, and `canPush`.
+- `push` requires an upstream-backed branch and returns branch/upstream/SHA metadata.
+- `stash` ignores `.glib/` changes, includes untracked files, and returns `stash@{0}` when it creates a new stash.
 
 Stubbed (`501`):
 
-- stage/unstage/discard/commit/push/pull/checkout/create-branch/get-commit
+- stage/unstage/discard/commit/pull/checkout/create-branch/get-commit
 
 ### FS
 
@@ -140,9 +152,18 @@ Stored in config dir `keybindings.json`.
 
 ### Auth
 
-- `GET /api/auth/session` returns GitHub local auth status from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`.
+- `GET /api/auth/session` returns GitHub auth status and account info when available.
 - `POST /api/auth/github` verifies that a GitHub token is available for GitTrix GitHub durable operations.
-- `POST /api/auth/signout` returns `{ ok: true }`
+- `POST /api/auth/github/device/start` starts GitHub device OAuth. Requires `GITHUB_OAUTH_CLIENT_ID` or `GH_OAUTH_CLIENT_ID`.
+- `POST /api/auth/github/device/poll` exchanges an approved device code and stores the token under app config.
+- `DELETE /api/auth/github` clears app-managed GitHub auth.
+- `POST /api/auth/signout` clears app-managed GitHub auth and returns `{ ok: true }`.
+
+GitHub token resolution order for durable GitHub operations:
+
+1. App-managed token at `<configDir>/auth/github.json`.
+2. `GITHUB_TOKEN` or `GH_TOKEN` environment variable.
+3. `gh auth token`.
 
 ## Session + agent routes
 
@@ -181,7 +202,7 @@ Responsibilities:
 - Self-host
   - durable: local repo adapter behavior pointed at the user repo
   - ephemeral: git-backed local worktree under `<configDir>/gittrix-sessions/<id>/workspace`, with clone fallback
-  - optional durable: GitHub adapter using the opened repo's `origin` and `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`
+  - optional durable: GitHub adapter using the opened repo's `origin` and app-managed GitHub auth before `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`
   - optional ephemeral: Cloudflare Artifacts adapter using `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 - Desktop (Electron)
   - Same adapter story as self-host; Electron only changes packaging/host process.

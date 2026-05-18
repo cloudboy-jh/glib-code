@@ -1,6 +1,6 @@
 # Onboarding and First-Run Flow (Current)
 
-Last updated: 2026-05-04
+Last updated: 2026-05-18
 
 ## What exists today
 
@@ -23,6 +23,7 @@ Steps:
 4. Open or clone a git repo
 5. Review diffs freely without a provider key
 6. Add a provider key in Picker setup or Settings → Models before starting an agent session
+7. Use Settings → GitTrix to choose Local or GitHub durable storage before promoting session changes
 
 Backend server listens on `http://127.0.0.1:4273` in dev.
 
@@ -69,9 +70,11 @@ Provider auth behavior:
 
 GitHub account auth behavior in local/desktop:
 
-- `GET /api/auth/session` reports whether `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` is available.
-- `POST /api/auth/github` verifies local GitHub auth for GitTrix GitHub durable operations.
-- Users sign in by running `gh auth login` locally or by launching glib-code with `GITHUB_TOKEN`/`GH_TOKEN` set.
+- `GET /api/auth/session` reports whether app-managed GitHub auth, `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` is available.
+- `POST /api/auth/github` verifies GitHub auth for GitTrix GitHub durable operations.
+- `POST /api/auth/github/device/start` and `POST /api/auth/github/device/poll` support in-app GitHub device OAuth when `GITHUB_OAUTH_CLIENT_ID` or `GH_OAUTH_CLIENT_ID` is configured.
+- App-managed GitHub tokens are stored under `<configDir>/auth/github.json` and are checked before environment or `gh` fallback tokens.
+- Users can also sign in by running `gh auth login` locally or by launching glib-code with `GITHUB_TOKEN`/`GH_TOKEN` set.
 
 No hosted browser OAuth sign-in/onboarding path should be documented as shipped yet.
 
@@ -80,6 +83,8 @@ No hosted browser OAuth sign-in/onboarding path should be documented as shipped 
 - Ephemeral session workspaces live under `<configDir>/gittrix-sessions/`.
 - Local ephemeral session workspaces are git-backed worktrees with clone fallback.
 - Agent writes stay in the ephemeral workspace until the user commits all or selected changes through promote.
+- Local durable promote blocks overlapping dirty durable files, offers stash-and-continue, and can push when the branch has an upstream.
+- GitHub durable promote uses app-managed GitHub auth first, then environment/`gh` fallback tokens.
 - Hosted sandboxes install pi inside the sandbox automatically; hosted deployment/sync is not shipped yet.
 
 ## Local session validation

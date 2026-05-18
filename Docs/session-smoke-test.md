@@ -12,7 +12,7 @@ Use this after session/runtime/promote changes.
    - Tool cwd should be the GitTrix workspace path.
 5. Ask `make a tiny README edit`.
    - Expect the agent to edit and then summarize.
-6. Click `Commit + Push`.
+6. Click `Commit + Push` for GitHub durable or upstream-backed local repos, otherwise click `Commit`.
    - Expect a full-width session diff modal.
    - Button should be enabled when diff exists.
    - One-file diffs should not show a separate file sidebar.

@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-05-15
+Last updated: 2026-05-18
 
 ## API wiring cleanup
 
@@ -36,10 +36,11 @@ Last updated: 2026-05-15
 
 ## Diff → session context flow
 
-- [ ] Expand diff selection from file-level to hunk-level context selection.
-- [ ] Support multi-select aggregation before creating context packet.
-- [ ] Keep context summary visible in composer before send.
-- [ ] Preserve selected context when switching between Diff and Session mode.
+- [x] Start sessions from the active diff file or whole diff payload.
+- [x] Keep attached context visible in the session surface and composer chips.
+- [x] Allow attached context chips to be removed from the session.
+- [ ] Wire active hunk/multi-file selection UI into the current full-width diff workbench.
+- [ ] Preserve selected context while navigating within Diff before session creation.
 
 ## Session and streaming
 
