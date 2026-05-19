@@ -1,6 +1,6 @@
 # Next Steps
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 ## Current shipped local loop
 
@@ -9,22 +9,63 @@ Last updated: 2026-05-18
 - Add provider API keys explicitly inside glib-code.
 - Start pi-backed agent sessions paired with GitTrix metadata. Local GitTrix sessions use git-backed ephemeral workspaces when available; old/non-git sessions still fall back to durable repo cwd.
 - Stream user/assistant/error/tool-call timeline events over SSE.
+- Persist session documents and indexes with atomic writes and per-session/index write locks so concurrent tool/meta updates do not corrupt or drop events.
 - Keep session send/stream/abort/hydrate/diff/promote actions scoped to `sessionId` plus active `projectPath` so reloads, project switches, and stale index state do not strand valid sessions.
+- Reject concurrent sends for a session with a structured `TURN_ALREADY_RUNNING` response.
+- Delete sessions from the sidebar/API with active-turn abort, runtime disposal, local session cleanup, and best-effort GitTrix workspace eviction.
+- Export sessions as glib JSON, glib event JSONL, Markdown transcripts, or pi-compatible JSONL downloads.
 - Preserve streamed assistant text chunks with collision-proof event IDs.
 - Review session diffs and commit all or selected files back to the durable repo.
 - Sign in with GitHub via device OAuth, select GitHub durable storage, and promote session changes as pushed commits.
 - Local durable promote supports dirty-repo protection, stash-and-continue, and local push when the branch has an upstream.
 - Settings → GitTrix exposes Local/GitHub durable choices, Local/Cloudflare Artifacts ephemeral choices, and the commit promote strategy; unsupported choices stay guarded by config/auth checks.
+- Picker/sidebar UX keeps the global sidebar available on home, shows project sessions as soon as a project is selected, and uses a larger Diffs/Session mode chooser.
 - Diff → session context currently packs the opened file or whole diff. Hunk/multi-file context payload plumbing exists in app state, but no active selector UI is wired into the current diff workbench.
 
-## Immediate priority order
+## Development phases
 
-1. UI/UX polish for the commit modal and Settings → GitTrix cards now that the GitHub durable smoke path works.
-2. Finish live session smoke validation for reload/restart recovery after successful GitHub durable promote.
-3. Terminal WebSocket transport (`/api/term`).
-4. Attachments API + frontend integration (`/api/attachments`).
-5. Remaining git mutation routes under `/api/git` (stage/unstage/discard/pull/checkout).
-6. Redesigned hunk/multi-file context selection that wires into the current full-width diff workbench without compromising readability.
+### Phase 1: stabilize local/desktop loop
+
+Goal: make the current local and desktop session workflow boring and reliable before adding more surface area.
+
+Scope:
+
+1. Finish live session smoke validation for reload/restart recovery after successful GitHub durable promote. ✅ Local/GitHub smoke path has passed; keep this checklist as the release gate.
+2. Fix concrete reload/restart/session recovery bugs found by the smoke checklist. ✅ Session persistence races, concurrent sends, stale session routing, and delete/export paths are now hardened.
+3. Add regression coverage for session-id plus `projectPath` routing, stale streams, duplicate creates, and recovery banners. ✅ Core route/session-store coverage exists; multi-tab/restart integration remains in the reliability pass.
+4. Polish promote failure/success states only where they block clear recovery. ✅ Dirty repo, promote failure, stash/push, and baseline conflict surfaces are covered.
+
+Exit criteria:
+
+- `Docs/session-smoke-test.md` passes on local web and desktop dev.
+- Reopened sessions can send, stream, diff, and promote after app refresh and backend restart.
+- Stale sessions show one recoverable state, not timeline spam.
+- Duplicate create/send attempts do not create duplicate sessions or concurrent turns.
+- Session delete/export are available from the sidebar and stay scoped to the selected project/session.
+
+### Phase 2: finish core product gaps
+
+Goal: complete the missing local-product primitives after Phase 1 is stable.
+
+Scope:
+
+1. Terminal WebSocket transport (`/api/term`) and real terminal UI state.
+2. Attachments API + composer integration (`/api/attachments`).
+3. Remaining git mutation routes under `/api/git` (`stage`, `unstage`, `discard`, `pull`, `checkout`, branch operations).
+4. Project/provider override UX, or remove the half-built override contract.
+
+Exit criteria:
+
+- Terminal connects to the correct durable repo or session workspace cwd and handles disconnect/reconnect.
+- Attachments can be uploaded, referenced in sends, read, and deleted with a documented persistence boundary.
+- Git command UI only exposes actions backed by real routes and explicit destructive confirmations.
+- Provider/model override behavior is either persisted and visible or removed from API/docs.
+
+### Later phases
+
+- Phase 3: hunk/multi-file context selection and hunk-level promote.
+- Phase 4: broader test hardening, restart/multi-tab behavior, release discipline.
+- Phase 5: hosted/cloud architecture, desktop bridge, Cloudflare/GitTrix sync.
 
 ## Completed recently
 
@@ -69,10 +110,19 @@ Last updated: 2026-05-18
 - Added local stash-and-continue plus local push support for upstream-backed local repos.
 - Added route coverage for session promote errors, dirty repo blocking, git stash/push, and GitHub auth config failures.
 - Captured the latest external validation run under `suitener-results/`.
+- Added shared atomic write helpers and moved session/settings/project/GitHub/pi auth JSON persistence onto atomic writes.
+- Serialized session event/meta writes per session and serialized the global session index to prevent concurrent tool/meta write races.
+- Added session-store concurrency regression tests.
+- Added server-side concurrent-turn rejection with `TURN_ALREADY_RUNNING` and route coverage.
+- Researched pi and opencode session/export formats; pi is JSONL session-header + message entries, while opencode is SQLite-backed and not a simple portable export target.
+- Added backend session exports for glib JSON, glib event JSONL, Markdown, and pi-compatible JSONL.
+- Added sidebar session delete/export UI, export downloads, local session cleanup, and active-session replacement behavior.
+- Kept the sidebar visible/useful on the picker, hydrated selected-project sessions immediately, and enlarged the Diffs/Session chooser.
+- Switched dev logs to human-readable output by default with `GLIB_LOG_JSON=1` for JSON logs.
 
 ## 1) Sandbox + pi RPC runtime
 
-- Finish live authenticated smoke coverage for create/send/tool/final-answer/abort/delete against installed pi.
+- Finish live authenticated smoke coverage for create/send/tool/final-answer/abort/delete/export against installed pi.
 - Keep frontend `AgentEvent` contract untouched.
 - Keep GitTrix storage/promote interfaces untouched.
 
@@ -109,6 +159,7 @@ Last updated: 2026-05-18
 - Validate behavior across both hosts: Vite dev web and Electron shell.
 - Add restart/recovery checks for session metadata, timeline persistence, and GitTrix workspace mapping.
 - Add tests that assert agent cwd is the GitTrix ephemeral workspace once GitTrix reports `isGitBacked: true`.
+- Add browser-level checks for sidebar delete/export downloads and project-picker/sidebar state.
 
 ## 7) Cloudflare Artifacts adapter
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
-import { abortRunningTurn, broadcast, disposeRuntimeSession, runTurn, subscribe } from "../services/agent-runtime";
+import { abortRunningTurn, broadcast, disposeRuntimeSession, getRunningTurn, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/session-store";
 import { getProvidersState, getSettings } from "../services/settings-store";
 import { getCurrentProjectId, getProjectById, getProjectOverride } from "../services/project-store";
@@ -135,6 +135,7 @@ export const agentRoutes = new Hono()
 
     const prompt = body?.prompt?.trim();
     if (!prompt) return c.json(routeError("prompt required", "PROMPT_REQUIRED"), 400);
+    if (getRunningTurn(id)) return c.json(routeError("session already has a running turn", "TURN_ALREADY_RUNNING", true), 409);
     const capabilities = await getPiCapabilities();
     if (!capabilities.ok) return c.json(routeError(capabilities.error ?? "pi provider discovery failed", "PI_CAPABILITIES_FAILED", true), 503);
     const provider = capabilities.providers.find((p) => p.id === existing.meta.provider && p.hasAuth);

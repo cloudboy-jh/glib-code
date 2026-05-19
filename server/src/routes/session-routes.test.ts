@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentRoutes } from "./agent";
 import { sessionsRoutes } from "./sessions";
-import { createSession } from "../services/session-store";
+import { appendEvents, createSession } from "../services/session-store";
 import { registerProject, resetProjectStoreForTests, setCurrentProject } from "../services/project-store";
+import { __setRunningTurnForTests } from "../services/agent-runtime";
 
 let root = "";
 let repoA = "";
@@ -84,6 +85,47 @@ describe("session routes projectPath resolution", () => {
     expect((await res.json()).title).toBe("patched");
   });
 
+  test("GET /api/sessions/:id/export returns markdown export", async () => {
+    const session = await makeSession();
+    await appendEvents(repoA, session.id, [
+      { type: "user_turn", turnId: "turn_1", prompt: "hello", at: "2026-01-01T00:00:00.000Z" },
+      { type: "text_part", turnId: "turn_1", stepId: "step_1", partId: "part_1", text: "hi there", at: "2026-01-01T00:00:01.000Z" },
+      { type: "turn_end", turnId: "turn_1", reason: "stop", at: "2026-01-01T00:00:02.000Z" }
+    ]);
+
+    const res = await app.request(`/api/sessions/${session.id}/export?projectPath=${encodeURIComponent(repoA)}&format=markdown`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/markdown");
+    const body = await res.text();
+    expect(body).toContain("## User");
+    expect(body).toContain("hello");
+    expect(body).toContain("## Assistant");
+    expect(body).toContain("hi there");
+  });
+
+  test("GET /api/sessions/:id/export returns pi jsonl export", async () => {
+    const session = await makeSession();
+    await appendEvents(repoA, session.id, [
+      { type: "user_turn", turnId: "turn_1", prompt: "hello", at: "2026-01-01T00:00:00.000Z" },
+      { type: "text_part", turnId: "turn_1", stepId: "step_1", partId: "part_1", text: "hi there", at: "2026-01-01T00:00:01.000Z" },
+      { type: "turn_end", turnId: "turn_1", reason: "stop", at: "2026-01-01T00:00:02.000Z" }
+    ]);
+
+    const res = await app.request(`/api/sessions/${session.id}/export?projectPath=${encodeURIComponent(repoA)}&format=pi-jsonl`);
+    expect(res.status).toBe(200);
+    const lines = (await res.text()).trim().split("\n").map((line) => JSON.parse(line));
+    expect(lines[0]).toMatchObject({ type: "session", version: 3, id: session.id, cwd: repoA.replace(/\\/g, "/") });
+    expect(lines[1]).toMatchObject({ type: "message", message: { role: "user", content: "hello" } });
+    expect(lines[2]).toMatchObject({ type: "message", message: { role: "assistant", content: "hi there" } });
+  });
+
+  test("GET /api/sessions/:id/export rejects unsupported format", async () => {
+    const session = await makeSession();
+    const res = await app.request(`/api/sessions/${session.id}/export?projectPath=${encodeURIComponent(repoA)}&format=docx`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("UNSUPPORTED_EXPORT_FORMAT");
+  });
+
   test("send validates resolved session before provider runtime", async () => {
     const session = await makeSession();
     const res = await app.request(`/api/agent/sessions/${session.id}/send`, {
@@ -93,6 +135,22 @@ describe("session routes projectPath resolution", () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toContain("prompt required");
+  });
+
+  test("send rejects when a turn is already running", async () => {
+    const session = await makeSession();
+    const cleanup = __setRunningTurnForTests(session.id);
+    try {
+      const res = await app.request(`/api/agent/sessions/${session.id}/send`, {
+        method: "POST",
+        body: JSON.stringify({ prompt: "hello", projectPath: repoA }),
+        headers: { "content-type": "application/json" }
+      });
+      expect(res.status).toBe(409);
+      expect((await res.json()).code).toBe("TURN_ALREADY_RUNNING");
+    } finally {
+      cleanup();
+    }
   });
 
   test("abort route resolves explicit projectPath and returns no active turn", async () => {

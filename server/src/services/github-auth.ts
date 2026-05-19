@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { ensureParent, getConfigDir } from "../lib/paths";
+import { getConfigDir } from "../lib/paths";
+import { writeJsonAtomic } from "../lib/atomic-write";
 
 type GitHubAuthState = {
   accessToken?: string;
@@ -28,9 +29,7 @@ async function readState(): Promise<GitHubAuthState> {
 }
 
 async function writeState(state: GitHubAuthState) {
-  const path = authPath();
-  await ensureParent(path);
-  await writeFile(path, JSON.stringify(state, null, 2), "utf8");
+  await writeJsonAtomic(authPath(), state);
 }
 
 export async function getStoredGitHubToken() {

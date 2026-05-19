@@ -73,6 +73,11 @@ export function getRunningTurn(sessionId: string) {
   return runningTurns.get(sessionId) ?? null;
 }
 
+export function __setRunningTurnForTests(sessionId: string, turnId = "turn_test") {
+  runningTurns.set(sessionId, { turnId, startedAt: nowIso(), abort: async () => {} });
+  return () => runningTurns.delete(sessionId);
+}
+
 export function abortRunningTurn(sessionId: string) {
   const running = runningTurns.get(sessionId);
   if (!running) return null;

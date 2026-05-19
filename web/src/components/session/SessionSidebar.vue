@@ -98,21 +98,28 @@
                 </button>
 
                 <div v-if="!isProjectCollapsed(project.key)" class="mt-1 space-y-1">
-                  <button
+                  <div
                     v-for="s in project.rows"
                     :key="s.id"
-                    type="button"
-                    :disabled="disabled"
                     :class="[
-                      'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                      'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors',
                       s.id === activeId ? 'bg-accent text-foreground shadow-sm/5' : 'text-foreground/92 hover:bg-accent/70'
                     ]"
-                    @click="$emit('select', s.id)"
                   >
-                    <span class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(s.status)" />
-                    <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
-                    <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
-                  </button>
+                    <button type="button" :disabled="disabled" class="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50" @click="$emit('select', s.id)">
+                      <span class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(s.status)" />
+                      <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
+                      <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
+                    </button>
+                    <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Export session" @click.stop="$emit('export', s.id)">
+                        Export
+                      </button>
+                      <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50" title="Delete session" @click.stop="$emit('delete', s.id)">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -134,7 +141,7 @@
         </button>
         <button
           type="button"
-          :disabled="disabled"
+          :disabled="disabled || newDisabled"
           :class="[
             'flex items-center rounded-lg text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
             collapsed ? 'mx-auto h-9 w-9 justify-center text-muted-foreground/70 hover:bg-accent hover:text-foreground' : 'mb-0.5 h-9 w-full gap-2 px-3 text-muted-foreground/75 hover:bg-accent hover:text-foreground'
@@ -182,11 +189,12 @@ const props = withDefaults(
     logoWordmarkSrc?: string;
     logoIconSrc?: string;
     disabled?: boolean;
+    newDisabled?: boolean;
   }>(),
-  { collapsed: false, disabled: false }
+  { collapsed: false, disabled: false, newDisabled: false }
 );
 
-defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: [] }>();
+defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string] }>();
 
 const collapsedRepos = ref<Set<string>>(new Set());
 const collapsedProjects = ref<Set<string>>(new Set());

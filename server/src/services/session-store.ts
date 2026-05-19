@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { ensureDir, getConfigDir, repoGlibDir } from "../lib/paths";
+import { writeJsonAtomic } from "../lib/atomic-write";
 
 function normalizeProjectPath(path: string) {
   return path.replace(/\\/g, "/");
@@ -32,6 +33,9 @@ type SessionDoc = {
 
 type SessionIndex = Record<string, string>;
 
+const sessionWriteLocks = new Map<string, Promise<unknown>>();
+let indexWriteLock: Promise<unknown> = Promise.resolve();
+
 function sessionIndexPath() {
   return join(getConfigDir(), "sessions-index.json");
 }
@@ -42,6 +46,45 @@ function sessionsDir(repoPath: string) {
 
 function sessionPath(repoPath: string, sessionId: string) {
   return join(sessionsDir(repoPath), `${sessionId}.json`);
+}
+
+function sessionLockKey(repoPath: string, sessionId: string) {
+  return `${normalizeProjectPath(repoPath)}:${sessionId}`;
+}
+
+async function withSessionWriteLock<T>(repoPath: string, sessionId: string, fn: () => Promise<T>): Promise<T> {
+  const key = sessionLockKey(repoPath, sessionId);
+  const previous = sessionWriteLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.catch(() => undefined).then(() => current);
+  sessionWriteLocks.set(key, queued);
+  await previous.catch(() => undefined);
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (sessionWriteLocks.get(key) === queued) sessionWriteLocks.delete(key);
+  }
+}
+
+async function withIndexWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = indexWriteLock;
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.catch(() => undefined).then(() => current);
+  indexWriteLock = queued;
+  await previous.catch(() => undefined);
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (indexWriteLock === queued) indexWriteLock = Promise.resolve();
+  }
 }
 
 function nowIso() {
@@ -70,8 +113,7 @@ async function readSessionDoc(repoPath: string, sessionId: string): Promise<Sess
 
 async function writeSessionDoc(repoPath: string, doc: SessionDoc) {
   await ensureSessionsRoot(repoPath);
-  const path = sessionPath(repoPath, doc.meta.id);
-  await writeFile(path, JSON.stringify(doc, null, 2), "utf8");
+  await writeJsonAtomic(sessionPath(repoPath, doc.meta.id), doc);
 }
 
 async function readSessionIndex(): Promise<SessionIndex> {
@@ -86,26 +128,29 @@ async function readSessionIndex(): Promise<SessionIndex> {
 }
 
 async function writeSessionIndex(index: SessionIndex) {
-  const path = sessionIndexPath();
   await ensureDir(getConfigDir());
-  await writeFile(path, JSON.stringify(index, null, 2), "utf8");
+  await writeJsonAtomic(sessionIndexPath(), index);
 }
 
 async function indexSession(sessionId: string, projectPath: string) {
   projectPath = normalizeProjectPath(projectPath);
-  const index = await readSessionIndex();
-  if (index[sessionId] === projectPath) return;
-  index[sessionId] = projectPath;
-  await writeSessionIndex(index);
+  await withIndexWriteLock(async () => {
+    const index = await readSessionIndex();
+    if (index[sessionId] === projectPath) return;
+    index[sessionId] = projectPath;
+    await writeSessionIndex(index);
+  });
 }
 
 async function unindexSession(sessionId: string, projectPath?: string) {
   if (projectPath) projectPath = normalizeProjectPath(projectPath);
-  const index = await readSessionIndex();
-  if (!index[sessionId]) return;
-  if (projectPath && index[sessionId] !== projectPath) return;
-  delete index[sessionId];
-  await writeSessionIndex(index);
+  await withIndexWriteLock(async () => {
+    const index = await readSessionIndex();
+    if (!index[sessionId]) return;
+    if (projectPath && index[sessionId] !== projectPath) return;
+    delete index[sessionId];
+    await writeSessionIndex(index);
+  });
 }
 
 export async function createSession(params: {
@@ -180,12 +225,14 @@ export async function getSessionById(sessionId: string) {
 
 export async function appendEvents(projectPath: string, sessionId: string, events: AgentEvent[]) {
   projectPath = normalizeProjectPath(projectPath);
-  const doc = await readSessionDoc(projectPath, sessionId);
-  if (!doc) return null;
-  doc.events.push(...events);
-  doc.meta.updatedAt = nowIso();
-  await writeSessionDoc(projectPath, doc);
-  return doc;
+  return withSessionWriteLock(projectPath, sessionId, async () => {
+    const doc = await readSessionDoc(projectPath, sessionId);
+    if (!doc) return null;
+    doc.events.push(...events);
+    doc.meta.updatedAt = nowIso();
+    await writeSessionDoc(projectPath, doc);
+    return doc;
+  });
 }
 
 export async function patchSessionMeta(
@@ -194,17 +241,21 @@ export async function patchSessionMeta(
   partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider">>
 ) {
   projectPath = normalizeProjectPath(projectPath);
-  const doc = await readSessionDoc(projectPath, sessionId);
-  if (!doc) return null;
-  doc.meta = { ...doc.meta, ...partial, updatedAt: nowIso() };
-  await writeSessionDoc(projectPath, doc);
-  return doc.meta;
+  return withSessionWriteLock(projectPath, sessionId, async () => {
+    const doc = await readSessionDoc(projectPath, sessionId);
+    if (!doc) return null;
+    doc.meta = { ...doc.meta, ...partial, updatedAt: nowIso() };
+    await writeSessionDoc(projectPath, doc);
+    return doc.meta;
+  });
 }
 
 export async function deleteSession(projectPath: string, sessionId: string) {
   projectPath = normalizeProjectPath(projectPath);
-  await rm(sessionPath(projectPath, sessionId), { force: true });
-  await unindexSession(sessionId, projectPath);
+  await withSessionWriteLock(projectPath, sessionId, async () => {
+    await rm(sessionPath(projectPath, sessionId), { force: true });
+    await unindexSession(sessionId, projectPath);
+  });
 }
 
 export async function forkSession(projectPath: string, sourceSessionId: string) {

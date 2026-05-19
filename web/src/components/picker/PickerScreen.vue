@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto w-full max-w-3xl px-6" tabindex="0" @keydown="onPickerKeydown">
+  <div class="mx-auto w-full max-w-5xl px-6" tabindex="0" @keydown="onPickerKeydown">
     <div class="mb-9 text-center">
       <div
         v-if="logoSrc"

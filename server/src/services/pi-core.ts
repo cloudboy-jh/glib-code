@@ -1,8 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname } from "node:path";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { getPiAuthPath } from "../lib/paths";
+import { writeJsonAtomic } from "../lib/atomic-write";
 
 let authStorage: AuthStorage | null = null;
 let modelRegistry: ModelRegistry | null = null;
@@ -21,8 +21,7 @@ async function normalizeAuthFile() {
       }
     }
     if (changed) {
-      await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, JSON.stringify(parsed, null, 2), "utf8");
+      await writeJsonAtomic(path, parsed);
     }
   } catch {
     // ignore malformed auth files

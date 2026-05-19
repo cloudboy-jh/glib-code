@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ensureParent, getConfigDir } from "../lib/paths";
+import { getConfigDir } from "../lib/paths";
+import { writeJsonAtomic } from "../lib/atomic-write";
 
 export type ProjectEntry = {
   id: string;
@@ -40,10 +41,7 @@ function cfg(name: string) {
 }
 
 async function writeAtomic(path: string, value: unknown) {
-  await ensureParent(path);
-  const tempPath = `${path}.tmp`;
-  await writeFile(tempPath, JSON.stringify(value, null, 2), "utf8");
-  await rename(tempPath, path);
+  await writeJsonAtomic(path, value);
 }
 
 async function readJson<T>(path: string, fallback: T): Promise<T> {

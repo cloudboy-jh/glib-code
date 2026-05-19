@@ -5,7 +5,8 @@
         <SessionSidebar
           :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
-          :collapsed="state.sidebarCollapsed"
+          :collapsed="sidebarUiCollapsed"
+          :new-disabled="!currentProject"
           :logo-wordmark-src="logoWordmarkSrc"
           :logo-icon-src="logoIconSrc"
           @select="selectSessionFromSidebar"
@@ -13,10 +14,12 @@
           @go-home="goHome"
           @open-settings="openSettings('Models')"
           @toggle-collapse="toggleSidebarCollapse"
+          @delete="confirmDeleteSession"
+          @export="openExportDialog"
         />
 
         <button
-          v-if="!state.sidebarCollapsed"
+          v-if="!sidebarUiCollapsed"
           type="button"
           class="absolute inset-y-0 -right-2 z-10 hidden w-4 cursor-col-resize bg-transparent transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-border md:block"
           aria-label="Resize sidebar"
@@ -40,7 +43,7 @@
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
-          <template v-if="!currentProject">
+          <template v-if="!currentProject || pendingProjectOpen">
             <div class="grid h-full place-items-center px-6">
               <PickerScreen
                 :recents="recents"
@@ -189,6 +192,25 @@
       @select="selectModel"
       @needs-auth="openProviderAuth"
     />
+
+    <div v-if="exportDialog.sessionId" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="closeExportDialog">
+      <div class="w-full max-w-sm rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-3">
+          <div class="text-sm font-semibold">Export session</div>
+          <div class="mt-1 text-xs text-muted-foreground">{{ exportDialog.title }}</div>
+        </div>
+        <div v-if="exportDialog.error" class="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{{ exportDialog.error }}</div>
+        <div class="grid gap-2">
+          <button v-for="format in exportFormats" :key="format.value" type="button" class="rounded-lg border border-border/80 bg-background/70 px-3 py-2 text-left text-sm hover:bg-accent/70" @click="exportSession(format.value)">
+            <div class="font-medium">{{ format.label }}</div>
+            <div class="text-xs text-muted-foreground">{{ format.description }}</div>
+          </button>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button type="button" class="rounded-md border border-border/70 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="closeExportDialog">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <TerminalDrawer
       v-if="state.terminalOpen"
@@ -506,6 +528,19 @@ const state = reactive({
   agentSetupKind: 'agent' as 'agent' | 'gittrix'
 });
 
+const exportDialog = reactive({
+  sessionId: '',
+  title: '',
+  error: ''
+});
+
+const exportFormats = [
+  { value: 'markdown', label: 'Markdown', description: 'Readable transcript for notes or sharing.' },
+  { value: 'json', label: 'JSON', description: 'Full glib-code session document.' },
+  { value: 'jsonl', label: 'JSONL', description: 'Raw glib-code event stream.' },
+  { value: 'pi-jsonl', label: 'pi JSONL', description: 'pi-compatible conversation JSONL.' }
+] as const;
+
 const promote = reactive({
   diff: '',
   loading: false,
@@ -544,6 +579,7 @@ const paletteCommands = [
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
 const sidebarSessions = computed(() => sessions.map((session) => ({ ...session, status: staleSessionIds.has(session.id) ? 'stale' as const : session.status })));
+const sidebarUiCollapsed = computed(() => state.sidebarCollapsed);
 const activeContextBundle = computed(() => (state.activeSessionId ? contextBundleBySessionId[state.activeSessionId] : undefined));
 const activeContextSummary = computed(() => {
   const ctx = activeContextBundle.value;
@@ -615,7 +651,7 @@ const filteredPaletteCommands = computed(() => {
 });
 
 const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n(simulated output)` : 'No commands run yet.'));
-const sidebarWidth = computed(() => (state.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
+const sidebarWidth = computed(() => (sidebarUiCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
 const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();
 const staleSessionIds = reactive(new Set<string>());
@@ -1051,6 +1087,33 @@ async function apiDelete(path: string): Promise<void> {
   }
 }
 
+async function apiBlob(path: string) {
+  const response = await fetch(`${API_BASE}${path}`);
+  if (!response.ok) throw await readApiError(response);
+  return response;
+}
+
+function filenameFromDisposition(value: string | null) {
+  if (!value) return '';
+  const utf8 = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8?.[1]) return decodeURIComponent(utf8[1]);
+  const quoted = value.match(/filename="([^"]+)"/i);
+  if (quoted?.[1]) return quoted[1];
+  const bare = value.match(/filename=([^;]+)/i);
+  return bare?.[1]?.trim() ?? '';
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename || 'session-export';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
@@ -1215,7 +1278,7 @@ function clampSidebarWidth(width: number) {
 
 function toggleSidebarCollapse() {
   state.sidebarCollapsed = !state.sidebarCollapsed;
-  if (!state.sidebarCollapsed) {
+  if (!sidebarUiCollapsed.value) {
     state.sidebarWidth = clampSidebarWidth(state.sidebarWidth);
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth));
   }
@@ -1233,7 +1296,7 @@ function closeProjectOpenModeDialog() {
 }
 
 function startSidebarResize(event: MouseEvent) {
-  if (state.sidebarCollapsed) return;
+  if (sidebarUiCollapsed.value) return;
   event.preventDefault();
 
   const startX = event.clientX;
@@ -1284,6 +1347,9 @@ function queueProjectOpen(projectName: string, path: string) {
   state.cloneDialogOpen = false;
   pendingProjectOpen.value = { name: projectName, path };
 
+  openProject(projectName, path, settings.defaultOpenMode);
+  void hydrateSessions().catch(() => undefined);
+
   const existingRecent = recents.find((r) => r.path === path);
   if (!existingRecent) {
     recents.unshift({ id: `pending-${Date.now()}`, name: projectName, path, lastOpenedAt: 'now', status: 'ok' });
@@ -1292,7 +1358,7 @@ function queueProjectOpen(projectName: string, path: string) {
 
 async function finalizeProjectOpen(mode: 'diff' | 'session') {
   if (!pendingProjectOpen.value) return;
-  openProject(pendingProjectOpen.value.name, pendingProjectOpen.value.path, mode);
+  state.mode = mode;
   if (mode === 'session' && !state.activeSessionId) {
     await createSession();
   }
@@ -1527,6 +1593,8 @@ function selectSessionFromSidebar(sessionId: string) {
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session) return;
 
+  closeProjectOpenModeDialog();
+
   switchActiveSession(sessionId);
   if (currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
 
@@ -1542,9 +1610,76 @@ function selectSessionFromSidebar(sessionId: string) {
   state.mode = 'session';
 }
 
+function removeSessionLocal(sessionId: string) {
+  disconnectSessionStream(sessionId);
+  const index = sessions.findIndex((entry) => entry.id === sessionId);
+  if (index >= 0) sessions.splice(index, 1);
+  delete timelineBySessionId[sessionId];
+  delete sessionContextById[sessionId];
+  delete contextBundleBySessionId[sessionId];
+  delete draftBySessionId[sessionId];
+  delete sessionNoticeById[sessionId];
+  staleSessionIds.delete(sessionId);
+  sendingSessionIds.delete(sessionId);
+
+  for (const [projectId, activeId] of Object.entries(activeSessionIdByProject)) {
+    if (activeId === sessionId) delete activeSessionIdByProject[projectId];
+  }
+
+  if (state.activeSessionId === sessionId) {
+    const replacement = currentProject.value ? sessions.find((entry) => entry.projectPath === currentProject.value?.path) : sessions[0];
+    if (replacement) switchActiveSession(replacement.id);
+    else clearActiveSession();
+  }
+}
+
+async function confirmDeleteSession(sessionId: string) {
+  const session = sessions.find((entry) => entry.id === sessionId);
+  if (!session?.projectPath) return;
+  const ok = window.confirm(`Delete session "${session.title}"? This removes the local session record and cleans up its workspace.`);
+  if (!ok) return;
+  try {
+    await apiDelete(`/sessions/${encodeURIComponent(sessionId)}?projectPath=${encodeURIComponent(session.projectPath)}`);
+    removeSessionLocal(sessionId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete session';
+    sessionNoticeById[sessionId] = message;
+  }
+}
+
+function openExportDialog(sessionId: string) {
+  const session = sessions.find((entry) => entry.id === sessionId);
+  if (!session) return;
+  exportDialog.sessionId = sessionId;
+  exportDialog.title = session.title;
+  exportDialog.error = '';
+}
+
+function closeExportDialog() {
+  exportDialog.sessionId = '';
+  exportDialog.title = '';
+  exportDialog.error = '';
+}
+
+async function exportSession(format: typeof exportFormats[number]['value']) {
+  const sessionId = exportDialog.sessionId;
+  const session = sessions.find((entry) => entry.id === sessionId);
+  if (!session?.projectPath) return;
+  exportDialog.error = '';
+  try {
+    const response = await apiBlob(`/sessions/${encodeURIComponent(sessionId)}/export?projectPath=${encodeURIComponent(session.projectPath)}&format=${encodeURIComponent(format)}`);
+    const filename = filenameFromDisposition(response.headers.get('content-disposition')) || `${session.title || session.id}.${format === 'markdown' ? 'md' : format === 'json' ? 'json' : 'jsonl'}`;
+    downloadBlob(await response.blob(), filename);
+    closeExportDialog();
+  } catch (error) {
+    exportDialog.error = error instanceof Error ? error.message : 'Failed to export session';
+  }
+}
+
 async function sendPrompt() {
   if (!state.activeSessionId || !forms.prompt.trim()) return;
   const sessionId = state.activeSessionId;
+  const sentPrompt = forms.prompt;
   if (staleSessionIds.has(sessionId)) return;
   if (sendingSessionIds.has(sessionId)) return;
   const session = activeSession.value;
@@ -1553,11 +1688,14 @@ async function sendPrompt() {
   sendingSessionIds.add(sessionId);
   try {
     await apiPost(`/agent/sessions/${encodeURIComponent(sessionId)}/send`, {
-      prompt: forms.prompt,
+      prompt: sentPrompt,
       context: bundle?.payload,
       projectPath: session.projectPath
     });
-    forms.prompt = '';
+    if (state.activeSessionId === sessionId && forms.prompt === sentPrompt) {
+      forms.prompt = '';
+      draftBySessionId[sessionId] = '';
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send prompt';
     if (message.toLowerCase().includes('session not found')) {

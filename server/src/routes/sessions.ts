@@ -5,6 +5,8 @@ import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
+import { abortRunningTurn, disposeRuntimeSession } from "../services/agent-runtime";
+import { exportSessionDoc, parseExportFormat } from "../services/session-export";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -60,6 +62,17 @@ export const sessionsRoutes = new Hono()
     if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
     return c.json(doc);
   })
+  .get("/:id/export", async (c) => {
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc } = await resolveSession(requestedProjectPath, c.req.param("id"));
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    const format = parseExportFormat(c.req.query("format"));
+    if (!format) return c.json(routeError("unsupported export format", "UNSUPPORTED_EXPORT_FORMAT"), 400);
+    const result = exportSessionDoc(doc, format);
+    c.header("Content-Type", result.contentType);
+    c.header("Content-Disposition", `attachment; filename="${result.filename}"`);
+    return c.body(result.body);
+  })
   .post("/:id/fork", async (c) => {
     const project = mustProject();
     if (!project) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 400);
@@ -72,6 +85,8 @@ export const sessionsRoutes = new Hono()
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
     const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, id);
     if (!projectPath) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    abortRunningTurn(id);
+    await disposeRuntimeSession(id);
     await deleteSession(projectPath, id);
     if (doc?.meta.gittrixSessionId) {
       try {

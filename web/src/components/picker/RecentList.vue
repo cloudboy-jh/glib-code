@@ -161,12 +161,12 @@ defineEmits<{
   left: 50%;
   top: 50%;
   z-index: 60;
-  width: min(calc(100vw - 32px), 520px);
+  width: min(calc(100vw - 48px), 760px);
   transform: translate(-50%, -50%);
   border-radius: 14px;
   border: 1px solid hsl(var(--border) / 0.85);
   background: hsl(var(--card) / 0.96);
-  padding: 14px;
+  padding: 18px;
   box-shadow: 0 24px 70px hsl(0 0% 0% / 0.45);
 }
 
@@ -174,7 +174,7 @@ defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .recent-mode-title {
@@ -185,17 +185,17 @@ defineEmits<{
 .recent-mode-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 12px;
 }
 
 .recent-mode-button {
   display: flex;
-  min-height: 68px;
+  min-height: 92px;
   align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
   border-radius: 9px;
   border: 1px solid hsl(var(--border) / 0.7);
-  padding: 10px;
+  padding: 16px;
   text-align: left;
   color: hsl(var(--foreground));
 }
@@ -208,8 +208,8 @@ defineEmits<{
 
 .recent-mode-icon {
   display: inline-flex;
-  height: 28px;
-  width: 28px;
+  height: 36px;
+  width: 36px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
@@ -232,7 +232,7 @@ defineEmits<{
 
 .recent-mode-label {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: hsl(var(--foreground));
 }
@@ -240,7 +240,7 @@ defineEmits<{
 .recent-mode-text {
   display: block;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 13px;
   color: hsl(var(--muted-foreground));
 }
 
