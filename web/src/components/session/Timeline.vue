@@ -18,7 +18,16 @@
         <div v-if="e.level === 'error'" class="rounded-md border border-red-500/35 bg-red-950/20 px-3 py-2 text-sm text-red-300/95">
           {{ e.text }}
         </div>
-        <p v-else-if="e.text" class="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">{{ e.text }}</p>
+        <div v-else-if="e.text" class="space-y-2">
+          <template v-for="(block, blockIndex) in parseMessageBlocks(e.text)" :key="`${e.id}-block-${blockIndex}`">
+            <p v-if="block.kind === 'text'" class="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">{{ block.value }}</p>
+            <div v-else-if="block.kind === 'diff'" class="space-y-1">
+              <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
+              <DiffView :patch="block.value" diff-style="unified" :theme-preset="themePreset" :theme-type="themeType" />
+            </div>
+            <pre v-else class="max-h-64 overflow-auto rounded-md bg-black/20 p-2 text-[11px] leading-5 text-muted-foreground">{{ block.value }}</pre>
+          </template>
+        </div>
 
         <div v-if="e.toolCalls?.length" class="mt-2 space-y-2">
           <details
@@ -96,6 +105,29 @@ const props = defineProps<{
 }>();
 
 const scrollerRef = ref<HTMLDivElement | null>(null);
+
+function parseMessageBlocks(text: string) {
+  const blocks: Array<{ kind: 'text' | 'diff' | 'code'; value: string }> = [];
+  const regex = /```(\w+)?\n([\s\S]*?)```/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    const [full, langRaw, body] = match;
+    const start = match.index;
+    if (start > last) {
+      const chunk = text.slice(last, start).trim();
+      if (chunk) blocks.push({ kind: 'text', value: chunk });
+    }
+    const lang = (langRaw || '').toLowerCase();
+    blocks.push({ kind: lang === 'diff' ? 'diff' : 'code', value: body.trim() });
+    last = start + full.length;
+  }
+  if (last < text.length) {
+    const tail = text.slice(last).trim();
+    if (tail) blocks.push({ kind: 'text', value: tail });
+  }
+  return blocks.length ? blocks : [{ kind: 'text' as const, value: text }];
+}
 
 function isNearBottom(el: HTMLDivElement, threshold = 80) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;

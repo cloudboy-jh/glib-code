@@ -177,6 +177,77 @@ function redactSecrets(value: string) {
     .replace(/\b[A-Za-z0-9_\-]{32,}\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}\b/g, "[redacted]");
 }
 
+function isUnifiedDiff(value: string) {
+  return /^diff --git /m.test(value) || /^@@ -\d+/m.test(value) || /^--- .+\n\+\+\+ /m.test(value);
+}
+
+function summarize(value: string, limit = 5) {
+  const lines = value.split("\n").map((line) => line.trimEnd()).filter(Boolean);
+  const shown = lines.slice(0, limit).join("\n");
+  return lines.length > limit ? `${shown}\n… ${lines.length - limit} more line${lines.length - limit === 1 ? "" : "s"}` : shown;
+}
+
+function classifyToolResult(result: unknown, isError: boolean) {
+  const raw = redactSecrets(JSON.stringify(result ?? {}));
+  const text = typeof (result as any)?.stdout === "string"
+    ? (result as any).stdout
+    : typeof (result as any)?.stderr === "string"
+      ? (result as any).stderr
+      : typeof (result as any)?.text === "string"
+        ? (result as any).text
+        : raw;
+  const safeText = redactSecrets(String(text || "")).trim();
+
+  if (isError) {
+    return {
+      output: raw,
+      resultType: "error" as const,
+      summary: summarize(safeText || raw),
+      artifact: { text: safeText || raw }
+    };
+  }
+
+  if (safeText && isUnifiedDiff(safeText)) {
+    return {
+      output: raw,
+      resultType: "diff" as const,
+      summary: summarize(safeText, 4),
+      artifact: { patch: safeText }
+    };
+  }
+
+  const trimmed = safeText;
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    try {
+      return {
+        output: raw,
+        resultType: "json" as const,
+        summary: summarize(trimmed),
+        artifact: { json: JSON.parse(trimmed) }
+      };
+    } catch {
+      // fall through
+    }
+  }
+
+  const codeLike = /```|\b(import|export|function|const|let|class|type|interface)\b|^\s*[{};]/m.test(trimmed) && trimmed.split("\n").length > 3;
+  if (codeLike) {
+    return {
+      output: raw,
+      resultType: "code" as const,
+      summary: summarize(trimmed),
+      artifact: { text: trimmed }
+    };
+  }
+
+  return {
+    output: raw,
+    resultType: "terminal" as const,
+    summary: summarize(trimmed || raw),
+    artifact: { text: trimmed || raw }
+  };
+}
+
 function rememberError(turnId: string, message: string): AgentEvent | null {
   if (errorEmittedByTurn.has(turnId)) return null;
   errorEmittedByTurn.add(turnId);
@@ -362,6 +433,7 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   }
   if (event.type === "tool_execution_end") {
     const toolCall = endToolCall(turnId, event);
+    const classified = classifyToolResult(event.result ?? {}, event.isError === true);
     return {
       type: "tool_call",
       turnId,
@@ -370,8 +442,11 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
       tool: toolCall.tool,
       title: toolCall.title,
       input: toolCall.input,
-      output: redactSecrets(JSON.stringify(event.result ?? {})),
+      output: classified.output,
       metadata: { isError: event.isError },
+      resultType: classified.resultType,
+      summary: classified.summary,
+      artifact: classified.artifact,
       durationMs: 0,
       at: nowIso()
     };

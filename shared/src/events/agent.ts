@@ -18,6 +18,15 @@ export type ToolName =
   | "task"
   | string;
 
+export type ToolResultType = "diff" | "terminal" | "json" | "code" | "text" | "error";
+
+export type ToolResultArtifact = {
+  patch?: string;
+  text?: string;
+  json?: unknown;
+  language?: string;
+};
+
 export type AgentEvent =
   | { type: "session_start"; sessionId: string; projectId: string; branch: string; model: string; createdAt: string }
   | { type: "user_turn"; turnId: string; prompt: string; context?: string; attachments?: string[]; at: string }
@@ -36,6 +45,9 @@ export type AgentEvent =
       input: object;
       output: string;
       metadata: object;
+      resultType?: ToolResultType;
+      summary?: string;
+      artifact?: ToolResultArtifact;
       durationMs: number;
       at: string;
     }
