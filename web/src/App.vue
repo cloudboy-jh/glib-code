@@ -382,6 +382,7 @@ type Session = {
   id: string;
   title: string;
   time: string;
+  updatedAt?: string;
   status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
   repo: string;
   project: string;
@@ -658,9 +659,12 @@ const staleSessionIds = reactive(new Set<string>());
 const sessionNoticeById = reactive<Record<string, string | undefined>>({});
 const streamErrorCountBySessionId = new Map<string, number>();
 const sendingSessionIds = reactive(new Set<string>());
+const hydratedVersionBySessionId = new Map<string, string>();
+const hydratingSessionDocById = new Map<string, Promise<void>>();
 
 let stopSidebarResize: (() => void) | null = null;
 let creatingSession: Promise<Session | null> | null = null;
+let hydratingSessionsPromise: Promise<void> | null = null;
 
 const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
 const composerDisabled = computed(() => Boolean(state.activeSessionId && (staleSessionIds.has(state.activeSessionId) || sendingSessionIds.has(state.activeSessionId))));
@@ -784,12 +788,15 @@ function switchActiveSession(sessionId: string) {
   if (state.activeSessionId) draftBySessionId[state.activeSessionId] = forms.prompt;
   state.activeSessionId = sessionId;
   forms.prompt = draftBySessionId[sessionId] ?? '';
+  syncActiveSessionStream();
+  if (sessionId) void hydrateSessionDoc(sessionId).catch(() => undefined);
 }
 
 function clearActiveSession() {
   if (state.activeSessionId) draftBySessionId[state.activeSessionId] = forms.prompt;
   state.activeSessionId = '';
   forms.prompt = '';
+  syncActiveSessionStream();
 }
 
 function redactTimelineText(value: string) {
@@ -910,6 +917,7 @@ function mapApiSession(meta: SessionMetaApi): Session {
     id: meta.id,
     title: meta.title,
     time: timeLabel(meta.updatedAt),
+    updatedAt: meta.updatedAt,
     status: meta.status === 'running' ? 'running' : meta.status === 'error' || meta.status === 'aborted' ? 'disconnected' : 'connected',
     repo: repoName,
     project: repoName,
@@ -921,21 +929,36 @@ function mapApiSession(meta: SessionMetaApi): Session {
 }
 
 async function hydrateSessionDoc(sessionId: string) {
-  const session = sessions.find((entry) => entry.id === sessionId);
-  const query = session?.projectPath ? `?projectPath=${encodeURIComponent(session.projectPath)}` : '';
-  const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}${query}`);
-  timelineBySessionId[sessionId] = [];
-  seenEventKeysBySessionId.set(sessionId, new Set<string>());
-  for (const evt of doc.events) reduceAgentEventToTimeline(sessionId, evt);
+  const existingInflight = hydratingSessionDocById.get(sessionId);
+  if (existingInflight) return existingInflight;
+
+  const run = (async () => {
+    const session = sessions.find((entry) => entry.id === sessionId);
+    if (!session) return;
+    const knownVersion = hydratedVersionBySessionId.get(sessionId);
+    if (knownVersion && knownVersion === session.updatedAt) return;
+    const query = session.projectPath ? `?projectPath=${encodeURIComponent(session.projectPath)}` : '';
+    const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}${query}`);
+    timelineBySessionId[sessionId] = [];
+    seenEventKeysBySessionId.set(sessionId, new Set<string>());
+    for (const evt of doc.events) reduceAgentEventToTimeline(sessionId, evt);
+    hydratedVersionBySessionId.set(sessionId, doc.meta.updatedAt);
+  })().finally(() => {
+    hydratingSessionDocById.delete(sessionId);
+  });
+
+  hydratingSessionDocById.set(sessionId, run);
+  return run;
 }
 
 function connectSessionStream(sessionId: string) {
   if (streamsBySessionId.has(sessionId)) return;
+  if (!state.activeSessionId || state.activeSessionId !== sessionId) return;
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session?.projectPath) return;
   if (staleSessionIds.has(sessionId)) return;
   setSessionStatus(sessionId, 'connecting');
-  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}`);
+  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}&replay=150`);
   const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
   for (const name of names) {
     stream.addEventListener(name, (evt) => {
@@ -958,6 +981,14 @@ function connectSessionStream(sessionId: string) {
     if (count >= 3) void confirmAndMarkSessionStale(sessionId, 'Session stream disconnected. Reload sessions or start a replacement session.');
   };
   streamsBySessionId.set(sessionId, stream);
+}
+
+function syncActiveSessionStream() {
+  const activeId = state.activeSessionId;
+  for (const id of [...streamsBySessionId.keys()]) {
+    if (!activeId || id !== activeId) disconnectSessionStream(id);
+  }
+  if (activeId) connectSessionStream(activeId);
 }
 
 function disconnectSessionStream(sessionId: string) {
@@ -994,6 +1025,8 @@ async function reloadActiveSessions() {
   if (activeId && sessions.some((session) => session.id === activeId)) {
     staleSessionIds.delete(activeId);
     sessionNoticeById[activeId] = undefined;
+    hydratedVersionBySessionId.delete(activeId);
+    await hydrateSessionDoc(activeId).catch(() => undefined);
     connectSessionStream(activeId);
   } else if (activeId) {
     staleSessionIds.add(activeId);
@@ -1009,16 +1042,25 @@ async function createReplacementSession() {
 
 async function hydrateSessions() {
   if (!currentProject.value) return;
-  const rows = await apiGet<SessionMetaApi[]>('/sessions');
-  sessions.splice(0, sessions.length, ...rows.map(mapApiSession));
-  const activeIds = new Set(rows.map((row) => row.id));
-  for (const id of [...streamsBySessionId.keys()]) {
-    if (!activeIds.has(id)) disconnectSessionStream(id);
-  }
-  for (const row of rows) {
-    await hydrateSessionDoc(row.id);
-    connectSessionStream(row.id);
-  }
+  if (hydratingSessionsPromise) return hydratingSessionsPromise;
+  hydratingSessionsPromise = (async () => {
+    const rows = await apiGet<SessionMetaApi[]>('/sessions');
+    sessions.splice(0, sessions.length, ...rows.map(mapApiSession));
+    const activeIds = new Set(rows.map((row) => row.id));
+    for (const id of [...streamsBySessionId.keys()]) {
+      if (!activeIds.has(id)) disconnectSessionStream(id);
+    }
+    for (const id of [...hydratedVersionBySessionId.keys()]) {
+      if (!activeIds.has(id)) hydratedVersionBySessionId.delete(id);
+    }
+    if (state.activeSessionId && activeIds.has(state.activeSessionId)) {
+      await hydrateSessionDoc(state.activeSessionId);
+    }
+    syncActiveSessionStream();
+  })().finally(() => {
+    hydratingSessionsPromise = null;
+  });
+  return hydratingSessionsPromise;
 }
 
 function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {

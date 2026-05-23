@@ -187,6 +187,10 @@ export const agentRoutes = new Hono()
     const { existing, projectPath } = await resolveSession(requestedProjectPath, id);
     if (!existing) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
 
+    const replayRaw = Number(c.req.query("replay") ?? "100");
+    const replayLimit = Number.isFinite(replayRaw) ? Math.max(0, Math.min(500, Math.trunc(replayRaw))) : 100;
+    const replayEvents = replayLimit > 0 ? existing.events.slice(-replayLimit) : [];
+
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
@@ -203,9 +207,9 @@ export const agentRoutes = new Hono()
           }
         };
 
-        log("agent", "sse open", { sessionId: id, replayEvents: existing.events.length });
+        log("agent", "sse open", { sessionId: id, replayEvents: replayEvents.length, replayLimit });
         safeEnqueue(`event: ready\ndata: ${JSON.stringify({ sessionId: id })}\n\n`);
-        for (const evt of existing.events) {
+        for (const evt of replayEvents) {
           if (!safeEnqueue(sseEncode(evt))) break;
         }
         const unsub = subscribe(id, (event) => {
