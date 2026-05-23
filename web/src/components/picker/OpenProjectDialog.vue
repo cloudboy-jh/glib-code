@@ -37,7 +37,7 @@
             type="button"
             class="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/60"
             @click="$emit('update:path', candidate.path)"
-            @dblclick="$emit('open')"
+            @dblclick="$emit('open', { mode: 'diff' })"
           >
             <span class="min-w-0">
               <span class="block truncate text-foreground">{{ candidate.name }}</span>
@@ -49,9 +49,12 @@
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-border/70 pt-4">
+      <div class="flex justify-between gap-2 border-t border-border/70 pt-4">
         <UiButton variant="outline" @click="$emit('close')">Cancel</UiButton>
-        <UiButton @click="$emit('open')">Open Project</UiButton>
+        <div class="flex gap-2">
+          <UiButton variant="outline" @click="$emit('open', { mode: 'diff' })">Open in Diffs</UiButton>
+          <UiButton @click="$emit('open', { mode: 'session' })">Open in Session</UiButton>
+        </div>
       </div>
     </div>
   </UiDialog>
@@ -65,7 +68,7 @@ import UiInput from '../ui/input.vue';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const props = defineProps<{ path: string }>();
-const emit = defineEmits<{ close: []; open: []; 'update:path': [value: string] }>();
+const emit = defineEmits<{ close: []; open: [payload: { mode: 'diff' | 'session' }]; 'update:path': [value: string] }>();
 
 type Candidate = { name: string; path: string; source: string };
 const candidates = ref<Candidate[]>([]);

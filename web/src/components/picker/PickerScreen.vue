@@ -71,14 +71,8 @@
         :recents="recents"
         :active-index="pickerIndex"
         :active-offset="3"
-        :pending-path="pendingProjectPath"
-        :pending-name="pendingProjectName"
-        :pending-mode="pendingMode"
         @open="emit('openRecent', $event)"
         @forget="emit('forgetRecent', $event)"
-        @select-mode="emit('selectProjectMode', $event)"
-        @set-mode="pendingMode = $event"
-        @cancel-mode="emit('cancelProjectMode')"
       />
     </section>
 
@@ -112,26 +106,20 @@ const props = defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
   providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
   logoSrc?: string;
-  pendingProjectPath?: string | null;
-  pendingProjectName?: string;
-  defaultOpenMode?: 'diff' | 'session';
 }>();
 const emit = defineEmits<{
   openProject: [];
   openClone: [];
   openPalette: [];
-  openRecent: [path: string];
+  openRecent: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
   forgetRecent: [id: string];
   openTheme: [];
   openGittrix: [];
   openModel: [];
   providerAuthSave: [providerId: string, apiKey: string];
-  selectProjectMode: [mode: 'diff' | 'session'];
-  cancelProjectMode: [];
 }>();
 
 const pickerIndex = ref(0);
-const pendingMode = ref<'diff' | 'session'>(props.defaultOpenMode ?? 'diff');
 const providerDraft = ref('openrouter');
 const apiKeyDraft = ref('');
 const totalPickerRows = computed(() => 3 + props.recents.length);
@@ -157,55 +145,17 @@ watch(totalPickerRows, (count) => {
   if (pickerIndex.value >= count) pickerIndex.value = Math.max(count - 1, 0);
 });
 
-watch(
-  () => props.pendingProjectPath,
-  (next) => {
-    if (!next) {
-      pickerIndex.value = 0;
-      pendingMode.value = props.defaultOpenMode ?? 'diff';
-    }
-  }
-);
-
 function runPickerSelection(index: number) {
   if (index === 0) emit('openProject');
   else if (index === 1) emit('openClone');
   else if (index === 2) emit('openPalette');
   else if (index <= 2 + props.recents.length) {
     const recent = props.recents[index - 3];
-    if (recent && recent.status === 'ok') emit('openRecent', recent.path);
+    if (recent && recent.status === 'ok') emit('openRecent', { name: recent.name, path: recent.path, mode: 'diff' });
   }
 }
 
 function onPickerKeydown(event: KeyboardEvent) {
-  if (props.pendingProjectPath) {
-    if (event.key === 'ArrowLeft' || event.key === 'h' || event.key === 'H') {
-      event.preventDefault();
-      pendingMode.value = 'diff';
-      return;
-    }
-
-    if (event.key === 'ArrowRight' || event.key === 'l' || event.key === 'L') {
-      event.preventDefault();
-      pendingMode.value = 'session';
-      return;
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      emit('selectProjectMode', pendingMode.value);
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      emit('cancelProjectMode');
-      return;
-    }
-
-    return;
-  }
-
   if (event.key === 'j' || event.key === 'J' || event.key === 'ArrowDown') {
     event.preventDefault();
     pickerIndex.value = Math.min(pickerIndex.value + 1, lastPickerIndex.value);

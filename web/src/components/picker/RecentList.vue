@@ -2,7 +2,7 @@
   <div class="space-y-1">
     <template v-for="(r, idx) in recents" :key="r.id">
       <div :class="['recent-row', activeIndex === activeOffset + idx ? 'recent-row-active' : '']">
-        <button class="recent-row-open" @click="$emit('open', r.path)">
+        <button class="recent-row-open" @click="toggleModeCards(r.path)">
           <span class="recent-row-left">
             <Folder class="h-4 w-4" />
             <span class="min-w-0">
@@ -18,37 +18,32 @@
         </span>
       </div>
 
-      <div v-if="pendingPath && pendingPath === r.path" class="recent-mode-popover">
-        <div class="recent-mode-head">
-          <div class="recent-mode-title">Open {{ pendingName || r.name }} as</div>
-          <button class="recent-mode-cancel" type="button" @click="$emit('cancelMode')">Cancel</button>
-        </div>
-        <div class="recent-mode-actions">
-          <button
-            :class="['recent-mode-button', pendingMode === 'diff' ? 'recent-mode-button-active' : '']"
-            type="button"
-            @mouseenter="$emit('setMode', 'diff')"
-            @click="$emit('selectMode', 'diff')"
-          >
-            <span class="recent-mode-icon recent-mode-icon-primary"><GitBranch class="h-4 w-4" /></span>
-            <span>
-              <span class="recent-mode-label">Diffs</span>
-              <span class="recent-mode-text">Review changes first</span>
-            </span>
-          </button>
-          <button
-            :class="['recent-mode-button', pendingMode === 'session' ? 'recent-mode-button-active' : '']"
-            type="button"
-            @mouseenter="$emit('setMode', 'session')"
-            @click="$emit('selectMode', 'session')"
-          >
-            <span class="recent-mode-icon recent-mode-glyph">&gt;_</span>
-            <span>
-              <span class="recent-mode-label">Session</span>
-              <span class="recent-mode-text">Start prompting now</span>
-            </span>
-          </button>
-        </div>
+      <div v-if="expandedPath === r.path" class="recent-mode-cards">
+        <button
+          :class="['recent-mode-button', hoveredMode === 'diff' ? 'recent-mode-button-active' : '']"
+          type="button"
+          @mouseenter="hoveredMode = 'diff'"
+          @click="$emit('open', { name: r.name, path: r.path, mode: 'diff' })"
+        >
+          <span class="recent-mode-icon recent-mode-icon-primary"><GitBranch class="h-4 w-4" /></span>
+          <span>
+            <span class="recent-mode-label">Diffs</span>
+            <span class="recent-mode-text">Review changes first</span>
+          </span>
+        </button>
+
+        <button
+          :class="['recent-mode-button', hoveredMode === 'session' ? 'recent-mode-button-active' : '']"
+          type="button"
+          @mouseenter="hoveredMode = 'session'"
+          @click="$emit('open', { name: r.name, path: r.path, mode: 'session' })"
+        >
+          <span class="recent-mode-icon recent-mode-glyph">&gt;_</span>
+          <span>
+            <span class="recent-mode-label">Session</span>
+            <span class="recent-mode-text">Start prompting now</span>
+          </span>
+        </button>
       </div>
     </template>
 
@@ -59,32 +54,33 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, GitBranch } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { Folder } from 'lucide-vue-next';
+import { GitBranch } from 'lucide-vue-next';
 
 withDefaults(
   defineProps<{
     recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
     activeIndex?: number;
     activeOffset?: number;
-    pendingPath?: string | null;
-    pendingName?: string;
-    pendingMode?: 'diff' | 'session';
   }>(),
   {
     activeIndex: -1,
-    activeOffset: 0,
-    pendingPath: null,
-    pendingName: '',
-    pendingMode: 'diff'
+    activeOffset: 0
   }
 );
 defineEmits<{
-  open: [path: string];
+  open: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
   forget: [id: string];
-  selectMode: [mode: 'diff' | 'session'];
-  setMode: [mode: 'diff' | 'session'];
-  cancelMode: [];
 }>();
+
+const expandedPath = ref<string | null>(null);
+const hoveredMode = ref<'diff' | 'session'>('diff');
+
+function toggleModeCards(path: string) {
+  expandedPath.value = expandedPath.value === path ? null : path;
+  hoveredMode.value = 'diff';
+}
 </script>
 
 <style scoped>
@@ -156,60 +152,37 @@ defineEmits<{
   color: hsl(var(--foreground));
 }
 
-.recent-mode-popover {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 60;
-  width: min(calc(100vw - 48px), 760px);
-  transform: translate(-50%, -50%);
-  border-radius: 14px;
-  border: 1px solid hsl(var(--border) / 0.85);
-  background: hsl(var(--card) / 0.96);
-  padding: 18px;
-  box-shadow: 0 24px 70px hsl(0 0% 0% / 0.45);
-}
-
-.recent-mode-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.recent-mode-title {
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-
-.recent-mode-actions {
+.recent-mode-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
+  margin: 6px 0 2px;
+  padding: 0 2px;
 }
 
 .recent-mode-button {
   display: flex;
-  min-height: 92px;
+  min-height: 88px;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
   border-radius: 9px;
   border: 1px solid hsl(var(--border) / 0.7);
-  padding: 16px;
+  background: hsl(var(--background) / 0.25);
+  padding: 14px;
   text-align: left;
   color: hsl(var(--foreground));
 }
 
+.recent-mode-button:hover,
 .recent-mode-button-active {
   border-color: hsl(var(--primary) / 0.55);
   background: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
 }
 
 .recent-mode-icon {
   display: inline-flex;
-  height: 36px;
-  width: 36px;
+  height: 34px;
+  width: 34px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
@@ -242,19 +215,6 @@ defineEmits<{
   margin-top: 2px;
   font-size: 13px;
   color: hsl(var(--muted-foreground));
-}
-
-.recent-mode-cancel {
-  height: 24px;
-  border-radius: 7px;
-  padding: 0 6px;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-}
-
-.recent-mode-cancel:hover {
-  background: hsl(var(--muted) / 0.7);
-  color: hsl(var(--foreground));
 }
 
 </style>

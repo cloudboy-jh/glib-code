@@ -43,15 +43,12 @@
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
-          <template v-if="!currentProject || pendingProjectOpen">
+          <template v-if="!currentProject">
             <div class="grid h-full place-items-center px-6">
               <PickerScreen
                 :recents="recents"
                 :providers="providerCapabilities.providers"
                 :logo-src="logoWordmarkSrc"
-                :pending-project-path="pendingProjectOpen?.path ?? null"
-                :pending-project-name="pendingProjectOpen?.name ?? ''"
-                :default-open-mode="settings.defaultOpenMode"
                 @open-project="state.openProjectDialogOpen = true"
                 @open-clone="state.cloneDialogOpen = true"
                 @open-palette="openCommandPalette"
@@ -61,8 +58,6 @@
                 @open-recent="openRecentProject"
                 @forget-recent="forgetRecentProject"
                 @provider-auth-save="saveProviderAuth"
-                @select-project-mode="finalizeProjectOpen"
-                @cancel-project-mode="closeProjectOpenModeDialog"
               />
             </div>
           </template>
@@ -443,7 +438,6 @@ type TimelineEntry = {
   }>;
 };
 
-type PendingProjectOpen = { name: string; path: string };
 type RecentStatus = 'ok' | 'missing_path' | 'missing_git';
 type RecentEntry = { id: string; name: string; path: string; lastOpenedAt: string; status: RecentStatus };
 type ProviderCapability = { id: string; hasAuth: boolean; modelIds: string[] };
@@ -457,8 +451,6 @@ const picker = reactive({
   cloneUrl: '',
   cloneDestination: 'C:/repos'
 });
-
-const pendingProjectOpen = ref<PendingProjectOpen | null>(null);
 
 const sessions = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
@@ -1333,10 +1325,6 @@ function goHome() {
   clearActiveSession();
 }
 
-function closeProjectOpenModeDialog() {
-  pendingProjectOpen.value = null;
-}
-
 function startSidebarResize(event: MouseEvent) {
   if (sidebarUiCollapsed.value) return;
   event.preventDefault();
@@ -1384,29 +1372,20 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
   switchActiveSession(activeSessionIdByProject[id] ?? '');
 }
 
-function queueProjectOpen(projectName: string, path: string) {
+async function queueProjectOpen(projectName: string, path: string, mode: 'diff' | 'session') {
   state.openProjectDialogOpen = false;
   state.cloneDialogOpen = false;
-  pendingProjectOpen.value = { name: projectName, path };
 
-  openProject(projectName, path, settings.defaultOpenMode);
-  void hydrateSessions().catch(() => undefined);
+  openProject(projectName, path, mode);
+  await hydrateSessions().catch(() => undefined);
+  if (mode === 'session' && !state.activeSessionId) {
+    await createSession();
+  }
 
   const existingRecent = recents.find((r) => r.path === path);
   if (!existingRecent) {
     recents.unshift({ id: `pending-${Date.now()}`, name: projectName, path, lastOpenedAt: 'now', status: 'ok' });
   }
-}
-
-async function finalizeProjectOpen(mode: 'diff' | 'session') {
-  if (!pendingProjectOpen.value) return;
-  state.mode = mode;
-  if (mode === 'session' && !state.activeSessionId) {
-    await createSession();
-  }
-  closeProjectOpenModeDialog();
-  state.openProjectDialogOpen = false;
-  state.cloneDialogOpen = false;
 }
 
 async function resolveProjectOpen(path: string) {
@@ -1435,24 +1414,24 @@ async function resolveProjectOpen(path: string) {
   }
 }
 
-async function openExistingProject() {
+async function openExistingProject(payload: { mode: 'diff' | 'session' }) {
   const path = picker.openPath.trim();
   if (!path) return;
   const opened = await resolveProjectOpen(path);
   if (!opened.ok) return;
-  queueProjectOpen(opened.name, opened.path);
+  await queueProjectOpen(opened.name, opened.path, payload.mode);
   void hydrateRecents();
 }
 
-async function openRecentProject(path: string) {
-  const opened = await resolveProjectOpen(path);
+async function openRecentProject(payload: { name: string; path: string; mode: 'diff' | 'session' }) {
+  const opened = await resolveProjectOpen(payload.path);
   if (!opened.ok) {
     void hydrateRecents();
     return;
   }
-  const recent = recents.find((r) => r.path === path);
+  const recent = recents.find((r) => r.path === payload.path);
   if (recent) recent.status = 'ok';
-  queueProjectOpen(recent?.name ?? opened.name, opened.path);
+  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, payload.mode);
   void hydrateRecents();
 }
 
@@ -1476,13 +1455,13 @@ async function forgetRecentProject(id: string) {
   }
 }
 
-function cloneRepository() {
+async function cloneRepository() {
   const url = picker.cloneUrl.trim();
   const destination = picker.cloneDestination.trim();
   if (!url || !destination) return;
 
   const rawName = url.replace(/\.git$/i, '').split('/').filter(Boolean).pop() ?? 'repo';
-  queueProjectOpen(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`);
+  await queueProjectOpen(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`, settings.defaultOpenMode);
 }
 
 function openCommandPalette() {
@@ -1634,8 +1613,6 @@ function removeContextChip(id: string) {
 function selectSessionFromSidebar(sessionId: string) {
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session) return;
-
-  closeProjectOpenModeDialog();
 
   switchActiveSession(sessionId);
   if (currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
@@ -2040,10 +2017,6 @@ function onGlobalKeydown(event: KeyboardEvent) {
     }
     if (state.themeDialogOpen) {
       state.themeDialogOpen = false;
-      return;
-    }
-    if (pendingProjectOpen.value) {
-      closeProjectOpenModeDialog();
       return;
     }
     if (state.cloneDialogOpen) {
