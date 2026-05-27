@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createSession, deleteSession, getSessionById } from "./session-store";
 import { registerProject, resetProjectStoreForTests, setCurrentProject } from "./project-store";
 import { resolveAgentCwd, resolveSession } from "./session-resolver";
+import { canonicalProjectPath } from "../lib/project-path";
 
 let root = "";
 let repoA = "";
@@ -29,7 +30,7 @@ describe("session resolver", () => {
     const session = await createSession({ projectId: "project-a", projectPath: repoA, title: "A", model: "m", provider: "p" });
     const resolved = await resolveSession(null, session.id);
     expect(resolved.existing?.meta.id).toBe(session.id);
-    expect(resolved.projectPath?.replace(/\\/g, "/")).toBe(repoA.replace(/\\/g, "/"));
+    expect(canonicalProjectPath(resolved.projectPath ?? "")).toBe(canonicalProjectPath(repoA));
   });
 
   test("resolves by explicit projectPath when index is missing", async () => {
@@ -45,14 +46,14 @@ describe("session resolver", () => {
     expect(await getSessionById(session.id)).toBeNull();
     const resolved = await resolveSession(repoA, session.id);
     expect(resolved.existing).toBeNull();
-    expect(resolved.projectPath?.replace(/\\/g, "/")).toBe(repoA.replace(/\\/g, "/"));
+    expect(canonicalProjectPath(resolved.projectPath ?? "")).toBe(canonicalProjectPath(repoA));
   });
 
   test("uses git-backed ephemeral cwd only when metadata and .git agree", async () => {
     const eph = join(root, "eph");
     await mkdir(join(eph, ".git"), { recursive: true });
-    expect(resolveAgentCwd(repoA, eph, true).replace(/\\/g, "/")).toBe(eph.replace(/\\/g, "/"));
-    expect(resolveAgentCwd(repoA, eph, false).replace(/\\/g, "/")).toBe(repoA.replace(/\\/g, "/"));
-    expect(resolveAgentCwd(repoA, join(root, "missing"), true).replace(/\\/g, "/")).toBe(repoA.replace(/\\/g, "/"));
+    expect(canonicalProjectPath(resolveAgentCwd(repoA, eph, true))).toBe(canonicalProjectPath(eph));
+    expect(canonicalProjectPath(resolveAgentCwd(repoA, eph, false))).toBe(canonicalProjectPath(repoA));
+    expect(canonicalProjectPath(resolveAgentCwd(repoA, join(root, "missing"), true))).toBe(canonicalProjectPath(repoA));
   });
 });

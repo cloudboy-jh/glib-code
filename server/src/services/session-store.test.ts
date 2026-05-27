@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { appendEvents, createSession, getSession, getSessionById, patchSessionMeta } from "./session-store";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
+import { canonicalProjectPath } from "../lib/project-path";
 
 let root = "";
 let repo = "";
@@ -49,7 +50,7 @@ describe("session store", () => {
     await Promise.all(Array.from({ length: 20 }, (_, index) => appendEvents(repo, session.id, [textEvent(index)])));
 
     const indexed = await getSessionById(session.id);
-    expect(indexed?.projectPath.replace(/\\/g, "/")).toBe(repo.replace(/\\/g, "/"));
+    expect(canonicalProjectPath(indexed?.projectPath ?? "")).toBe(canonicalProjectPath(repo));
     expect(indexed?.doc.events).toHaveLength(20);
   });
 });
