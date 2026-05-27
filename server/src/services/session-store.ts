@@ -4,9 +4,10 @@ import { join } from "node:path";
 import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { ensureDir, getConfigDir, repoGlibDir } from "../lib/paths";
 import { writeJsonAtomic } from "../lib/atomic-write";
+import { canonicalProjectPath } from "../lib/project-path";
 
 function normalizeProjectPath(path: string) {
-  return path.replace(/\\/g, "/");
+  return canonicalProjectPath(path) ?? path.replace(/\\/g, "/").trim();
 }
 
 export type SessionMeta = {

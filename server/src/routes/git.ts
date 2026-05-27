@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { gitBranches, gitLog, gitPush, gitStash, gitStatus } from "../services/git";
+import { routeError } from "../lib/route-error";
 
 const notImplemented = (c: any) => c.json({ ok: false, message: "not implemented" }, 501);
-const routeError = (message: string, code: string, retryable = false) => ({ ok: false, code, message, retryable });
 
 export const gitRoutes = new Hono()
   .get("/status", async (c) => {

@@ -45,142 +45,73 @@
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
-          <template v-if="!currentProject">
-            <div class="grid h-full place-items-center px-6">
-              <PickerScreen
-                :recents="recents"
-                :providers="providerCapabilities.providers"
-                :sessions-by-path="pickerSessionsByPath"
-                :logo-src="logoWordmarkSrc"
-                @open-project="state.openProjectDialogOpen = true"
-                @open-clone="state.cloneDialogOpen = true"
-                @open-palette="openCommandPalette"
-                @open-theme="state.themeDialogOpen = true"
-                @open-gittrix="openSettings('Git')"
-                @open-model="openSettings('Models')"
-                @open-recent="openRecentProject"
-                @continue-recent-session="continueRecentSessionFromPicker"
-                @start-new-recent-session="startNewRecentSessionFromPicker"
-                @forget-recent="forgetRecentProject"
-                @provider-auth-save="saveProviderAuth"
-              />
-            </div>
-          </template>
+          <PickerView
+            v-if="!currentProject"
+            :recents="recents"
+            :providers="providerCapabilities.providers"
+            :sessions-by-path="pickerSessionsByPath"
+            :logo-src="logoWordmarkSrc"
+            @open-project="state.openProjectDialogOpen = true"
+            @open-clone="state.cloneDialogOpen = true"
+            @open-palette="openCommandPalette"
+            @open-theme="state.themeDialogOpen = true"
+            @open-gittrix="openSettings('Git')"
+            @open-model="openSettings('Models')"
+            @open-recent="openRecentProject"
+            @continue-recent-session="continueRecentSessionFromPicker"
+            @start-new-recent-session="startNewRecentSessionFromPicker"
+            @forget-recent="forgetRecentProject"
+            @provider-auth-save="saveProviderAuth"
+          />
 
-          <template v-else>
-            <template v-if="state.mode === 'session'">
-              <template v-if="activeSession">
-                <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-                  <SessionContextCapsule
-                    v-if="activeContextBundle"
-                    :summary="activeContextSummary"
-                    @view="state.contextViewerOpen = true"
-                    @remove="removeActiveContext"
-                    @back-to-diffs="state.mode = 'diff'"
-                  />
-                  <div v-if="activeSessionNotice" class="mx-auto mt-2 w-full max-w-5xl px-3 sm:px-5">
-                    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                      <span class="font-medium">{{ activeSessionNotice }}</span>
-                      <span class="ml-auto" />
-                      <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="reloadActiveSessions">Reload sessions</button>
-                      <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="createReplacementSession">New replacement</button>
-                    </div>
-                  </div>
-                  <Timeline :entries="activeTimeline" :theme-preset="settings.themePreset" :theme-type="diffThemeType" />
-                  <Composer
-                    :context="contextLabel"
-                    :prompt="forms.prompt"
-                    :meta="selectedModelLabel"
-                    :context-chips="activeContextChips"
-                    :disabled="composerDisabled"
-                    @update:prompt="setComposerPrompt"
-                    @send="sendPrompt"
-                    @execute-command="runComposerCommand"
-                    @remove-context-chip="removeContextChip"
-                  />
-                </div>
-              </template>
+          <SessionView
+            v-else-if="state.mode === 'session'"
+            :active-session="activeSession"
+            :active-context-summary="activeContextSummary"
+            :active-session-notice="activeSessionNotice"
+            :active-timeline="activeTimeline"
+            :theme-preset="settings.themePreset"
+            :theme-type="diffThemeType"
+            :context-label="contextLabel"
+            :prompt="forms.prompt"
+            :selected-model-label="selectedModelLabel"
+            :active-context-chips="activeContextChips"
+            :composer-disabled="composerDisabled"
+            :session-continue-open="state.sessionContinueOpen"
+            :recent-project-sessions="recentProjectSessions"
+            :agent-setup-message="state.agentSetupMessage"
+            :agent-setup-kind="state.agentSetupKind"
+            :default-provider="settings.defaultProvider"
+            :compatible-usable-model="compatibleUsableModel"
+            @open-context-viewer="state.contextViewerOpen = true"
+            @remove-active-context="removeActiveContext"
+            @back-to-diffs="state.mode = 'diff'"
+            @reload-active-sessions="reloadActiveSessions"
+            @create-replacement-session="createReplacementSession"
+            @update-prompt="setComposerPrompt"
+            @send-prompt="sendPrompt"
+            @run-composer-command="runComposerCommand"
+            @remove-context-chip="removeContextChip"
+            @toggle-continue="state.sessionContinueOpen = !state.sessionContinueOpen"
+            @create-session="createSession"
+            @select-session="selectSessionFromSidebar"
+            @open-git-settings="openSettings('Git')"
+            @use-local-gittrix="useLocalGitTrix"
+            @open-model-settings="openSettings('Models')"
+            @use-compatible-model="selectModel($event.providerId, $event.modelId)"
+            @open-model-picker="state.modelPickerOpen = true"
+          />
 
-              <template v-else>
-                <div class="grid h-full place-items-center p-6">
-                  <div class="w-full max-w-3xl rounded-xl border border-border/80 bg-card/55 p-6">
-                    <h2 class="mb-2 text-lg font-semibold">Session workspace</h2>
-                    <p class="mb-4 text-sm text-muted-foreground">Choose continue or start new.</p>
-                    <div class="mb-4 grid gap-3 md:grid-cols-2">
-                      <button
-                        type="button"
-                        class="group flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 text-left transition-colors hover:bg-accent/45"
-                        @click="state.sessionContinueOpen = !state.sessionContinueOpen"
-                      >
-                        <div class="mt-0.5 rounded-md border border-border/70 bg-background/60 p-1.5 text-muted-foreground group-hover:text-foreground">
-                          <History class="h-4 w-4" />
-                        </div>
-                        <div class="min-w-0">
-                          <div class="text-sm font-semibold">Continue</div>
-                          <div class="mt-0.5 text-xs text-muted-foreground">Pick an existing session</div>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        class="group flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 text-left transition-colors hover:bg-accent/45"
-                        @click="createSession"
-                      >
-                        <div class="mt-0.5 rounded-md border border-border/70 bg-background/60 p-1.5 text-muted-foreground group-hover:text-foreground">
-                          <PlusSquare class="h-4 w-4" />
-                        </div>
-                        <div class="min-w-0">
-                          <div class="text-sm font-semibold">New session</div>
-                          <div class="mt-0.5 text-xs text-muted-foreground">Start a fresh isolated workspace</div>
-                        </div>
-                      </button>
-                    </div>
-                    <div v-if="state.sessionContinueOpen" class="mb-4 rounded-lg border border-border/70 bg-background/40 p-3">
-                      <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/80">Recent sessions</div>
-                      <div v-if="recentProjectSessions.length" class="space-y-2 text-left">
-                        <button
-                          v-for="session in recentProjectSessions"
-                          :key="`landing-${session.id}`"
-                          type="button"
-                          class="flex w-full items-center gap-2 rounded-md border border-border/70 bg-background/50 px-3 py-2 text-left text-sm hover:bg-accent/60"
-                          @click="selectSessionFromSidebar(session.id)"
-                        >
-                          <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
-                          <span class="shrink-0 text-xs text-muted-foreground/75">{{ session.time }}</span>
-                        </button>
-                      </div>
-                      <div v-else class="text-left text-xs text-muted-foreground">No existing sessions for this project.</div>
-                    </div>
-                    <div v-if="state.agentSetupMessage" class="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
-                      <p>{{ state.agentSetupMessage }}</p>
-                      <div v-if="state.agentSetupKind === 'gittrix'" class="mt-2 flex flex-wrap gap-3">
-                        <button class="underline underline-offset-2" @click="openSettings('Git')">Open GitTrix settings</button>
-                        <button class="underline underline-offset-2" @click="useLocalGitTrix">Use local GitTrix</button>
-                      </div>
-                      <div v-else class="mt-2 flex flex-wrap gap-3">
-                        <button class="underline underline-offset-2" @click="openSettings('Models')">Add {{ settings.defaultProvider }} key</button>
-                        <button v-if="compatibleUsableModel" class="underline underline-offset-2" @click="selectModel(compatibleUsableModel.providerId, compatibleUsableModel.modelId)">
-                          Use {{ compatibleUsableModel.providerId }}/{{ compatibleUsableModel.modelId }}
-                        </button>
-                        <button class="underline underline-offset-2" @click="state.modelPickerOpen = true">Change model</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </template>
-
-            <template v-else>
-              <DiffWorkbench
-                :current-project="currentProject"
-                :diff-style="state.diffStyle"
-                :theme-type="diffThemeType"
-                :theme-preset="settings.themePreset"
-                @update:diff-style="state.diffStyle = $event"
-                @open-projects="goHome"
-                @start-session-from-diff="startSessionFromDiff"
-              />
-            </template>
-          </template>
+          <DiffView
+            v-else
+            :current-project="currentProject"
+            :diff-style="state.diffStyle"
+            :theme-type="diffThemeType"
+            :theme-preset="settings.themePreset"
+            @update:diff-style="state.diffStyle = $event"
+            @open-projects="goHome"
+            @start-session-from-diff="startSessionFromDiff"
+          />
         </main>
       </section>
     </div>
@@ -369,7 +300,7 @@
               </div>
             </div>
             <div v-else-if="!promote.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
-            <DiffView v-else :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
+            <SharedDiffView v-else :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
         </div>
         <div class="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card/98 px-4 py-3">
           <div class="text-xs text-muted-foreground">
@@ -408,32 +339,36 @@ import CommandPalette from './components/app/CommandPalette.vue';
 import TerminalDrawer from './components/app/TerminalDrawer.vue';
 import CloneRepoDialog from './components/picker/CloneRepoDialog.vue';
 import OpenProjectDialog from './components/picker/OpenProjectDialog.vue';
-import PickerScreen from './components/picker/PickerScreen.vue';
 import ThemeDialog from './components/picker/ThemeDialog.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
 import ModelPicker from './components/settings/ModelPicker.vue';
-import Composer from './components/session/Composer.vue';
-import SessionContextCapsule from './components/session/SessionContextCapsule.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
 import SessionSidebar from './components/session/SessionSidebar.vue';
-import Timeline from './components/session/Timeline.vue';
+import DiffView from './views/DiffView.vue';
+import PickerView from './views/PickerView.vue';
+import SessionView from './views/SessionView.vue';
+import { ApiRequestError, useApiClient } from './composables/useApiClient';
+import { useGlobalShortcuts } from './composables/useGlobalShortcuts';
+import { canonicalizeProjectPath, usePickerSessions } from './composables/usePickerSessions';
+import { useSessionOrchestrator } from './composables/useSessionOrchestrator';
+import { useSessionStreaming } from './composables/useSessionStreaming';
 import { applyTheme } from './lib/theme';
 import { THEME_PRESETS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import { ChevronDown, History, PlusSquare } from 'lucide-vue-next';
+import { ChevronDown } from 'lucide-vue-next';
 import logoIcon from '../../glibcode-iconlogo.png';
 import logoWordmark from '../../glibcode-wordmark.png';
 
 const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
-const DiffWorkbench = defineAsyncComponent(() => import('./components/diff/DiffWorkbench.vue'));
-const DiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
+const SharedDiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
 const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
 const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
+const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient();
 
 type Session = {
   id: string;
@@ -652,24 +587,17 @@ const sidebarSessions = computed(() => {
     }))
     .sort((a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt));
 });
-const pickerSessionsByPath = computed(() => {
-  const grouped: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: Session['status'] }>> = {};
-  for (const session of pickerSessionCatalog) {
-    const key = canonicalizeProjectPath(session.projectPath);
-    if (!key) continue;
-    const list = grouped[key] ?? (grouped[key] = []);
-    list.push({
-      id: session.id,
-      title: normalizeSessionTitle(session),
-      time: session.time,
-      updatedAt: session.updatedAt,
-      status: staleSessionIds.has(session.id) ? 'stale' : session.status
-    });
-  }
-  for (const key of Object.keys(grouped)) {
-    grouped[key].sort((a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt));
-  }
-  return grouped;
+const { pickerSessionsByPath, hydratePickerSessions } = usePickerSessions({
+  apiGet,
+  mapApiSession: (meta) => {
+    const mapped = mapApiSession(meta as SessionMetaApi);
+    return {
+      ...mapped,
+      title: normalizeSessionTitle(mapped),
+      status: staleSessionIds.has(mapped.id) ? 'stale' : mapped.status
+    };
+  },
+  pickerSessionCatalog
 });
 const recentProjectSessions = computed(() => {
   if (!currentProject.value) return sidebarSessions.value.slice(0, 3);
@@ -761,6 +689,19 @@ const hydratingSessionDocById = new Map<string, Promise<void>>();
 let stopSidebarResize: (() => void) | null = null;
 let creatingSession: Promise<Session | null> | null = null;
 let hydratingSessionsPromise: Promise<void> | null = null;
+
+const { connectSessionStream, syncActiveSessionStream, disconnectSessionStream, markSessionStale, confirmAndMarkSessionStale } = useSessionStreaming({
+  apiBase: API_BASE,
+  sessions,
+  state,
+  streamsBySessionId,
+  streamErrorCountBySessionId,
+  staleSessionIds,
+  sessionNoticeById,
+  setSessionStatus,
+  reduceAgentEventToTimeline,
+  hydrateSessionDoc
+});
 
 const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
 const composerDisabled = computed(() => Boolean(state.activeSessionId && (staleSessionIds.has(state.activeSessionId) || sendingSessionIds.has(state.activeSessionId))));
@@ -1074,82 +1015,6 @@ async function hydrateSessionDoc(sessionId: string) {
   return run;
 }
 
-function canonicalizeProjectPath(path: string) {
-  const slashNormalized = path.replace(/\\/g, '/').trim();
-  const withoutTrailing = slashNormalized.replace(/\/+$/g, '');
-  const maybeDrive = /^[A-Za-z]:\//.test(withoutTrailing);
-  const normalizedDrive = maybeDrive ? `${withoutTrailing[0].toLowerCase()}${withoutTrailing.slice(1)}` : withoutTrailing;
-  return normalizedDrive.toLowerCase();
-}
-
-function connectSessionStream(sessionId: string) {
-  if (streamsBySessionId.has(sessionId)) return;
-  if (!state.activeSessionId || state.activeSessionId !== sessionId) return;
-  const session = sessions.find((entry) => entry.id === sessionId);
-  if (!session?.projectPath) return;
-  if (staleSessionIds.has(sessionId)) return;
-  setSessionStatus(sessionId, 'connecting');
-  const stream = new EventSource(`${API_BASE}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}&replay=150`);
-  const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
-  for (const name of names) {
-    stream.addEventListener(name, (evt) => {
-      streamErrorCountBySessionId.set(sessionId, 0);
-      setSessionStatus(sessionId, 'connected');
-      if (!staleSessionIds.has(sessionId)) sessionNoticeById[sessionId] = undefined;
-      const message = evt as MessageEvent<string>;
-      try {
-        const parsed = JSON.parse(message.data) as AgentEvent;
-        reduceAgentEventToTimeline(sessionId, parsed);
-      } catch {
-        // ignore malformed data
-      }
-    });
-  }
-  stream.onerror = () => {
-    const count = (streamErrorCountBySessionId.get(sessionId) ?? 0) + 1;
-    streamErrorCountBySessionId.set(sessionId, count);
-    setSessionStatus(sessionId, 'disconnected');
-    if (count >= 3) void confirmAndMarkSessionStale(sessionId, 'Session stream disconnected. Reload sessions or start a replacement session.');
-  };
-  streamsBySessionId.set(sessionId, stream);
-}
-
-function syncActiveSessionStream() {
-  const activeId = state.activeSessionId;
-  for (const id of [...streamsBySessionId.keys()]) {
-    if (!activeId || id !== activeId) disconnectSessionStream(id);
-  }
-  if (activeId) connectSessionStream(activeId);
-}
-
-function disconnectSessionStream(sessionId: string) {
-  const stream = streamsBySessionId.get(sessionId);
-  if (!stream) return;
-  stream.close();
-  streamsBySessionId.delete(sessionId);
-  streamErrorCountBySessionId.delete(sessionId);
-  if (!staleSessionIds.has(sessionId)) setSessionStatus(sessionId, 'disconnected');
-}
-
-function markSessionStale(sessionId: string, message: string) {
-  if (staleSessionIds.has(sessionId)) return;
-  staleSessionIds.add(sessionId);
-  sessionNoticeById[sessionId] = message;
-  setSessionStatus(sessionId, 'stale');
-  disconnectSessionStream(sessionId);
-}
-
-async function confirmAndMarkSessionStale(sessionId: string, message: string) {
-  try {
-    await hydrateSessionDoc(sessionId);
-    sessionNoticeById[sessionId] = 'Session stream disconnected. Reconnecting…';
-    disconnectSessionStream(sessionId);
-    setTimeout(() => connectSessionStream(sessionId), 750);
-  } catch {
-    markSessionStale(sessionId, message);
-  }
-}
-
 async function reloadActiveSessions() {
   const activeId = state.activeSessionId;
   await hydrateSessions().catch(() => undefined);
@@ -1197,15 +1062,6 @@ async function hydrateSessions() {
   return hydratingSessionsPromise;
 }
 
-async function hydratePickerSessions() {
-  try {
-    const rows = await apiGet<SessionMetaApi[]>('/sessions?scope=all');
-    pickerSessionCatalog.splice(0, pickerSessionCatalog.length, ...rows.map(mapApiSession));
-  } catch {
-    pickerSessionCatalog.splice(0, pickerSessionCatalog.length);
-  }
-}
-
 function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {
   state.settingsTab = tab;
   state.settingsOpen = true;
@@ -1220,63 +1076,6 @@ function openGitTrixFromSettings() {
   state.openProjectDialogOpen = true;
 }
 
-async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
-  return response.json() as Promise<T>;
-}
-
-class ApiRequestError extends Error {
-  status: number;
-  code?: string;
-  payload?: unknown;
-
-  constructor(status: number, message: string, code?: string, payload?: unknown) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.status = status;
-    this.code = code;
-    this.payload = payload;
-  }
-}
-
-async function readApiError(response: Response) {
-  const detail = await response.text().catch(() => '');
-  if (!detail) return new ApiRequestError(response.status, `request failed: ${response.status}`);
-  try {
-    const parsed = JSON.parse(detail) as { message?: string; error?: string; code?: string };
-    return new ApiRequestError(response.status, parsed.message || parsed.error || parsed.code || detail, parsed.code, parsed);
-  } catch {
-    return new ApiRequestError(response.status, detail);
-  }
-}
-
-async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
-  return response.json() as Promise<T>;
-}
-
-async function apiDelete(path: string): Promise<void> {
-  const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
-}
-
-async function apiBlob(path: string) {
-  const response = await fetch(`${API_BASE}${path}`);
-  if (!response.ok) throw await readApiError(response);
-  return response;
-}
 
 function filenameFromDisposition(value: string | null) {
   if (!value) return '';
@@ -1297,18 +1096,6 @@ function downloadBlob(blob: Blob, filename: string) {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
-}
-
-async function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    throw await readApiError(response);
-  }
-  return response.json() as Promise<T>;
 }
 
 function replaceRecents(next: RecentEntry[]) {
@@ -1542,99 +1329,13 @@ async function queueProjectOpen(projectName: string, path: string, mode: 'diff' 
   }
 }
 
-async function resolveProjectOpen(path: string) {
-  const normalizedPath = path.trim();
-  if (!normalizedPath) return { ok: false as const, reason: 'missing_path' as const };
-
-  try {
-    const opened = await apiPost<{ id?: string; name?: string; path?: string; branch?: string; needsInit?: boolean }>('/projects/open', {
-      path: normalizedPath
-    });
-    if (opened.needsInit) return { ok: false as const, reason: 'missing_git' as const };
-    return {
-      ok: true as const,
-      name: opened.name ?? normalizedPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project',
-      path: opened.path ?? normalizedPath
-    };
-  } catch {
-    if (import.meta.env.DEV) {
-      return {
-        ok: true as const,
-        name: normalizedPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project',
-        path: normalizedPath
-      };
-    }
-    return { ok: false as const, reason: 'missing_path' as const };
-  }
-}
-
 async function openExistingProject(payload: { mode: 'diff' | 'session' }) {
   const path = picker.openPath.trim();
   if (!path) return;
-  const opened = await resolveProjectOpen(path);
+  const opened = await sessionOrchestrator.resolveProjectOpen(path);
   if (!opened.ok) return;
   await queueProjectOpen(opened.name, opened.path, payload.mode);
   void hydrateRecents();
-}
-
-async function openRecentProject(payload: { name: string; path: string; mode: 'diff' | 'session' }) {
-  const opened = await resolveProjectOpen(payload.path);
-  if (!opened.ok) {
-    void hydrateRecents();
-    return;
-  }
-  const recent = recents.find((r) => r.path === payload.path);
-  if (recent) recent.status = 'ok';
-  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, payload.mode);
-  void hydrateRecents();
-}
-
-async function continueRecentSessionFromPicker(payload: { name: string; path: string; sessionId: string }) {
-  const opened = await resolveProjectOpen(payload.path);
-  if (!opened.ok) {
-    void hydrateRecents();
-    return;
-  }
-  const recent = recents.find((r) => r.path === payload.path);
-  if (recent) recent.status = 'ok';
-  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, 'session');
-  await hydrateSessions().catch(() => undefined);
-  const target = sessions.find((session) => session.id === payload.sessionId);
-  if (target) selectSessionFromSidebar(target.id);
-  void hydrateRecents();
-}
-
-async function startNewRecentSessionFromPicker(payload: { name: string; path: string }) {
-  const opened = await resolveProjectOpen(payload.path);
-  if (!opened.ok) {
-    void hydrateRecents();
-    return;
-  }
-  const recent = recents.find((r) => r.path === payload.path);
-  if (recent) recent.status = 'ok';
-  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, 'session', { skipAutoCreate: true });
-  await createSession();
-  void hydrateRecents();
-}
-
-async function removeRecentProject(id: string) {
-  try {
-    await apiDelete(`/projects/recents/${id}`);
-    await hydrateRecents();
-  } catch {
-    const index = recents.findIndex((row) => row.id === id);
-    if (index >= 0) recents.splice(index, 1);
-  }
-}
-
-async function forgetRecentProject(id: string) {
-  try {
-    await apiPost(`/projects/recents/${id}/forget`, {});
-    await hydrateRecents();
-  } catch {
-    const index = recents.findIndex((row) => row.id === id);
-    if (index >= 0) recents.splice(index, 1);
-  }
 }
 
 async function cloneRepository() {
@@ -1872,6 +1573,24 @@ async function confirmDeleteSessionNow() {
     deleteDialog.busy = false;
   }
 }
+
+const sessionOrchestrator = useSessionOrchestrator({
+  apiPost,
+  apiDelete,
+  hydrateRecents,
+  hydrateSessions,
+  queueProjectOpen,
+  createSession,
+  selectSessionFromSidebar,
+  sessions,
+  recents
+});
+
+const openRecentProject = sessionOrchestrator.openRecentProject;
+const continueRecentSessionFromPicker = sessionOrchestrator.continueRecentSessionFromPicker;
+const startNewRecentSessionFromPicker = sessionOrchestrator.startNewRecentSessionFromPicker;
+const removeRecentProject = sessionOrchestrator.removeRecentProject;
+const forgetRecentProject = sessionOrchestrator.forgetRecentProject;
 
 function toEpochMs(value?: string) {
   if (!value) return 0;
@@ -2208,70 +1927,63 @@ function runComposerCommand(command: string) {
   }
 }
 
-function onGlobalKeydown(event: KeyboardEvent) {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault();
-    state.paletteOpen = !state.paletteOpen;
-    if (state.paletteOpen) {
-      forms.palette = '';
-      state.paletteIndex = 0;
+const shortcuts = useGlobalShortcuts({
+  state,
+  forms,
+  filteredPaletteCommands,
+  runPalette,
+  closeOnEscape: [
+    () => {
+      if (promote.fileMenuOpen) {
+        promote.fileMenuOpen = false;
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (deleteDialog.open) {
+        closeDeleteSessionDialog();
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (exportDialog.sessionId) {
+        closeExportDialog();
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (state.conflictDialogOpen) {
+        state.conflictDialogOpen = false;
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (state.promoteDialogOpen) {
+        state.promoteDialogOpen = false;
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (state.contextViewerOpen) {
+        state.contextViewerOpen = false;
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (state.modelPickerOpen) {
+        state.modelPickerOpen = false;
+        return true;
+      }
+      return false;
     }
-    return;
-  }
-
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
-    event.preventDefault();
-    state.terminalOpen = !state.terminalOpen;
-    return;
-  }
-
-  if (event.key === 'Escape') {
-    if (state.paletteOpen) {
-      state.paletteOpen = false;
-      return;
-    }
-    if (state.settingsOpen) {
-      state.settingsOpen = false;
-      return;
-    }
-    if (state.themeDialogOpen) {
-      state.themeDialogOpen = false;
-      return;
-    }
-    if (state.cloneDialogOpen) {
-      state.cloneDialogOpen = false;
-      return;
-    }
-    if (state.openProjectDialogOpen) {
-      state.openProjectDialogOpen = false;
-      return;
-    }
-    if (state.terminalOpen) {
-      state.terminalOpen = false;
-    }
-    return;
-  }
-
-  if (!state.paletteOpen) return;
-
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    state.paletteIndex = Math.min(state.paletteIndex + 1, Math.max(filteredPaletteCommands.value.length - 1, 0));
-    return;
-  }
-
-  if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    state.paletteIndex = Math.max(state.paletteIndex - 1, 0);
-    return;
-  }
-
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    const cmd = filteredPaletteCommands.value[state.paletteIndex];
-    if (cmd) runPalette(cmd.id);
-  }
-}
+  ]
+});
 
 onMounted(() => {
   applyTheme(settings.themePreset);
@@ -2287,7 +1999,7 @@ onMounted(() => {
   void hydrateSettings().catch(() => undefined);
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
-  window.addEventListener('keydown', onGlobalKeydown);
+  shortcuts.bind();
 });
 
 const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);
@@ -2309,6 +2021,6 @@ watch(
 onUnmounted(() => {
   stopSidebarResize?.();
   for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
-  window.removeEventListener('keydown', onGlobalKeydown);
+  shortcuts.unbind();
 });
 </script>

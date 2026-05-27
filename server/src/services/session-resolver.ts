@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import { getCurrentProjectId, getProjectById } from "./project-store";
 import { getSession, getSessionById } from "./session-store";
+import { canonicalProjectPath } from "../lib/project-path";
 
 export function normalizeProjectPath(value?: string | null) {
-  return typeof value === "string" && value.trim() ? value.trim().replace(/\\/g, "/") : null;
+  return canonicalProjectPath(value);
 }
 
 export function requiredProjectPath(value: unknown) {

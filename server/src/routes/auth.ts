@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { getGitHubToken } from "../services/gittrix-service";
 import { clearGitHubAuth, getGitHubAccount, pollGitHubDeviceFlow, startGitHubDeviceFlow } from "../services/github-auth";
-
-const routeError = (message: string, code: string, retryable = false) => ({ ok: false, code, message, retryable });
+import { routeError } from "../lib/route-error";
 
 export const authRoutes = new Hono()
   .get("/session", async (c) => {

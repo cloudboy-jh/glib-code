@@ -7,15 +7,13 @@ import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
 import { abortRunningTurn, disposeRuntimeSession } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
+import { routeError } from "../lib/route-error";
+import { canonicalProjectPath } from "../lib/project-path";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
   if (!projectId) return null;
   return getProjectById(projectId);
-}
-
-function routeError(message: string, code: string, retryable = false) {
-  return { ok: false, code, message, retryable };
 }
 
 async function listSessionsAcrossProjects() {
@@ -34,7 +32,8 @@ async function listSessionsAcrossProjects() {
   for (const projectPath of paths) {
     const sessions = await listSessions(projectPath);
     for (const session of sessions) {
-      merged.set(`${session.projectPath}::${session.id}`, session);
+      const keyPath = canonicalProjectPath(session.projectPath) ?? session.projectPath;
+      merged.set(`${keyPath}::${session.id}`, session);
     }
   }
 

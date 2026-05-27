@@ -65,8 +65,8 @@ Last updated: 2026-05-27
 - [x] Ensure timeline auto-scroll follows new assistant/tool output by default.
 - [x] Remove markdown artifacts from tool-call preview text while keeping raw payloads under Inspect.
 - [x] Replace collapsed sidebar dot-only session items with compact identifiable items.
-- [ ] Keep picker keyboard controls working with all dialog states.
-- [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
+- [x] Keep picker keyboard controls working with all dialog states.
+- [x] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
 - [x] Keep multi-turn streaming stable beyond first turn (no clipped second-turn tail in normal flows).
 - [x] Preserve final assistant answer after tool calls by waiting for pi `agent_end` server-side.

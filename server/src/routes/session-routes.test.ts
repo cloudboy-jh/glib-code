@@ -106,6 +106,23 @@ describe("session routes projectPath resolution", () => {
     expect((await res.json()).meta.id).toBe(session.id);
   });
 
+  test("GET /api/sessions/:id resolves canonical path variants", async () => {
+    const session = await makeSession();
+    const variantPath = `${repoA.replace(/\\/g, "/").toUpperCase()}/`;
+    const res = await app.request(`/api/sessions/${session.id}?projectPath=${encodeURIComponent(variantPath)}`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).meta.id).toBe(session.id);
+  });
+
+  test("GET /api/sessions/:id missing returns standard error envelope", async () => {
+    const res = await app.request(`/api/sessions/missing-session-id?projectPath=${encodeURIComponent(repoA)}`);
+    expect(res.status).toBe(404);
+    const body = await res.json() as { ok?: boolean; code?: string; message?: string };
+    expect(body.ok).toBe(false);
+    expect(body.code).toBe("SESSION_NOT_FOUND");
+    expect(typeof body.message).toBe("string");
+  });
+
   test("PATCH /api/sessions/:id resolves explicit projectPath", async () => {
     const session = await makeSession();
     const res = await app.request(`/api/sessions/${session.id}?projectPath=${encodeURIComponent(repoA)}`, {
@@ -146,7 +163,7 @@ describe("session routes projectPath resolution", () => {
     const res = await app.request(`/api/sessions/${session.id}/export?projectPath=${encodeURIComponent(repoA)}&format=pi-jsonl`);
     expect(res.status).toBe(200);
     const lines = (await res.text()).trim().split("\n").map((line) => JSON.parse(line));
-    expect(lines[0]).toMatchObject({ type: "session", version: 3, id: session.id, cwd: repoA.replace(/\\/g, "/") });
+    expect(lines[0]).toMatchObject({ type: "session", version: 3, id: session.id, cwd: repoA.replace(/\\/g, "/").toLowerCase() });
     expect(lines[1]).toMatchObject({ type: "message", message: { role: "user", content: "hello" } });
     expect(lines[2]).toMatchObject({ type: "message", message: { role: "assistant", content: "hi there" } });
   });

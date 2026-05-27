@@ -9,6 +9,7 @@ import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
 import { log, logError } from "../lib/log";
+import { routeError } from "../lib/route-error";
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -55,10 +56,6 @@ function missingCloudflareConfig() {
   if (!(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID)) missing.push("CLOUDFLARE_ACCOUNT_ID");
   if (!(process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN)) missing.push("CLOUDFLARE_API_TOKEN");
   return missing;
-}
-
-function routeError(message: string, code: string, retryable = false) {
-  return { ok: false, code, message, retryable };
 }
 
 export const agentRoutes = new Hono()
