@@ -18,32 +18,85 @@
         </span>
       </div>
 
-      <div v-if="expandedPath === r.path" class="recent-mode-cards">
-        <button
-          :class="['recent-mode-button', hoveredMode === 'diff' ? 'recent-mode-button-active' : '']"
-          type="button"
-          @mouseenter="hoveredMode = 'diff'"
-          @click="$emit('open', { name: r.name, path: r.path, mode: 'diff' })"
-        >
-          <span class="recent-mode-icon recent-mode-icon-primary"><GitBranch class="h-4 w-4" /></span>
-          <span>
-            <span class="recent-mode-label">Diffs</span>
-            <span class="recent-mode-text">Review changes first</span>
-          </span>
-        </button>
+      <div v-if="expandedPath === r.path">
+        <div v-if="modePhase === 'mode'" class="recent-mode-cards">
+          <button
+            :class="['recent-mode-button', hoveredMode === 'diff' ? 'recent-mode-button-active' : '']"
+            type="button"
+            @mouseenter="hoveredMode = 'diff'"
+            @click="$emit('open', { name: r.name, path: r.path, mode: 'diff' })"
+          >
+            <span class="recent-mode-icon recent-mode-icon-primary"><GitBranch class="h-4 w-4" /></span>
+            <span>
+              <span class="recent-mode-label">Diffs</span>
+              <span class="recent-mode-text">Review changes first</span>
+            </span>
+          </button>
 
-        <button
-          :class="['recent-mode-button', hoveredMode === 'session' ? 'recent-mode-button-active' : '']"
-          type="button"
-          @mouseenter="hoveredMode = 'session'"
-          @click="$emit('open', { name: r.name, path: r.path, mode: 'session' })"
-        >
-          <span class="recent-mode-icon recent-mode-glyph">&gt;_</span>
-          <span>
-            <span class="recent-mode-label">Session</span>
-            <span class="recent-mode-text">Start prompting now</span>
-          </span>
-        </button>
+          <button
+            :class="['recent-mode-button', hoveredMode === 'session' ? 'recent-mode-button-active' : '']"
+            type="button"
+            @mouseenter="hoveredMode = 'session'"
+            @click="modePhase = 'session-choice'"
+          >
+            <span class="recent-mode-icon recent-mode-glyph">&gt;_</span>
+            <span>
+              <span class="recent-mode-label">Session</span>
+              <span class="recent-mode-text">Continue or start fresh</span>
+            </span>
+          </button>
+        </div>
+
+        <div v-else-if="modePhase === 'session-choice'" class="recent-session-choice">
+          <button class="recent-back-button" type="button" @click="modePhase = 'mode'">
+            <ArrowLeft class="h-3.5 w-3.5" />
+            <span>Back</span>
+          </button>
+          <div class="recent-mode-cards">
+            <button class="recent-mode-button" type="button" @click="modePhase = 'session-list'">
+              <span class="recent-mode-icon"><History class="h-4 w-4" /></span>
+              <span>
+                <span class="recent-mode-label">Continue</span>
+                <span class="recent-mode-text">Choose existing session</span>
+              </span>
+            </button>
+            <button class="recent-mode-button" type="button" @click="$emit('startNewSession', { name: r.name, path: r.path })">
+              <span class="recent-mode-icon"><PlusSquare class="h-4 w-4" /></span>
+              <span>
+                <span class="recent-mode-label">New</span>
+                <span class="recent-mode-text">Create fresh session</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="recent-session-choice">
+          <button class="recent-back-button" type="button" @click="modePhase = 'session-choice'">
+            <ArrowLeft class="h-3.5 w-3.5" />
+            <span>Back</span>
+          </button>
+          <div class="recent-session-list">
+            <button
+              v-for="session in visibleSessionsForPath(r.path)"
+              :key="`${r.path}-${session.id}`"
+              type="button"
+              class="recent-session-row"
+              @click="$emit('continueSession', { name: r.name, path: r.path, sessionId: session.id })"
+            >
+              <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
+              <span class="shrink-0 text-[11px] text-muted-foreground/75">{{ session.time }}</span>
+            </button>
+            <button
+              v-if="sessionsForPath(r.path).length > 5"
+              type="button"
+              class="recent-show-more"
+              @click="toggleShowAllSessions(r.path)"
+            >
+              {{ showAllSessionPaths.has(canonicalizePath(r.path)) ? 'Show less' : `Show ${sessionsForPath(r.path).length - 5} more` }}
+            </button>
+            <div v-if="sessionsForPath(r.path).length === 0" class="px-2 py-2 text-xs text-muted-foreground">No sessions yet.</div>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -55,12 +108,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Folder } from 'lucide-vue-next';
-import { GitBranch } from 'lucide-vue-next';
+import { ArrowLeft, Folder, GitBranch, History, PlusSquare } from 'lucide-vue-next';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
+    sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string }>>;
     activeIndex?: number;
     activeOffset?: number;
   }>(),
@@ -71,15 +124,46 @@ withDefaults(
 );
 defineEmits<{
   open: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
+  continueSession: [payload: { name: string; path: string; sessionId: string }];
+  startNewSession: [payload: { name: string; path: string }];
   forget: [id: string];
 }>();
 
 const expandedPath = ref<string | null>(null);
 const hoveredMode = ref<'diff' | 'session'>('diff');
+const modePhase = ref<'mode' | 'session-choice' | 'session-list'>('mode');
+const showAllSessionPaths = ref(new Set<string>());
 
 function toggleModeCards(path: string) {
   expandedPath.value = expandedPath.value === path ? null : path;
   hoveredMode.value = 'diff';
+  modePhase.value = 'mode';
+}
+
+function sessionsForPath(path: string) {
+  return props.sessionsByPath?.[canonicalizePath(path)] ?? [];
+}
+
+function visibleSessionsForPath(path: string) {
+  const sessions = sessionsForPath(path);
+  if (showAllSessionPaths.value.has(canonicalizePath(path))) return sessions;
+  return sessions.slice(0, 5);
+}
+
+function toggleShowAllSessions(path: string) {
+  const key = canonicalizePath(path);
+  const next = new Set(showAllSessionPaths.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  showAllSessionPaths.value = next;
+}
+
+function canonicalizePath(path: string) {
+  const slashNormalized = path.replace(/\\/g, '/').trim();
+  const withoutTrailing = slashNormalized.replace(/\/+$/g, '');
+  const maybeDrive = /^[A-Za-z]:\//.test(withoutTrailing);
+  const normalizedDrive = maybeDrive ? `${withoutTrailing[0].toLowerCase()}${withoutTrailing.slice(1)}` : withoutTrailing;
+  return normalizedDrive.toLowerCase();
 }
 </script>
 
@@ -158,6 +242,75 @@ function toggleModeCards(path: string) {
   gap: 10px;
   margin: 6px 0 2px;
   padding: 0 2px;
+}
+
+.recent-session-choice {
+  margin: 6px 0 2px;
+  padding: 0 2px;
+}
+
+.recent-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  border-radius: 7px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--background) / 0.25);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.recent-back-button:hover {
+  background: hsl(var(--muted) / 0.65);
+  color: hsl(var(--foreground));
+}
+
+.recent-session-list {
+  border-radius: 9px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--background) / 0.2);
+  padding: 8px;
+}
+
+.recent-session-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border-radius: 7px;
+  border: 1px solid hsl(var(--border) / 0.65);
+  background: hsl(var(--background) / 0.35);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+}
+
+.recent-session-row + .recent-session-row {
+  margin-top: 6px;
+}
+
+.recent-show-more {
+  margin-top: 8px;
+  width: 100%;
+  border-radius: 7px;
+  border: 1px solid hsl(var(--border) / 0.65);
+  background: hsl(var(--background) / 0.15);
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.recent-show-more:hover {
+  background: hsl(var(--muted) / 0.55);
+  color: hsl(var(--foreground));
+}
+
+.recent-session-row:hover {
+  background: hsl(var(--muted) / 0.65);
 }
 
 .recent-mode-button {

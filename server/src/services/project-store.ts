@@ -93,6 +93,10 @@ export function getProjectById(id: string) {
   return store.projectsById.get(id) ?? null;
 }
 
+export function listRegisteredProjects() {
+  return [...store.projectsById.values()];
+}
+
 export function setProjectOverride(projectId: string, override: ProjectOverride) {
   const next = { ...(store.projectOverrides.get(projectId) ?? {}), ...override };
   store.projectOverrides.set(projectId, next);

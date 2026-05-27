@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-18
+Last updated: 2026-05-27
 
 For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers the current frontend implementation.
 
@@ -43,7 +43,8 @@ Still local/mock in frontend state:
 
 Agent/session data-plane now API-backed:
 
-- Session list hydration from `/api/sessions`
+- Session list hydration from `/api/sessions` (project-scoped in session workspace)
+- Picker session catalog hydration from `/api/sessions?scope=all` (cross-project)
 - Session create through `/api/agent/sessions`
 - Prompt send through `/api/agent/sessions/:id/send`
 - Timeline streaming through `/api/agent/sessions/:id/stream`
@@ -139,6 +140,8 @@ Current state:
 
 ## Known frontend debts
 
+- Validate picker keyboard navigation through mode -> session-choice -> session-list states.
+- Verify overlay/key precedence (`Esc`, `Cmd/Ctrl+K`, `Cmd/Ctrl+J`) across picker/session/settings dialogs.
 - Wire real terminal WS when backend `/api/term` is implemented.
 - Add project-level provider/model override UX with effective-state display.
 - Wire hunk/multi-file session context selection into the current full-width diff workbench without restoring the old side-panel.

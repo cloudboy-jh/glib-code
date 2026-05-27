@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-05-18
+Last updated: 2026-05-27
 
 ## API wiring cleanup
 
@@ -61,6 +61,10 @@ Last updated: 2026-05-18
 
 ## UX integrity
 
+- [x] Reduce Session composer visual footprint (width/padding/radius) to avoid oversized browser presentation.
+- [x] Ensure timeline auto-scroll follows new assistant/tool output by default.
+- [x] Remove markdown artifacts from tool-call preview text while keeping raw payloads under Inspect.
+- [x] Replace collapsed sidebar dot-only session items with compact identifiable items.
 - [ ] Keep picker keyboard controls working with all dialog states.
 - [ ] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.

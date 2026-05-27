@@ -1,6 +1,6 @@
 # UI Parity / Consistency Checklist
 
-Last updated: 2026-05-18
+Last updated: 2026-05-27
 
 This is now a practical checklist for current `web/` implementation quality, not a source-locked mirror document.
 
@@ -26,11 +26,14 @@ This is now a practical checklist for current `web/` implementation quality, not
 ## Session UX
 
 - [x] Empty session and empty timeline states are distinct and intentional.
+- [x] Session composer footprint feels balanced in browser layouts (especially macOS).
+- [x] Timeline auto-scroll follows new assistant/tool output without manual user scrolling.
 - [ ] Composer command interactions work with keyboard only.
 - [ ] Command palette actions respect current mode/project availability.
 - [x] Provider/model selectors reflect backend capability state exactly.
 - [x] Unavailable providers/models are not selectable for agent execution.
 - [x] Provider/model error states are explicit and actionable.
+- [x] Tool-call previews are free of markdown/raw text artifacts in the primary card view.
 - [x] Tool calls are not dumped as raw text; they render as compact expandable cards.
 
 ## Overlay behavior
@@ -43,5 +46,5 @@ This is now a practical checklist for current `web/` implementation quality, not
 
 - [ ] Capture before/after screenshots for Diff, Session, Settings.
 - [x] Add current Picker screenshot to README.
-- [ ] Build/typecheck pass after UI changes.
+- [x] Build/typecheck pass after UI changes.
 - [ ] No placeholder text in primary product surfaces.

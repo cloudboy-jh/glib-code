@@ -51,6 +51,10 @@ async function makeSession() {
   return createSession({ projectId: "project-a", projectPath: repoA, title: "A", model: "m", provider: "p" });
 }
 
+async function makeSessionB() {
+  return createSession({ projectId: "project-b", projectPath: repoB, title: "B", model: "m", provider: "p" });
+}
+
 async function makeGitTrixSession() {
   return createSession({
     projectId: "project-a",
@@ -67,6 +71,34 @@ async function makeGitTrixSession() {
 }
 
 describe("session routes projectPath resolution", () => {
+  test("GET /api/sessions defaults to current project scope", async () => {
+    await makeSession();
+    const sessionB = await makeSessionB();
+    const res = await app.request("/api/sessions");
+    expect(res.status).toBe(200);
+    const rows = await res.json() as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toEqual([sessionB.id]);
+  });
+
+  test("GET /api/sessions?scope=all returns sessions across projects", async () => {
+    const sessionA = await makeSession();
+    const sessionB = await makeSessionB();
+    const res = await app.request("/api/sessions?scope=all");
+    expect(res.status).toBe(200);
+    const rows = await res.json() as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toContain(sessionA.id);
+    expect(rows.map((row) => row.id)).toContain(sessionB.id);
+  });
+
+  test("GET /api/sessions?scope=all works without current project", async () => {
+    const sessionA = await makeSession();
+    setCurrentProject(null);
+    const res = await app.request("/api/sessions?scope=all");
+    expect(res.status).toBe(200);
+    const rows = await res.json() as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toContain(sessionA.id);
+  });
+
   test("GET /api/sessions/:id resolves explicit projectPath instead of current project", async () => {
     const session = await makeSession();
     const res = await app.request(`/api/sessions/${session.id}?projectPath=${encodeURIComponent(repoA)}`);

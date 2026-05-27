@@ -1,6 +1,6 @@
 <template>
-  <div class="shrink-0 px-3 pb-3 pt-1.5 sm:px-5 sm:pt-2">
-    <div class="mx-auto w-full max-w-5xl rounded-[22px] border border-border/80 bg-card/90 p-2.5 shadow-sm shadow-black/10 sm:p-3">
+  <div class="shrink-0 px-3 pb-2 pt-1 sm:px-4 sm:pt-1.5">
+    <div class="mx-auto w-full max-w-4xl rounded-2xl border border-border/80 bg-card/90 p-2 shadow-sm shadow-black/10 sm:p-2.5">
       <ComposerInput
         ref="composerInputRef"
         :context="context"

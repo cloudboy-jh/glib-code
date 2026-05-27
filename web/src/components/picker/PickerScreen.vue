@@ -69,9 +69,12 @@
 
       <RecentList
         :recents="recents"
+        :sessions-by-path="sessionsByPath"
         :active-index="pickerIndex"
         :active-offset="3"
         @open="emit('openRecent', $event)"
+        @continue-session="emit('continueRecentSession', $event)"
+        @start-new-session="emit('startNewRecentSession', $event)"
         @forget="emit('forgetRecent', $event)"
       />
     </section>
@@ -105,6 +108,7 @@ import RecentList from './RecentList.vue';
 const props = defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
   providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
+  sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' }>>;
   logoSrc?: string;
 }>();
 const emit = defineEmits<{
@@ -112,6 +116,8 @@ const emit = defineEmits<{
   openClone: [];
   openPalette: [];
   openRecent: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
+  continueRecentSession: [payload: { name: string; path: string; sessionId: string }];
+  startNewRecentSession: [payload: { name: string; path: string }];
   forgetRecent: [id: string];
   openTheme: [];
   openGittrix: [];

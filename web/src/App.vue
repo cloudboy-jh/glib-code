@@ -1,10 +1,12 @@
 <template>
-  <div class="h-screen w-screen overflow-hidden bg-background text-foreground">
+  <div class="h-[100dvh] w-[100dvw] overflow-hidden bg-background text-foreground">
     <div class="grid h-full grid-cols-[auto_1fr]">
       <div class="relative h-full border-r border-border/60 bg-card" :style="{ width: `${sidebarWidth}px` }">
         <SessionSidebar
           :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
+          :current-project-path="currentProject?.path ?? ''"
+          :current-project-name="currentProject?.name ?? ''"
           :collapsed="sidebarUiCollapsed"
           :new-disabled="!currentProject"
           :logo-wordmark-src="logoWordmarkSrc"
@@ -48,6 +50,7 @@
               <PickerScreen
                 :recents="recents"
                 :providers="providerCapabilities.providers"
+                :sessions-by-path="pickerSessionsByPath"
                 :logo-src="logoWordmarkSrc"
                 @open-project="state.openProjectDialogOpen = true"
                 @open-clone="state.cloneDialogOpen = true"
@@ -56,6 +59,8 @@
                 @open-gittrix="openSettings('Git')"
                 @open-model="openSettings('Models')"
                 @open-recent="openRecentProject"
+                @continue-recent-session="continueRecentSessionFromPicker"
+                @start-new-recent-session="startNewRecentSessionFromPicker"
                 @forget-recent="forgetRecentProject"
                 @provider-auth-save="saveProviderAuth"
               />
@@ -98,9 +103,53 @@
 
               <template v-else>
                 <div class="grid h-full place-items-center p-6">
-                  <div class="max-w-xl rounded-xl border border-border/80 bg-card/55 p-6 text-center">
-                    <h2 class="mb-2 text-lg font-semibold">No session started</h2>
-                    <p class="mb-4 text-sm text-muted-foreground">Review diffs first or start a new session with the agent.</p>
+                  <div class="w-full max-w-3xl rounded-xl border border-border/80 bg-card/55 p-6">
+                    <h2 class="mb-2 text-lg font-semibold">Session workspace</h2>
+                    <p class="mb-4 text-sm text-muted-foreground">Choose continue or start new.</p>
+                    <div class="mb-4 grid gap-3 md:grid-cols-2">
+                      <button
+                        type="button"
+                        class="group flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 text-left transition-colors hover:bg-accent/45"
+                        @click="state.sessionContinueOpen = !state.sessionContinueOpen"
+                      >
+                        <div class="mt-0.5 rounded-md border border-border/70 bg-background/60 p-1.5 text-muted-foreground group-hover:text-foreground">
+                          <History class="h-4 w-4" />
+                        </div>
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold">Continue</div>
+                          <div class="mt-0.5 text-xs text-muted-foreground">Pick an existing session</div>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        class="group flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 text-left transition-colors hover:bg-accent/45"
+                        @click="createSession"
+                      >
+                        <div class="mt-0.5 rounded-md border border-border/70 bg-background/60 p-1.5 text-muted-foreground group-hover:text-foreground">
+                          <PlusSquare class="h-4 w-4" />
+                        </div>
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold">New session</div>
+                          <div class="mt-0.5 text-xs text-muted-foreground">Start a fresh isolated workspace</div>
+                        </div>
+                      </button>
+                    </div>
+                    <div v-if="state.sessionContinueOpen" class="mb-4 rounded-lg border border-border/70 bg-background/40 p-3">
+                      <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/80">Recent sessions</div>
+                      <div v-if="recentProjectSessions.length" class="space-y-2 text-left">
+                        <button
+                          v-for="session in recentProjectSessions"
+                          :key="`landing-${session.id}`"
+                          type="button"
+                          class="flex w-full items-center gap-2 rounded-md border border-border/70 bg-background/50 px-3 py-2 text-left text-sm hover:bg-accent/60"
+                          @click="selectSessionFromSidebar(session.id)"
+                        >
+                          <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
+                          <span class="shrink-0 text-xs text-muted-foreground/75">{{ session.time }}</span>
+                        </button>
+                      </div>
+                      <div v-else class="text-left text-xs text-muted-foreground">No existing sessions for this project.</div>
+                    </div>
                     <div v-if="state.agentSetupMessage" class="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
                       <p>{{ state.agentSetupMessage }}</p>
                       <div v-if="state.agentSetupKind === 'gittrix'" class="mt-2 flex flex-wrap gap-3">
@@ -115,9 +164,6 @@
                         <button class="underline underline-offset-2" @click="state.modelPickerOpen = true">Change model</button>
                       </div>
                     </div>
-                    <button class="h-9 rounded-md border border-border/80 bg-primary/90 px-4 text-sm font-semibold text-primary-foreground" @click="createSession">
-                      Start session
-                    </button>
                   </div>
                 </div>
               </template>
@@ -374,7 +420,7 @@ import Timeline from './components/session/Timeline.vue';
 import { applyTheme } from './lib/theme';
 import { THEME_PRESETS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, History, PlusSquare } from 'lucide-vue-next';
 import logoIcon from '../../glibcode-iconlogo.png';
 import logoWordmark from '../../glibcode-wordmark.png';
 
@@ -469,6 +515,7 @@ const picker = reactive({
 });
 
 const sessions = reactive<Session[]>([]);
+const pickerSessionCatalog = reactive<Session[]>([]);
 const timelineBySessionId = reactive<Record<string, TimelineEntry[]>>({});
 const sessionContextById = reactive<Record<string, string>>({});
 const contextBundleBySessionId = reactive<Record<string, ContextBundle | undefined>>({});
@@ -533,6 +580,7 @@ const state = reactive({
   contextViewerOpen: false,
   promoteDialogOpen: false,
   conflictDialogOpen: false,
+  sessionContinueOpen: false,
   agentSetupMessage: '',
   agentSetupKind: 'agent' as 'agent' | 'gittrix'
 });
@@ -595,7 +643,39 @@ const paletteCommands = [
 ];
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
-const sidebarSessions = computed(() => sessions.map((session) => ({ ...session, status: staleSessionIds.has(session.id) ? 'stale' as const : session.status })));
+const sidebarSessions = computed(() => {
+  return sessions
+    .map((session) => ({
+      ...session,
+      title: normalizeSessionTitle(session),
+      status: staleSessionIds.has(session.id) ? 'stale' as const : session.status
+    }))
+    .sort((a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt));
+});
+const pickerSessionsByPath = computed(() => {
+  const grouped: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: Session['status'] }>> = {};
+  for (const session of pickerSessionCatalog) {
+    const key = canonicalizeProjectPath(session.projectPath);
+    if (!key) continue;
+    const list = grouped[key] ?? (grouped[key] = []);
+    list.push({
+      id: session.id,
+      title: normalizeSessionTitle(session),
+      time: session.time,
+      updatedAt: session.updatedAt,
+      status: staleSessionIds.has(session.id) ? 'stale' : session.status
+    });
+  }
+  for (const key of Object.keys(grouped)) {
+    grouped[key].sort((a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt));
+  }
+  return grouped;
+});
+const recentProjectSessions = computed(() => {
+  if (!currentProject.value) return sidebarSessions.value.slice(0, 3);
+  const activeProjectPath = canonicalizeProjectPath(currentProject.value.path);
+  return sidebarSessions.value.filter((session) => canonicalizeProjectPath(session.projectPath) === activeProjectPath).slice(0, 5);
+});
 const sidebarUiCollapsed = computed(() => state.sidebarCollapsed);
 const activeContextBundle = computed(() => (state.activeSessionId ? contextBundleBySessionId[state.activeSessionId] : undefined));
 const activeContextSummary = computed(() => {
@@ -803,6 +883,7 @@ function setComposerPrompt(value: string) {
 function switchActiveSession(sessionId: string) {
   if (state.activeSessionId) draftBySessionId[state.activeSessionId] = forms.prompt;
   state.activeSessionId = sessionId;
+  if (sessionId && currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
   forms.prompt = draftBySessionId[sessionId] ?? '';
   syncActiveSessionStream();
   if (sessionId) void hydrateSessionDoc(sessionId).catch(() => undefined);
@@ -844,6 +925,18 @@ function summarizeLines(value: string, limit = 6) {
   return lines.length > limit ? `${shown}\n… ${lines.length - limit} more line${lines.length - limit === 1 ? '' : 's'}` : shown;
 }
 
+function stripMarkdownArtifacts(value: string) {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .trim();
+}
+
 function classifyToolCall(event: Extract<AgentEvent, { type: 'tool_call' }>) {
   const input = event.input as { command?: unknown; cwd?: unknown; filePath?: unknown; path?: unknown };
   const command = typeof input.command === 'string' ? input.command : undefined;
@@ -860,22 +953,23 @@ function classifyToolCall(event: Extract<AgentEvent, { type: 'tool_call' }>) {
   const fileTarget = typeof input.filePath === 'string' ? input.filePath : typeof input.path === 'string' ? input.path : '';
   const titleTarget = command ? command.split(/\s+/).slice(0, 4).join(' ') : fileTarget;
   const title = `${event.tool}${titleTarget ? ` · ${titleTarget}` : ''}`;
+  const summary = event.summary ? stripMarkdownArtifacts(event.summary) : '';
 
   if (!rawOutput) return { title, status: 'running' as const, renderKind: 'terminal' as const, command, cwd, rawInput, rawOutput, preview: '' };
-  if (typedResult === 'diff' && typedPatch) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: typedPatch, preview: event.summary || summarizeLines(typedPatch, 4) };
+  if (typedResult === 'diff' && typedPatch) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: typedPatch, preview: summary || summarizeLines(typedPatch, 4) };
   if (typedResult === 'json' && typedJson !== undefined) {
     const asText = redactTimelineText(JSON.stringify(typedJson, null, 2));
-    return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'json' as const, command, cwd, rawInput, rawOutput, preview: event.summary || summarizeLines(asText) };
+    return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'json' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(asText) };
   }
-  if (typedResult === 'code' && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'code' as const, command, cwd, rawInput, rawOutput, preview: event.summary || summarizeLines(typedText) };
-  if ((typedResult === 'terminal' || typedResult === 'text') && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: event.summary || summarizeLines(typedText) };
-  if (typedResult === 'error') return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: event.summary || summarizeLines(typedText || output) };
+  if (typedResult === 'code' && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'code' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
+  if ((typedResult === 'terminal' || typedResult === 'text') && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
+  if (typedResult === 'error') return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText || output)) };
   if (isUnifiedDiff(output)) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: output, preview: summarizeLines(output, 4) };
-  if (failed) return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(output) };
+  if (failed) return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(output)) };
   const trimmed = output.trim();
   if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) return { title, status: 'done' as const, renderKind: 'json' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(trimmed) };
   const codeLike = /```|\b(import|export|function|const|let|class|type|interface)\b|^\s*[{};]/m.test(trimmed) && trimmed.split('\n').length > 3;
-  return { title, status: 'done' as const, renderKind: codeLike ? 'code' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(trimmed) };
+  return { title, status: 'done' as const, renderKind: codeLike ? 'code' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(trimmed)) };
 }
 
 function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
@@ -940,7 +1034,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
 }
 
 function mapApiSession(meta: SessionMetaApi): Session {
-  const normalizedPath = meta.projectPath.replace(/\\/g, '/');
+  const normalizedPath = canonicalizeProjectPath(meta.projectPath);
   const repoName = normalizedPath.split('/').filter(Boolean).pop() ?? 'project';
   return {
     id: meta.id,
@@ -978,6 +1072,14 @@ async function hydrateSessionDoc(sessionId: string) {
 
   hydratingSessionDocById.set(sessionId, run);
   return run;
+}
+
+function canonicalizeProjectPath(path: string) {
+  const slashNormalized = path.replace(/\\/g, '/').trim();
+  const withoutTrailing = slashNormalized.replace(/\/+$/g, '');
+  const maybeDrive = /^[A-Za-z]:\//.test(withoutTrailing);
+  const normalizedDrive = maybeDrive ? `${withoutTrailing[0].toLowerCase()}${withoutTrailing.slice(1)}` : withoutTrailing;
+  return normalizedDrive.toLowerCase();
 }
 
 function connectSessionStream(sessionId: string) {
@@ -1082,6 +1184,9 @@ async function hydrateSessions() {
     for (const id of [...hydratedVersionBySessionId.keys()]) {
       if (!activeIds.has(id)) hydratedVersionBySessionId.delete(id);
     }
+    if (state.activeSessionId && !activeIds.has(state.activeSessionId)) {
+      clearActiveSession();
+    }
     if (state.activeSessionId && activeIds.has(state.activeSessionId)) {
       await hydrateSessionDoc(state.activeSessionId);
     }
@@ -1090,6 +1195,15 @@ async function hydrateSessions() {
     hydratingSessionsPromise = null;
   });
   return hydratingSessionsPromise;
+}
+
+async function hydratePickerSessions() {
+  try {
+    const rows = await apiGet<SessionMetaApi[]>('/sessions?scope=all');
+    pickerSessionCatalog.splice(0, pickerSessionCatalog.length, ...rows.map(mapApiSession));
+  } catch {
+    pickerSessionCatalog.splice(0, pickerSessionCatalog.length);
+  }
 }
 
 function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {
@@ -1360,6 +1474,7 @@ function goHome() {
   currentProject.value = null;
   state.mode = 'diff';
   clearActiveSession();
+  void hydratePickerSessions().catch(() => undefined);
 }
 
 function startSidebarResize(event: MouseEvent) {
@@ -1406,17 +1521,19 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
   state.mode = mode;
   state.agentSetupMessage = '';
   state.agentSetupKind = 'agent';
-  switchActiveSession(activeSessionIdByProject[id] ?? '');
+  clearActiveSession();
 }
 
-async function queueProjectOpen(projectName: string, path: string, mode: 'diff' | 'session') {
+async function queueProjectOpen(projectName: string, path: string, mode: 'diff' | 'session', options?: { skipAutoCreate?: boolean }) {
   state.openProjectDialogOpen = false;
   state.cloneDialogOpen = false;
 
   openProject(projectName, path, mode);
   await hydrateSessions().catch(() => undefined);
-  if (mode === 'session' && !state.activeSessionId) {
-    await createSession();
+  if (!options?.skipAutoCreate && mode === 'session' && !state.activeSessionId) {
+    if (sessions.length === 0) {
+      await createSession();
+    }
   }
 
   const existingRecent = recents.find((r) => r.path === path);
@@ -1472,6 +1589,34 @@ async function openRecentProject(payload: { name: string; path: string; mode: 'd
   void hydrateRecents();
 }
 
+async function continueRecentSessionFromPicker(payload: { name: string; path: string; sessionId: string }) {
+  const opened = await resolveProjectOpen(payload.path);
+  if (!opened.ok) {
+    void hydrateRecents();
+    return;
+  }
+  const recent = recents.find((r) => r.path === payload.path);
+  if (recent) recent.status = 'ok';
+  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, 'session');
+  await hydrateSessions().catch(() => undefined);
+  const target = sessions.find((session) => session.id === payload.sessionId);
+  if (target) selectSessionFromSidebar(target.id);
+  void hydrateRecents();
+}
+
+async function startNewRecentSessionFromPicker(payload: { name: string; path: string }) {
+  const opened = await resolveProjectOpen(payload.path);
+  if (!opened.ok) {
+    void hydrateRecents();
+    return;
+  }
+  const recent = recents.find((r) => r.path === payload.path);
+  if (recent) recent.status = 'ok';
+  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, 'session', { skipAutoCreate: true });
+  await createSession();
+  void hydrateRecents();
+}
+
 async function removeRecentProject(id: string) {
   try {
     await apiDelete(`/projects/recents/${id}`);
@@ -1518,6 +1663,7 @@ function openCommitsListDiff() {
 }
 
 async function createSession(options?: { title?: string; context?: string; initialEntries?: TimelineEntry[] }) {
+  state.sessionContinueOpen = false;
   if (creatingSession) return creatingSession;
   creatingSession = createSessionInner(options).finally(() => {
     creatingSession = null;
@@ -1648,11 +1794,9 @@ function removeContextChip(id: string) {
 }
 
 function selectSessionFromSidebar(sessionId: string) {
+  state.sessionContinueOpen = false;
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session) return;
-
-  switchActiveSession(sessionId);
-  if (currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
 
   if (!currentProject.value || currentProject.value.path !== session.projectPath) {
     const sessionPath = session.projectPath || `C:/repos/${session.project || session.repo || 'project'}`;
@@ -1660,9 +1804,12 @@ function selectSessionFromSidebar(sessionId: string) {
     const recentName = recents.find((recent) => recent.path === sessionPath)?.name;
     const projectName = recentName || session.repo || session.project || 'project';
     openProject(projectName, sessionPath, 'session');
+    switchActiveSession(sessionId);
     return;
   }
 
+  switchActiveSession(sessionId);
+  if (currentProject.value) activeSessionIdByProject[currentProject.value.id] = sessionId;
   state.mode = 'session';
 }
 
@@ -1724,6 +1871,18 @@ async function confirmDeleteSessionNow() {
   } finally {
     deleteDialog.busy = false;
   }
+}
+
+function toEpochMs(value?: string) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSessionTitle(session: Session) {
+  const trimmed = session.title.trim();
+  if (trimmed && trimmed.toLowerCase() !== 'new session') return trimmed;
+  return 'Session';
 }
 
 function openExportDialog(sessionId: string) {
@@ -2124,6 +2283,7 @@ onMounted(() => {
     }
   }
   void hydrateRecents().catch(() => undefined);
+  void hydratePickerSessions().catch(() => undefined);
   void hydrateSettings().catch(() => undefined);
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);

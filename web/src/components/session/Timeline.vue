@@ -144,7 +144,7 @@ async function scrollToBottom(force = false) {
 watch(
   () => props.entries.map((entry) => `${entry.id}:${entry.text.length}:${entry.level ?? 'info'}:${entry.toolCalls?.map((tool) => `${tool.id}:${tool.status}:${tool.preview?.length ?? 0}:${tool.rawOutput?.length ?? 0}:${tool.diff?.length ?? 0}`).join(',') ?? ''}`).join('|'),
   async () => {
-    await scrollToBottom();
+    await scrollToBottom(true);
   }
 );
 

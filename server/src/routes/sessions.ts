@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
-import { getCurrentProjectId, getProjectById } from "../services/project-store";
+import { getCurrentProjectId, getProjectById, getRecents, listRegisteredProjects } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
@@ -16,6 +16,29 @@ function mustProject() {
 
 function routeError(message: string, code: string, retryable = false) {
   return { ok: false, code, message, retryable };
+}
+
+async function listSessionsAcrossProjects() {
+  const paths = new Set<string>();
+  const currentProject = mustProject();
+  if (currentProject?.path) paths.add(currentProject.path);
+  for (const project of listRegisteredProjects()) {
+    if (project.path) paths.add(project.path);
+  }
+  const recents = await getRecents();
+  for (const recent of recents) {
+    if (recent.path) paths.add(recent.path);
+  }
+
+  const merged = new Map<string, Awaited<ReturnType<typeof listSessions>>[number]>();
+  for (const projectPath of paths) {
+    const sessions = await listSessions(projectPath);
+    for (const session of sessions) {
+      merged.set(`${session.projectPath}::${session.id}`, session);
+    }
+  }
+
+  return [...merged.values()].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
 }
 
 function filesFromPatch(patch: string) {
@@ -52,6 +75,9 @@ function dirtyFilesForSelector(files: string[], selector: { mode: "all" } | { mo
 
 export const sessionsRoutes = new Hono()
   .get("/", async (c) => {
+    if (c.req.query("scope") === "all") {
+      return c.json(await listSessionsAcrossProjects());
+    }
     const project = mustProject();
     if (!project) return c.json([]);
     return c.json(await listSessions(project.path));
