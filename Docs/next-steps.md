@@ -3,6 +3,7 @@
 ## Frontend
 
 - [x] Harden picker keyboard flow across `mode -> session-choice -> session-list` (`j/k`, arrows, `Enter`, `Esc`) with no focus traps.
+- [x] Refactor Settings modal to a unified row-based layout across Models/GitTrix/Editor with subtle selected-state indicators.
 - [ ] Polish session list presentation consistency between picker and sidebar (spacing, hierarchy, timestamp weight).
 - [x] Add regression coverage for picker continue/new flow, canonical path lookups, list capping, and stale-session recovery actions.
 - [x] Enforce deterministic overlay/key precedence (`Esc`, `Cmd/Ctrl+K`, `Cmd/Ctrl+J`) so top-most UI surface always wins.

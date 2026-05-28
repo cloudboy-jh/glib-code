@@ -1,6 +1,6 @@
 # Frontend Checklist
 
-Last updated: 2026-05-27
+Last updated: 2026-05-28
 
 ## API wiring cleanup
 
@@ -67,6 +67,7 @@ Last updated: 2026-05-27
 - [x] Replace collapsed sidebar dot-only session items with compact identifiable items.
 - [x] Keep picker keyboard controls working with all dialog states.
 - [x] Ensure `Ctrl/Cmd+K`, `Ctrl/Cmd+J`, `Esc` precedence is deterministic.
+- [x] Unify Settings modal interaction patterns (single row system across Models/GitTrix/Editor) and use subtle selected-state affordances.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
 - [x] Keep multi-turn streaming stable beyond first turn (no clipped second-turn tail in normal flows).
 - [x] Preserve final assistant answer after tool calls by waiting for pi `agent_end` server-side.

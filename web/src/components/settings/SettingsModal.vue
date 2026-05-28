@@ -1,194 +1,138 @@
 <template>
-  <UiDialog size="xl" dialog-class="h-[82vh] max-w-[1180px] overflow-hidden" :show-close-button="false" @close="$emit('close')">
-    <div class="flex h-14 shrink-0 items-center border-b border-border/80 px-5">
+  <UiDialog size="xl" dialog-class="h-[min(760px,calc(100vh-40px))] max-w-[980px] overflow-hidden" :show-close-button="false" @close="$emit('close')">
+    <div class="flex h-14 shrink-0 items-center border-b border-border/80 bg-card/70 px-5">
       <div>
-        <h3 class="text-base font-semibold tracking-[0.01em]">Settings</h3>
-        <p class="text-[11px] text-muted-foreground">Runtime, GitTrix, appearance, and shortcuts.</p>
+        <h3 class="text-base font-semibold tracking-tight">Settings</h3>
+        <p class="text-[11px] text-muted-foreground">{{ activeTabDescription }}</p>
       </div>
       <UiButton variant="outline" size="sm" class="ml-auto" @click="$emit('close')">Close</UiButton>
     </div>
 
-    <div class="grid min-h-0 flex-1 grid-cols-[190px_1fr]">
-      <nav class="border-r border-border/80 bg-background/20 p-3">
+    <div class="grid min-h-0 flex-1 grid-cols-[188px_1fr]">
+      <nav class="border-r border-border/80 bg-background/20 p-2.5" aria-label="Settings sections">
         <button
           v-for="t in tabs"
           :key="t"
+          type="button"
+          :aria-current="tab === t ? 'page' : undefined"
           :class="[
-            'mb-1 flex h-11 w-full items-center justify-between rounded-lg border px-3 text-left text-sm font-medium transition-colors',
-            tab === t ? 'border-border bg-muted/80 text-foreground' : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/55 hover:text-foreground'
+            'mb-1 flex h-10 w-full items-center justify-between rounded-lg border px-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            tab === t ? 'border-border bg-muted/75 text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:bg-muted/45 hover:text-foreground'
           ]"
           @click="tab = t"
         >
           <span>{{ t }}</span>
-          <span v-if="t === 'Models'" class="rounded-full border border-border/60 px-1.5 py-0.5 text-[10px]">{{ authenticatedProviderCount }}</span>
+          <span v-if="t === 'Models'" class="rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{{ authenticatedProviderCount }}</span>
         </button>
       </nav>
 
-      <section class="min-h-0 overflow-auto p-6">
-        <template v-if="tab === 'Models'">
-          <div class="space-y-4">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Models</p>
-                <h4 class="mt-1 text-xl font-semibold tracking-tight">Model access</h4>
-                <p class="mt-1 text-sm text-muted-foreground">Choose the active model and manage provider keys.</p>
-              </div>
-            </div>
-
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-              <div class="flex items-center justify-between gap-4">
+      <section class="min-h-0 overflow-auto bg-background/10 px-6 py-6 sm:px-7" aria-live="polite">
+        <div :class="['min-h-full w-full', tab === 'Editor' || tab === 'Appearance' || tab === 'Keybindings' ? 'flex flex-col' : 'space-y-5']">
+          <template v-if="tab === 'Models'">
+            <SectionShell title="Active model" aria-label="Active model">
+              <div class="settings-row">
                 <div class="flex min-w-0 items-center gap-3">
-                  <ModelIcon :provider="settings.defaultProvider" :size="36" theme="dark" />
+                  <ModelIcon :provider="settings.defaultProvider" :size="30" theme="dark" />
                   <div class="min-w-0">
-                    <p class="text-xs text-muted-foreground">Active model</p>
-                    <p class="mt-1 truncate text-lg font-semibold text-foreground">{{ settings.defaultProvider }}/{{ settings.defaultModel }}</p>
-                    <p class="mt-1 text-xs text-muted-foreground">{{ settings.defaultProvider }} {{ activeProviderConnected ? 'connected' : 'needs key' }}</p>
+                    <p class="text-sm font-medium">Active model</p>
+                    <p class="truncate text-sm text-muted-foreground">{{ settings.defaultProvider }}/{{ settings.defaultModel }}</p>
                   </div>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
-                  <UiButton v-if="!activeProviderConnected && authDraftProviderId !== settings.defaultProvider" variant="outline" size="sm" @click="startAuthDraft(settings.defaultProvider)">Add {{ settings.defaultProvider }} key</UiButton>
-                  <UiButton variant="outline" size="sm" @click="$emit('open-model-picker')">Change model</UiButton>
+                <UiButton variant="outline" size="sm" @click="$emit('open-model-picker')">Change</UiButton>
+              </div>
+            </SectionShell>
+
+            <SectionShell title="Connected providers" :meta="`${connectedProviders.length} connected`" aria-label="Connected providers">
+              <ProviderRow v-for="provider in connectedProviders" :key="provider.id" :provider="provider" :active="provider.id === settings.defaultProvider" @select="$emit('update:provider', provider.id)" @remove="$emit('provider:remove-auth', provider.id)" />
+              <p v-if="connectedProviders.length === 0" class="px-4 py-4 text-sm text-muted-foreground">No connected providers yet.</p>
+            </SectionShell>
+
+            <SectionShell title="Available providers" meta="Add API keys" aria-label="Available providers">
+              <div v-for="provider in availableProviders" :key="provider.id" class="border-t border-border/60 first:border-t-0">
+                <ProviderRow :provider="provider" :active="false" @add="startAuthDraft(provider.id)" />
+                <div v-if="authDraftProviderId === provider.id" class="flex items-center gap-2 px-4 pb-3">
+                  <input v-model="authDraftApiKey" type="password" class="h-8 min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" :placeholder="`Paste ${provider.id} API key`" />
+                  <UiButton size="sm" variant="outline" :disabled="!authDraftApiKey.trim()" @click="saveProviderKey(provider.id)">Save</UiButton>
+                  <button class="rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" @click="cancelAuthDraft">Cancel</button>
                 </div>
               </div>
-              <div v-if="!activeProviderConnected && authDraftProviderId === settings.defaultProvider" class="mt-4 flex items-center gap-2 border-t border-border/60 pt-4">
-                <input v-model="authDraftApiKey" type="password" class="h-9 min-w-0 flex-1 rounded-md border border-border/70 bg-background px-3 text-sm" :placeholder="`Paste ${settings.defaultProvider} API key`" />
-                <UiButton size="sm" variant="outline" :disabled="!authDraftApiKey.trim()" @click="saveProviderKey(settings.defaultProvider)">Save</UiButton>
-                <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
+            </SectionShell>
+          </template>
+
+          <template v-else-if="tab === 'GitTrix'">
+            <SectionShell title="Durable storage" aria-label="Durable storage">
+              <SettingOptionRow
+                label="Local repo"
+                detail="Commit into the current checkout"
+                :selected="settings.durableProvider === 'local'"
+                @click="$emit('update:gittrix-provider', 'durableProvider', 'local')"
+              />
+              <SettingOptionRow
+                label="GitHub"
+                :detail="githubConnected ? `Signed in as ${githubAccount || 'GitHub user'}` : 'Sign in to enable GitHub promote flow'"
+                :selected="settings.durableProvider === 'github'"
+                @click="$emit('update:gittrix-provider', 'durableProvider', 'github')"
+              />
+              <SettingActionRow
+                label="GitHub account"
+                :detail="githubConnected ? `Signed in as ${githubAccount || 'GitHub user'}` : 'Not connected'"
+                :action-label="githubConnected ? 'Disconnect' : (githubSigningIn ? 'Signing in…' : 'Connect')"
+                :action-disabled="Boolean(githubSigningIn)"
+                @action="githubConnected ? $emit('disconnect-github') : $emit('connect-github')"
+              >
+                <template #leading>
+                  <img v-if="githubConnected && githubAvatarUrl" :src="githubAvatarUrl" alt="" class="h-8 w-8 rounded-full border border-border/70" />
+                  <div v-else class="grid h-8 w-8 place-items-center rounded-full border border-border/70 text-xs text-muted-foreground">GH</div>
+                </template>
+              </SettingActionRow>
+            </SectionShell>
+
+            <SectionShell title="Workspace storage" aria-label="Workspace storage">
+              <SettingOptionRow label="Local workspace" detail="Use local GitTrix workspaces" :selected="settings.ephemeralProvider === 'local'" @click="$emit('update:gittrix-provider', 'ephemeralProvider', 'local')" />
+              <SettingOptionRow label="Cloudflare Artifacts" detail="Remote ephemeral workspaces" :selected="settings.ephemeralProvider === 'cloudflare-artifacts'" @click="$emit('update:gittrix-provider', 'ephemeralProvider', 'cloudflare-artifacts')" />
+            </SectionShell>
+
+            <SectionShell title="Promote behavior" aria-label="Promote behavior">
+              <SettingOptionRow label="Commit" detail="Commit selected session changes" selected @click="$emit('update:gittrix-provider', 'promoteStrategy', 'commit')" />
+            </SectionShell>
+          </template>
+
+          <template v-else-if="tab === 'Editor'">
+            <SectionShell class="settings-section--fill" title="Default editor" meta="Project and file opens" aria-label="Editor integration">
+              <div class="settings-stretch-list">
+                <SettingOptionRow
+                  v-for="editor in editorOptions"
+                  :key="editor.id"
+                  :label="editor.name"
+                  :detail="editor.command"
+                  :selected="settings.preferredEditor === editor.id"
+                  @click="$emit('update:preferred-editor', editor.id)"
+                >
+                  <template #leading>
+                    <EditorIcon :editor="editor.id" :size="24" />
+                  </template>
+                </SettingOptionRow>
+                <SettingOptionRow label="None" detail="Disabled" :selected="!settings.preferredEditor" @click="$emit('update:preferred-editor', null)">
+                  <template #leading>
+                    <span class="grid h-6 w-6 place-items-center rounded-full border border-border/70 text-xs text-muted-foreground">—</span>
+                  </template>
+                </SettingOptionRow>
               </div>
-            </div>
+            </SectionShell>
+          </template>
 
-            <div v-if="authenticatedProviderCount === 0" class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-              New here? Get started with
-              <a class="underline underline-offset-2" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>
-              — one key, broad model access.
-            </div>
+          <template v-else-if="tab === 'Appearance'">
+            <section class="settings-section settings-section--fill p-4" aria-label="Theme">
+              <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
+            </section>
+          </template>
 
-            <div class="rounded-xl border border-border/70 bg-background/35">
-              <div class="flex items-center justify-between border-b border-border/70 px-4 py-3">
-                <div>
-                  <p class="text-sm font-medium">Providers</p>
-                  <p class="text-xs text-muted-foreground">Authenticated providers can run agent sessions.</p>
-                </div>
-                <span class="text-xs text-muted-foreground">{{ authenticatedProviderCount }} connected</span>
-              </div>
-
-              <div class="max-h-[46vh] divide-y divide-border/60 overflow-auto">
-                <div v-for="provider in sortedProviders" :key="provider.id" class="grid min-h-[64px] grid-cols-[minmax(0,1fr)_92px] items-center gap-4 px-4 py-2.5">
-                  <div class="flex min-w-0 items-center gap-3">
-                    <ModelIcon :provider="provider.id" :size="28" theme="dark" />
-                    <div class="min-w-0">
-                      <div class="flex min-w-0 items-center gap-2">
-                        <button
-                          type="button"
-                          :disabled="!provider.hasAuth"
-                          class="min-w-0 truncate text-left text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:text-muted-foreground/60"
-                          @click="$emit('update:provider', provider.id)"
-                        >
-                          {{ provider.id }}
-                        </button>
-                        <span v-if="settings.defaultProvider === provider.id" class="rounded-full border border-primary/35 px-1.5 py-0.5 text-[10px] text-primary">Default</span>
-                      </div>
-                      <p class="mt-1 text-xs text-muted-foreground">{{ provider.modelIds.length }} models · <span :class="provider.hasAuth ? 'text-emerald-300/75' : 'text-muted-foreground/75'">{{ provider.hasAuth ? 'connected' : 'needs key' }}</span></p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div v-if="!provider.hasAuth && authDraftProviderId !== provider.id" class="flex justify-end">
-                      <UiButton size="sm" variant="ghost" @click="startAuthDraft(provider.id)">Add</UiButton>
-                    </div>
-                    <div v-else-if="provider.hasAuth" class="flex justify-end">
-                      <UiButton size="sm" variant="ghost" @click="$emit('provider:remove-auth', provider.id)">Remove</UiButton>
-                    </div>
-                    <div v-else class="col-span-3 flex items-center gap-2">
-                      <input v-model="authDraftApiKey" type="password" class="h-8 w-44 rounded-md border border-border/70 bg-background px-2 text-xs" placeholder="Paste API key" />
-                      <UiButton size="sm" variant="outline" :disabled="!authDraftApiKey.trim()" @click="saveProviderKey(provider.id)">Save</UiButton>
-                      <button class="text-xs text-muted-foreground" @click="cancelAuthDraft">Cancel</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="providers.length === 0" class="p-4">
-                  <div class="rounded-lg border border-border/60 bg-background/55 p-4">
-                    <p class="text-sm text-amber-300">No providers discovered from the local runtime yet.</p>
-                    <p class="mt-1 text-xs text-muted-foreground">Add an OpenRouter key to bootstrap model access.</p>
-                    <div class="mt-3 flex items-center gap-2">
-                      <input v-model="bootstrapApiKey" type="password" class="h-9 flex-1 rounded-md border border-border/70 bg-background px-3 text-sm" placeholder="Paste OpenRouter API key" />
-                      <UiButton size="sm" variant="outline" :disabled="!bootstrapApiKey.trim()" @click="saveBootstrapKey">Save</UiButton>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <template v-else-if="tab === 'GitTrix'">
-          <div class="mx-auto max-w-[820px] space-y-5 pb-6">
-            <div>
-              <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">GitTrix</p>
-              <h4 class="mt-1 text-xl font-semibold tracking-tight">Isolation and promote flow</h4>
-                <p class="mt-1 max-w-2xl text-sm text-muted-foreground">Configure durable storage, ephemeral storage, and promotion.</p>
-              </div>
-            </div>
-
-            <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-              <SettingsOptionGroup title="Durable provider" :options="durableOptions" @select="(id) => $emit('update:gittrix-provider', 'durableProvider', id)" />
-              <div class="mt-3 rounded-lg border border-border/60 bg-background/45 p-3">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-3">
-                    <img v-if="githubConnected && githubAvatarUrl" :src="githubAvatarUrl" alt="" class="h-9 w-9 rounded-full border border-border/70" />
-                    <div v-else class="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-background/60 text-xs font-semibold text-muted-foreground">GH</div>
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium">GitHub account</p>
-                      <p class="mt-1 truncate text-xs text-muted-foreground">{{ githubConnected ? `Signed in as ${githubAccount || 'GitHub user'}` : 'Sign in to commit and push with GitHub.' }}</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <UiButton v-if="!githubConnected" size="sm" variant="outline" :disabled="githubSigningIn" @click="$emit('connect-github')">{{ githubSigningIn ? 'Signing in…' : 'Sign in with GitHub' }}</UiButton>
-                    <UiButton v-else size="sm" variant="outline" @click="$emit('disconnect-github')">Disconnect</UiButton>
-                  </div>
-                </div>
-                <div v-if="githubUserCode" class="mt-3 rounded-md border border-border/60 bg-background/50 p-2 text-xs text-muted-foreground">
-                  Enter <span class="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-semibold tracking-wide text-foreground">{{ githubUserCode }}</span> at <a class="underline underline-offset-2" :href="githubVerificationUri" target="_blank" rel="noreferrer">{{ githubVerificationUri }}</a>.
-                </div>
-                <div v-if="githubError" class="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">{{ githubError }}</div>
-              </div>
-              <SettingsOptionGroup class="mt-5" title="Ephemeral provider" :options="ephemeralOptions" @select="(id) => $emit('update:gittrix-provider', 'ephemeralProvider', id)" />
-              <SettingsOptionGroup class="mt-5" title="Promote strategy" :options="promoteOptions" @select="(id) => $emit('update:gittrix-provider', 'promoteStrategy', id)" />
-            </div>
-
-            <div class="space-y-4">
-                <div class="rounded-xl border border-border/70 bg-background/35 p-4">
-                  <p class="mb-3 text-sm font-medium">Default landing</p>
-                  <div class="grid grid-cols-2 gap-2">
-                    <button type="button" :class="landingClass(defaultOpenMode === 'diff')" @click="$emit('update:open-mode', 'diff')">Diffs</button>
-                    <button type="button" :class="landingClass(defaultOpenMode === 'session')" @click="$emit('update:open-mode', 'session')">Session</button>
-                  </div>
-                </div>
-            </div>
-          </div>
-        </template>
-
-        <template v-else-if="tab === 'Appearance'">
-          <div class="space-y-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Appearance</p>
-              <h4 class="mt-1 text-xl font-semibold tracking-tight">Theme</h4>
-            </div>
-            <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="space-y-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Keyboard shortcuts</p>
-              <h4 class="mt-1 text-xl font-semibold tracking-tight">Keybindings</h4>
-            </div>
-            <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
-          </div>
-        </template>
+          <template v-else>
+            <section class="settings-section settings-section--fill p-4" aria-label="Keybindings">
+              <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
+            </section>
+          </template>
+        </div>
       </section>
     </div>
   </UiDialog>
@@ -196,18 +140,19 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch } from 'vue';
+import { Check } from 'lucide-vue-next';
 import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
 import ModelIcon from '../shared/ModelIcon.vue';
-import ProviderMark from '../shared/ProviderMark.vue';
+import EditorIcon from '../shared/EditorIcon.vue';
 import KeybindingsEditor from './KeybindingsEditor.vue';
 import ThemePicker from './ThemePicker.vue';
 
 type Provider = { id: string; hasAuth: boolean; modelIds: string[] };
-type SettingsTab = 'Models' | 'GitTrix' | 'Appearance' | 'Keybindings';
+type SettingsTab = 'Models' | 'GitTrix' | 'Editor' | 'Appearance' | 'Keybindings';
 
 const props = defineProps<{
-  settings: { themePreset: string; defaultProvider: string; defaultModel: string; durableProvider: string; ephemeralProvider: string; promoteStrategy: string };
+  settings: { themePreset: string; defaultProvider: string; defaultModel: string; durableProvider: string; ephemeralProvider: string; promoteStrategy: string; preferredEditor: string | null };
   keybindings: Array<{ command: string; key: string }>;
   providers: Provider[];
   githubConnected: boolean;
@@ -218,48 +163,8 @@ const props = defineProps<{
   githubVerificationUri?: string;
   githubError?: string;
   defaultOpenMode: 'diff' | 'session';
-  initialTab?: 'Models' | 'Git' | 'Appearance' | 'Keybindings';
+  initialTab?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance' | 'Keybindings';
 }>();
-
-const tabs = ['Models', 'GitTrix', 'Appearance', 'Keybindings'] as const;
-const tab = ref<SettingsTab>(mapInitialTab(props.initialTab));
-
-watch(
-  () => props.initialTab,
-  (next) => {
-    tab.value = mapInitialTab(next);
-  }
-);
-
-const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
-const activeProviderConnected = computed(() => props.providers.some((provider) => provider.id === props.settings.defaultProvider && provider.hasAuth));
-const sortedProviders = computed(() => [...props.providers].sort((a, b) => Number(b.hasAuth) - Number(a.hasAuth) || a.id.localeCompare(b.id)));
-
-const durableOptions = computed<GitTrixOption[]>(() => [
-  { id: 'local', label: 'Local repo', available: true, selected: props.settings.durableProvider === 'local' },
-  { id: 'github', label: 'GitHub', available: true, selected: props.settings.durableProvider === 'github', detail: [props.githubConnected ? `Signed in as ${props.githubAccount || 'GitHub user'}` : 'Sign in below to enable GitHub commits and pushes.'] },
-  { id: 'gitlab', label: 'GitLab', available: false, selected: false },
-  { id: 'git-remote', label: 'Git remote', available: false, selected: false },
-  { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
-]);
-
-const ephemeralOptions = computed<GitTrixOption[]>(() => [
-  { id: 'local', label: 'Local workspace', available: true, selected: props.settings.ephemeralProvider === 'local' },
-  { id: 'cloudflare-artifacts', label: 'Cloudflare Artifacts', available: true, selected: props.settings.ephemeralProvider === 'cloudflare-artifacts', detail: ['CLOUDFLARE_ACCOUNT_ID · required', 'CLOUDFLARE_API_TOKEN · required', 'CLOUDFLARE_ARTIFACTS_NAMESPACE · optional'] },
-  { id: 'gitfork', label: 'GitFork', available: false, selected: false },
-  { id: 'code-storage', label: 'Code Storage', available: false, selected: false }
-]);
-
-const promoteOptions = computed<GitTrixOption[]>(() => [
-  { id: 'commit', label: 'Commit', available: true, selected: props.settings.promoteStrategy === 'commit' },
-  { id: 'branch', label: 'Branch', available: false, selected: false },
-  { id: 'pr', label: 'Pull request', available: false, selected: false },
-  { id: 'patch', label: 'Patch', available: false, selected: false }
-]);
-
-const authDraftProviderId = ref('');
-const authDraftApiKey = ref('');
-const bootstrapApiKey = ref('');
 
 const emit = defineEmits<{
   close: [];
@@ -269,6 +174,7 @@ const emit = defineEmits<{
   'update:keybinding': [command: string, key: string];
   'update:open-mode': [value: 'diff' | 'session'];
   'update:gittrix-provider': [key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string];
+  'update:preferred-editor': [value: string | null];
   'connect-github': [];
   'disconnect-github': [];
   'open-gittrix': [];
@@ -277,53 +183,133 @@ const emit = defineEmits<{
   'provider:remove-auth': [providerId: string];
 }>();
 
-type GitTrixOption = { id: string; label: string; available: boolean; selected: boolean; detail?: string[] };
+const tabs = ['Models', 'GitTrix', 'Editor', 'Appearance', 'Keybindings'] as const;
+const tab = ref<SettingsTab>(mapInitialTab(props.initialTab));
+const authDraftProviderId = ref('');
+const authDraftApiKey = ref('');
 
-const SettingsOptionGroup = defineComponent({
-  props: { title: { type: String, required: true }, options: { type: Array as () => GitTrixOption[], required: true } },
-  emits: ['select'],
-  setup(componentProps, { emit: componentEmit }) {
-    return () => {
-      const optionButtons = componentProps.options.map((option) => h('div', {
-        key: option.id,
-        class: [
-          'flex min-h-[52px] w-full flex-col gap-3 rounded-lg border px-3 py-3 text-left text-sm transition-colors',
-          option.selected ? 'border-primary/35 bg-primary/10 text-foreground' : option.available ? 'border-border/60 bg-background/55 text-foreground hover:bg-muted/55' : 'border-border/40 bg-background/25 text-muted-foreground'
-        ]
-      }, [
-        h('button', {
-          type: 'button',
-          disabled: !option.available,
-          onClick: () => componentEmit('select', option.id),
-          class: 'flex w-full min-w-0 items-center justify-between gap-3 text-left disabled:cursor-not-allowed'
-        }, [
-          h('span', { class: 'flex min-w-0 items-center gap-2' }, [
-            h(ProviderMark, { id: option.id, kind: 'git', size: 'sm', muted: !option.available }),
-            h('span', { class: 'truncate' }, option.label)
-          ]),
-          h('span', { class: ['shrink-0 text-[11px]', option.selected ? 'text-primary' : 'text-muted-foreground'] }, option.available ? (option.selected ? 'Selected' : 'Available') : 'Coming soon')
-        ]),
-        option.selected && option.detail?.length ? h('div', { class: 'ml-11 grid gap-1 rounded-md border border-border/60 bg-background/45 p-2 text-[11px] text-muted-foreground' }, option.detail.map((line) => h('div', line))) : null
-      ]));
+watch(() => props.initialTab, (next) => { tab.value = mapInitialTab(next); });
 
-      return h('div', { class: 'space-y-2' }, [
-        h('p', { class: 'text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground' }, componentProps.title),
-        h('div', { class: 'space-y-2' }, optionButtons)
-      ]);
-    };
+const tabMeta: Record<SettingsTab, { description: string }> = {
+  Models: { description: 'Choose the active model and manage provider keys.' },
+  GitTrix: { description: 'Configure storage and promotion behavior.' },
+  Editor: { description: 'Choose your default editor for project and file opens.' },
+  Appearance: { description: 'Pick the app color theme.' },
+  Keybindings: { description: 'Customize shortcuts for common actions.' }
+};
+
+function mapInitialTab(value?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance' | 'Keybindings'): SettingsTab {
+  if (value === 'Git') return 'GitTrix';
+  if (value === 'Integrations') return 'Editor';
+  return value ?? 'Models';
+}
+const activeTabDescription = computed(() => tabMeta[tab.value].description);
+const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
+const connectedProviders = computed(() => props.providers.filter((provider) => provider.hasAuth).sort((a, b) => Number(b.id === props.settings.defaultProvider) - Number(a.id === props.settings.defaultProvider) || a.id.localeCompare(b.id)));
+const availableProviders = computed(() => props.providers.filter((provider) => !provider.hasAuth).slice(0, 8));
+
+const editorOptions = [
+  { id: 'vscode', name: 'VS Code', command: 'code' },
+  { id: 'cursor', name: 'Cursor', command: 'cursor' },
+  { id: 'zed', name: 'Zed', command: 'zed' },
+  { id: 'obsidian', name: 'Obsidian', command: 'obsidian://' }
+] as const;
+
+const SectionHeader = defineComponent({
+  props: { title: { type: String, required: true }, meta: { type: String, default: '' } },
+  setup(sectionProps) {
+    return () => h('div', { class: 'flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3' }, [
+      h('p', { class: 'text-sm font-semibold' }, sectionProps.title),
+      sectionProps.meta ? h('span', { class: 'text-xs text-muted-foreground' }, sectionProps.meta) : null
+    ]);
   }
 });
 
-function mapInitialTab(value?: 'Models' | 'Git' | 'Appearance' | 'Keybindings'): SettingsTab {
-  return value === 'Git' ? 'GitTrix' : value ?? 'Models';
-}
+const SectionShell = defineComponent({
+  props: {
+    title: { type: String, required: true },
+    meta: { type: String, default: '' }
+  },
+  setup(sectionProps, { slots }) {
+    return () => h('section', { class: 'settings-section' }, [
+      h(SectionHeader, { title: sectionProps.title, meta: sectionProps.meta }),
+      slots.default?.()
+    ]);
+  }
+});
 
-function landingClass(active: boolean) {
-  return [
-    'h-10 rounded-md border text-sm transition-colors',
-    active ? 'border-border bg-muted/80 text-foreground' : 'border-border/60 bg-background/55 text-muted-foreground hover:border-border hover:bg-muted/55 hover:text-foreground'
-  ];
-}
+const SettingOptionRow = defineComponent({
+  props: {
+    label: { type: String, required: true },
+    detail: { type: String, default: '' },
+    selected: { type: Boolean, default: false }
+  },
+  emits: ['click'],
+  setup(rowProps, { slots, emit: rowEmit }) {
+    return () => h('button', {
+      type: 'button',
+      class: ['settings-row settings-option-row w-full border-t border-border/60 text-left first:border-t-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring', rowProps.selected ? 'bg-muted/45' : 'hover:bg-muted/35'],
+      onClick: () => rowEmit('click')
+    }, [
+      h('div', { class: 'flex min-w-0 items-center gap-3' }, [
+        slots.leading?.(),
+        h('div', { class: 'min-w-0' }, [
+          h('p', { class: 'text-sm font-medium' }, rowProps.label),
+          rowProps.detail ? h('p', { class: 'text-xs text-muted-foreground' }, rowProps.detail) : null
+        ])
+      ]),
+      rowProps.selected
+        ? h('span', { class: 'inline-flex h-5 w-5 items-center justify-center rounded-full border border-primary/35 bg-primary/10 text-primary' }, [
+            h(Check, { class: 'h-3.5 w-3.5' })
+          ])
+        : null
+    ]);
+  }
+});
+
+const SettingActionRow = defineComponent({
+  props: {
+    label: { type: String, required: true },
+    detail: { type: String, default: '' },
+    actionLabel: { type: String, required: true },
+    actionDisabled: { type: Boolean, default: false }
+  },
+  emits: ['action'],
+  setup(rowProps, { slots, emit: rowEmit }) {
+    return () => h('div', { class: 'settings-row w-full border-t border-border/60 first:border-t-0' }, [
+      h('div', { class: 'flex min-w-0 items-center gap-3' }, [
+        slots.leading?.(),
+        h('div', { class: 'min-w-0' }, [
+          h('p', { class: 'text-sm font-medium' }, rowProps.label),
+          rowProps.detail ? h('p', { class: 'text-xs text-muted-foreground' }, rowProps.detail) : null
+        ])
+      ]),
+      h(UiButton, { size: 'sm', variant: 'outline', disabled: rowProps.actionDisabled, onClick: () => rowEmit('action') }, () => rowProps.actionLabel)
+    ]);
+  }
+});
+
+const ProviderRow = defineComponent({
+  props: { provider: { type: Object as () => Provider, required: true }, active: { type: Boolean, default: false } },
+  emits: ['select', 'remove', 'add'],
+  setup(rowProps, { emit: rowEmit }) {
+    return () => h('div', { class: 'settings-row border-t border-border/60 first:border-t-0' }, [
+      h('button', { type: 'button', class: 'flex min-w-0 flex-1 items-center gap-3 rounded-md px-1 text-left transition-colors hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring', disabled: !rowProps.provider.hasAuth, onClick: () => rowProps.provider.hasAuth && rowEmit('select') }, [
+        h(ModelIcon, { provider: rowProps.provider.id, size: 28, theme: 'dark' }),
+        h('div', { class: 'min-w-0' }, [
+          h('div', { class: 'flex items-center gap-2' }, [
+            h('span', { class: ['truncate text-sm font-medium', rowProps.provider.hasAuth ? 'text-foreground' : 'text-muted-foreground'] }, rowProps.provider.id),
+            rowProps.active ? h('span', { class: 'rounded-full border border-primary/35 px-1.5 py-0.5 text-[10px] text-primary' }, 'Default') : null
+          ]),
+          h('p', { class: 'text-xs text-muted-foreground' }, `${rowProps.provider.modelIds.length} models · ${rowProps.provider.hasAuth ? 'connected' : 'needs key'}`)
+        ])
+      ]),
+      rowProps.provider.hasAuth
+        ? h(UiButton, { size: 'sm', variant: 'ghost', onClick: () => rowEmit('remove') }, () => 'Remove')
+        : h(UiButton, { size: 'sm', variant: 'ghost', onClick: () => rowEmit('add') }, () => 'Add key')
+    ]);
+  }
+});
 
 function startAuthDraft(providerId: string) {
   authDraftProviderId.value = providerId;
@@ -341,30 +327,41 @@ function saveProviderKey(providerId: string) {
   emit('provider:add-auth', providerId, key);
   cancelAuthDraft();
 }
-
-function saveBootstrapKey() {
-  const key = bootstrapApiKey.value.trim();
-  if (!key) return;
-  emit('provider:add-auth', 'openrouter', key);
-  bootstrapApiKey.value = '';
-}
 </script>
 
 <style scoped>
-.env-row {
+.settings-section {
+  overflow: hidden;
   display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid hsl(var(--border) / 0.72);
+  background: hsl(var(--background) / 0.32);
+}
+
+.settings-section--fill {
+  flex: 1 1 auto;
+}
+
+.settings-stretch-list {
+  display: block;
+}
+
+.settings-row {
+  display: flex;
+  min-height: 58px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  border-radius: 10px;
-  border: 1px solid hsl(var(--border) / 0.55);
-  background: hsl(var(--background) / 0.45);
-  padding: 8px 10px;
+  gap: 14px;
+  padding: 10px 16px;
 }
 
-.env-row span:first-child {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  color: hsl(var(--foreground));
+@media (max-width: 920px) {
+  .settings-row {
+    min-height: 54px;
+    gap: 12px;
+    padding: 10px 14px;
+  }
 }
-
 </style>
