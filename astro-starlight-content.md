@@ -47,9 +47,9 @@ Guides:
 
 ## Introduction
 
-glib-code is a review-first coding workflow for shipping agent-written changes without losing control of your repo.
+glib-code is a review-first coding workflow for shipping agent-written changes without losing control of durable git state.
 
-Agents can generate quickly. The failure mode is letting generated edits touch durable git state before review. glib-code fixes that by isolating agent work, rendering changes as diffs, and only promoting accepted output.
+It is currently in a solid beta state: core diff/session/promote behavior is functional, isolation boundaries are enforced, and day-to-day local usage is reliable.
 
 ## Architecture
 
@@ -66,7 +66,7 @@ glib-code is review-first by design:
 
 - inspect real diffs before and after agent work
 - keep agent writes isolated from durable repo
-- require explicit promotion of accepted changes
+- require explicit promotion of accepted output
 - keep provider/model choice explicit, not ambient
 - allow diff/project workflows without provider keys
 
@@ -102,11 +102,18 @@ Current behavior:
 
 - create: `POST /api/agent/sessions`
 - send: `POST /api/agent/sessions/:id/send`
-- stream: `GET /api/agent/sessions/:id/stream`
-- abort: `DELETE /api/agent/sessions/:id/turn`
+- stream: `GET /api/agent/sessions/:id/stream?projectPath=...&replay=...`
+- abort: `DELETE /api/agent/sessions/:id/turn?projectPath=...`
 - delete: `DELETE /api/agent/sessions/:id`
 
 Session timeline includes user turns, assistant output, tool calls, errors, and turn lifecycle events.
+
+Current reliability baseline:
+
+- stream/send/hydrate/diff/promote include active `projectPath`
+- server-side session resolver centralizes lookup behavior
+- stale sessions surface compact recovery actions instead of timeline spam
+- replay/reconnect handling is in place for normal refresh/reopen flows
 
 ### Promote
 
@@ -115,11 +122,15 @@ Promote is explicit transfer from ephemeral session workspace to durable repo.
 Current flow:
 
 - compute session diff
-- select files
+- select files (all or subset)
 - commit promote payload
 - optionally push when upstream/backing mode allows
 
-Conflict/dirty protections are enforced before mutation.
+Current protections:
+
+- overlap checks against dirty durable files
+- stash-and-continue path for local durable repos
+- handled failure envelopes for UI-safe recovery
 
 ### Provider/model authority
 
@@ -139,13 +150,19 @@ GitTrix provides durable/ephemeral boundary.
 - ephemeral: session workspace for agent edits
 - promote: controlled copy/commit back to durable
 
+Current state:
+
+- local sessions prefer git-backed ephemeral workspaces
+- `.git`-less ephemeral directories are not used for git-aware agent turns
+- durable fallback behavior exists for old/non-git session metadata
+
 ---
 
 ## Surfaces
 
 ### Web
 
-Vue/Vite app for project picker, diff workbench, sessions, promote UI.
+Vue/Vite app for project picker, diff workbench, sessions, and promote UI.
 
 Key UX points:
 
@@ -154,10 +171,11 @@ Key UX points:
 - typed tool-call rendering in timeline
 - diff rendering through Pierre (`@pierre/diffs`)
 - in-app destructive confirmations (session delete)
+- stale-session recovery actions (reload/new replacement)
 
 ### Server
 
-Bun/Hono API for sessions, agent runtime, diff, providers, promote.
+Bun/Hono API for sessions, agent runtime, diff, providers, and promote.
 
 Current responsibilities:
 
@@ -166,6 +184,7 @@ Current responsibilities:
 - agent event normalization
 - structured tool result typing (`resultType`, `summary`, `artifact`)
 - GitTrix session orchestration
+- centralized session resolution + route error envelopes
 
 ### Desktop
 
@@ -193,6 +212,7 @@ Electron shell wrapping web/server workflow with native integrations (e.g., fold
 ### Sessions
 
 - `GET /api/sessions`
+- `GET /api/sessions?scope=all`
 - `GET /api/sessions/:id?projectPath=...`
 - `GET /api/sessions/:id/diff?projectPath=...`
 - `POST /api/sessions/:id/promote?projectPath=...`
@@ -253,12 +273,24 @@ glib-code/
 └── Docs/
 ```
 
-## Current priorities
+## Overall status
 
-- richer typed tool artifacts and timeline components
-- less raw output in default UI paths
-- promote ergonomics (finer-grained selection)
-- resilience under reconnect/restart/multi-session load
+Operationally complete for core beta loop:
+
+- diff-first and session-first entry flows are functional
+- project-scoped and global session listing both work
+- session lifecycle APIs are wired and exercised in UI
+- GitTrix isolation is active for normal local session creation
+- promote supports guarded mutation paths and optional push
+
+Primary active gaps:
+
+- document sessions list scope contract centrally
+- add path normalization edge-case coverage (drive casing/slash/trailing slash)
+- harden `scope=all` listing performance and add pagination/limits
+- add telemetry for session-list latency and empty-result causes
+- finish active hunk/multi-file context wiring in diff workbench
+- finalize `/api/term` websocket lifecycle and frontend terminal swap-over
 
 ## Product principles
 
