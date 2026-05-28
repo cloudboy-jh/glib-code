@@ -85,9 +85,12 @@
         <div class="h-px flex-1 bg-border/80" />
       </div>
 
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
         <button class="picker-row !justify-start" @click="emit('openTheme')">
           <span class="picker-row-left"><Palette class="h-4 w-4" /><span>Theme</span></span>
+        </button>
+        <button class="picker-row !justify-start" @click="emit('openEditor')">
+          <span class="picker-row-left"><Code2 class="h-4 w-4" /><span>Editor</span></span>
         </button>
         <button class="picker-row !justify-start" @click="emit('openGittrix')">
           <span class="picker-row-left"><SlidersHorizontal class="h-4 w-4" /><span>GitTrix</span></span>
@@ -102,7 +105,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Bot, Command, FolderOpen, GitBranch, Palette, SlidersHorizontal } from 'lucide-vue-next';
+import { Bot, Code2, Command, FolderOpen, GitBranch, Palette, SlidersHorizontal } from 'lucide-vue-next';
 import RecentList from './RecentList.vue';
 
 const props = defineProps<{
@@ -120,6 +123,7 @@ const emit = defineEmits<{
   startNewRecentSession: [payload: { name: string; path: string }];
   forgetRecent: [id: string];
   openTheme: [];
+  openEditor: [];
   openGittrix: [];
   openModel: [];
   providerAuthSave: [providerId: string, apiKey: string];

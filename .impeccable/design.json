@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-28T00:00:00.000Z",
+  "title": "Design System: glib-code",
+  "extensions": {
+    "colorMeta": {
+      "bg-canvas": {
+        "role": "neutral",
+        "displayName": "Canvas Ink",
+        "canonical": "hsl(224 20% 8%)",
+        "tonalRamp": [
+          "#090B10",
+          "#10131A",
+          "#171C25",
+          "#1F2530",
+          "#2A3140",
+          "#4A5469",
+          "#7D879B",
+          "#C7CEDA"
+        ]
+      },
+      "surface-card": {
+        "role": "neutral",
+        "displayName": "Panel Slate",
+        "canonical": "hsl(226 18% 11%)",
+        "tonalRamp": [
+          "#0D1015",
+          "#171A21",
+          "#1F232C",
+          "#282E3A",
+          "#343B4A",
+          "#4F586C",
+          "#7A859C",
+          "#C1C9D7"
+        ]
+      },
+      "accent-primary": {
+        "role": "primary",
+        "displayName": "Operator Blue",
+        "canonical": "hsl(225 80% 66%)",
+        "tonalRamp": [
+          "#1A2E63",
+          "#274695",
+          "#355FC8",
+          "#4F79E4",
+          "#6388EE",
+          "#84A2F2",
+          "#A9C0F7",
+          "#D6E1FC"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Section-level settings and modal titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Operational descriptions and helper content."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Compact metadata and status labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay-lift",
+        "value": "0 20px 45px rgba(4, 6, 12, 0.45)",
+        "purpose": "Modal and top-layer surfaces."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-standard",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Primary UI state transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary confirmation and commit actions.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary { height: 36px; padding: 0 16px; border-radius: 6px; border: 1px solid transparent; background: #6388EE; color: #F8F9FC; font: 600 14px/1.2 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-primary:hover { background: #6F92F0; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 1px #5473D6; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions in dense rows.",
+      "html": "<button class=\"ds-btn-outline\">Close</button>",
+      "css": ".ds-btn-outline { height: 36px; padding: 0 16px; border-radius: 6px; border: 1px solid rgba(46, 51, 61, 0.8); background: rgba(23, 26, 33, 0.7); color: #E8EBEF; font: 500 14px/1.2 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-outline:hover { background: rgba(35, 39, 48, 0.7); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 1px #5473D6; }"
+    },
+    {
+      "name": "Settings Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Inline provider key and settings field input.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Paste API key\" />",
+      "css": ".ds-input { height: 32px; width: 260px; border-radius: 6px; border: 1px solid rgba(46, 51, 61, 0.7); background: #10131A; color: #E8EBEF; padding: 0 8px; font: 400 12px/1.2 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; } .ds-input::placeholder { color: #9EA5B3; } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 1px #5473D6; }"
+    },
+    {
+      "name": "Settings Rail Tab",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Left-rail tab row for settings categories.",
+      "html": "<button class=\"ds-tab ds-tab-active\">Models <span class=\"ds-tab-badge\">3</span></button>",
+      "css": ".ds-tab { display: flex; align-items: center; justify-content: space-between; width: 170px; height: 40px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #9EA5B3; padding: 0 12px; font: 500 14px/1.2 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-tab:hover { background: rgba(35, 39, 48, 0.45); color: #E8EBEF; } .ds-tab-active { border-color: rgba(46, 51, 61, 1); background: rgba(35, 39, 48, 0.75); color: #E8EBEF; } .ds-tab-badge { border: 1px solid rgba(46, 51, 61, 0.6); border-radius: 999px; padding: 1px 6px; font-size: 10px; color: #9EA5B3; }"
+    },
+    {
+      "name": "Settings Section Container",
+      "kind": "card",
+      "refersTo": "surface-card",
+      "description": "Grouped settings rows with explicit border-led structure.",
+      "html": "<section class=\"ds-section\"><header class=\"ds-section-head\">Connected providers</header><div class=\"ds-section-row\">OpenRouter · connected</div></section>",
+      "css": ".ds-section { overflow: hidden; border-radius: 14px; border: 1px solid rgba(46, 51, 61, 0.72); background: rgba(16, 19, 26, 0.32); } .ds-section-head { padding: 12px 16px; border-bottom: 1px solid rgba(46, 51, 61, 0.6); color: #E8EBEF; font: 600 14px/1.2 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; } .ds-section-row { min-height: 58px; padding: 10px 16px; color: #9EA5B3; font: 400 13px/1.4 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Control Room Quiet",
+    "overview": "glib-code should feel like a technical control room where each control has consequence and every visual decision lowers cognitive drag. The surface tone is calm and surgical, built for solo developers moving between repo context, session context, and high-impact settings changes without losing execution pace.\n\nThe system rejects dashboard theater. It avoids template SaaS card farms, loud neon devtool styling, and enterprise form bloat. Hierarchy is established through contrast, spacing rhythm, and type weight shifts rather than decorative flourish.\n\nInteractive elements should read as tactile restraint: immediate, crisp, and predictable. Feedback is fast and unambiguous. Motion stays subordinate to state clarity.",
+    "keyCharacteristics": [
+      "Dark neutral canvas with one operational accent.",
+      "Flat-by-default layers with border-led separation.",
+      "Dense enough for expert throughput, quiet enough for long sessions.",
+      "Explicit state contrast for active, focus, disabled, and destructive actions."
+    ],
+    "rules": [
+      {
+        "name": "The One-Signal Rule",
+        "body": "Accent color is for action and focus only, not decorative fill. If everything is loud, nothing is loud.",
+        "section": "colors"
+      },
+      {
+        "name": "The Contrast-Not-Noise Rule",
+        "body": "Emphasis comes from weight and scale jumps, not color proliferation.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-at-Rest Rule",
+        "body": "Surfaces should not float unless they are truly above the current interaction layer.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep settings sections grouped by outcome, not by technical storage details.",
+      "Do use one accent pathway (#6388EE / #5473D6) for action and focus semantics.",
+      "Do keep row heights and spacing tight but consistent for high-throughput configuration work.",
+      "Do preserve keyboard focus visibility on every interactive control."
+    ],
+    "donts": [
+      "Don't use generic SaaS dashboard card-grid templates for settings content.",
+      "Don't introduce flashy neon styling, decorative glow floods, or toy-like animation.",
+      "Don't build enterprise-bloated forms with redundant labels and repetitive helper text.",
+      "Don't use side-stripe border accents, gradient text, or default glassmorphism treatments."
+    ]
+  }
+}

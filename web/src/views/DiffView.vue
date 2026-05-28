@@ -4,9 +4,11 @@
     :diff-style="diffStyle"
     :theme-type="themeType"
     :theme-preset="themePreset"
+    :preferred-editor="preferredEditor"
     @update:diff-style="$emit('update:diffStyle', $event)"
     @open-projects="$emit('openProjects')"
     @start-session-from-diff="$emit('startSessionFromDiff', $event)"
+    @open-settings="$emit('openSettings')"
   />
 </template>
 
@@ -19,11 +21,13 @@ defineProps<{
   diffStyle: 'split' | 'unified';
   themeType: 'dark' | 'light';
   themePreset: ThemePreset;
+  preferredEditor: string | null;
 }>();
 
 defineEmits<{
   'update:diffStyle': [value: 'split' | 'unified'];
   openProjects: [];
   startSessionFromDiff: [payload: { source: 'uncommitted' | 'commits'; ref?: string; file?: string; paths?: string[]; context?: string }];
+  openSettings: [];
 }>();
 </script>

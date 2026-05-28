@@ -9,6 +9,7 @@
       @open-clone="emit('openClone')"
       @open-palette="emit('openPalette')"
       @open-theme="emit('openTheme')"
+      @open-editor="emit('openEditor')"
       @open-gittrix="emit('openGittrix')"
       @open-model="emit('openModel')"
       @open-recent="emit('openRecent', $event)"
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   openClone: [];
   openPalette: [];
   openTheme: [];
+  openEditor: [];
   openGittrix: [];
   openModel: [];
   openRecent: [payload: { name: string; path: string; mode: 'diff' | 'session' }];

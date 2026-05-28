@@ -7,6 +7,7 @@ import { fsRoutes } from "./fs";
 import { gitRoutes } from "./git";
 import { healthRoutes } from "./health";
 import { keybindingsRoutes } from "./keybindings";
+import { openRoutes } from "./open";
 import { projectsRoutes } from "./projects";
 import { providersRoutes } from "./providers";
 import { readinessRoutes } from "./readiness";
@@ -31,4 +32,5 @@ export function mountApiRoutes(app: Hono) {
   app.route("/api/attachments", attachmentsRoutes);
   app.route("/api/term", termRoutes);
   app.route("/api/providers", providersRoutes);
+  app.route("/api/open", openRoutes);
 }

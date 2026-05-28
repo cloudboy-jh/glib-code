@@ -81,7 +81,16 @@
             </button>
           </div>
 
-          <span class="ml-auto" />
+<span class="ml-auto" />
+          
+          <OpenInEditor
+            v-if="state.selectedFilePath"
+            :file-path="state.selectedFilePath"
+            :preferred-editor="preferredEditor"
+            :show-obsidian="true"
+            @open-settings="$emit('openSettings')"
+          />
+          
           <button
             class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18"
             :disabled="!state.files.length"
@@ -113,21 +122,53 @@
                   <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
                   <div class="text-[11px] text-muted-foreground">{{ state.files.length }} files</div>
                 </div>
-                <div class="min-h-0 overflow-auto p-1">
-                  <button
+<div class="min-h-0 overflow-auto p-1">
+                  <div
                     v-for="file in state.files"
                     :key="file.path"
-                    type="button"
                     :class="[
-                      'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px]',
-                      file.path === state.selectedFilePath ? 'bg-primary/20 text-primary' : 'text-foreground hover:bg-muted/70'
+                      'group flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted/70',
+                      file.path === state.selectedFilePath ? 'bg-primary/20' : ''
                     ]"
-                    :title="file.path"
-                    @click="selectFileFromMenu(file.path)"
                   >
-                    <span class="w-7 shrink-0 rounded border border-border/70 px-1 text-center text-[10px] text-muted-foreground">{{ file.status }}</span>
-                    <span class="min-w-0 flex-1 truncate">{{ file.path }}</span>
-                  </button>
+                    <button
+                      type="button"
+                      :class="[
+                        'min-w-0 flex-1 truncate text-left text-[11px]',
+                        file.path === state.selectedFilePath ? 'text-primary' : 'text-foreground'
+                      ]"
+                      :title="file.path"
+                      @click="selectFileFromMenu(file.path)"
+                    >
+                      <span class="w-7 inline-block shrink-0 rounded border border-border/70 px-1 text-center text-[10px] text-muted-foreground">{{ file.status }}</span>
+                      <span class="ml-2">{{ file.path }}</span>
+                    </button>
+                    
+                    <div class="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        v-if="file.path.toLowerCase().endsWith('.md') || file.path.toLowerCase().endsWith('.markdown') || file.path.toLowerCase().endsWith('.mdx')"
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        title="Open in Obsidian"
+                        @click="openFileInEditor(file.path, 'obsidian')"
+                      >
+                        O
+                      </button>
+                      <button
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        title="Open in VS Code"
+                        @click="openFileInEditor(file.path, 'vscode')"
+                      >
+                        V
+                      </button>
+                      <button
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        title="Open in Cursor"
+                        @click="openFileInEditor(file.path, 'cursor')"
+                      >
+                        C
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -155,7 +196,7 @@
           </div>
         </div>
 
-        <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+<div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{{ state.files.length }} changed files</span>
           <span class="mx-2">·</span>
           <span>{{ diffStats.hunks }} hunks</span>
@@ -178,6 +219,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ChevronDown, CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-next';
 import DiffView from '../shared/DiffView.vue';
+import OpenInEditor from '../shared/OpenInEditor.vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import diffsWordmark from '../../../../diffs-glibiconmain.png';
 
@@ -200,14 +242,16 @@ const props = withDefaults(
     diffStyle?: 'split' | 'unified';
     themeType?: 'dark' | 'light';
     themePreset?: ThemePreset;
+    preferredEditor?: string | null;
   }>(),
-  { diffStyle: 'split', themeType: 'dark', themePreset: 'catppuccin-mocha' }
+  { diffStyle: 'split', themeType: 'dark', themePreset: 'catppuccin-mocha', preferredEditor: null }
 );
 
 const emit = defineEmits<{
   'update:diffStyle': [value: 'split' | 'unified'];
   openProjects: [];
   startSessionFromDiff: [payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }];
+  openSettings: [];
 }>();
 
 const state = reactive({
@@ -223,19 +267,29 @@ const state = reactive({
 
 const fileMenuOpen = ref(false);
 const fileMenuRef = ref<HTMLElement | null>(null);
+const editorMenuOpen = ref(false);
 let loadFilesAndPatchSeq = 0;
 let loadedFilesKey = '';
 let loadedPatchKey = '';
 let loadingPatchKey = '';
 
+const isMarkdownFile = computed(() => {
+  const path = state.selectedFilePath.toLowerCase();
+  return path.endsWith('.md') || path.endsWith('.markdown') || path.endsWith('.mdx');
+});
+
 function onDocPointerDown(event: PointerEvent) {
   const target = event.target as Node | null;
   if (!target) return;
   if (!fileMenuRef.value?.contains(target)) fileMenuOpen.value = false;
+  editorMenuOpen.value = false;
 }
 
 function onDocKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Escape') fileMenuOpen.value = false;
+  if (event.key === 'Escape') {
+    fileMenuOpen.value = false;
+    editorMenuOpen.value = false;
+  }
 }
 
 const visibleStart = computed(() => {
@@ -364,6 +418,40 @@ async function selectPreviousFile() {
 async function selectNextFile() {
   if (currentFileIndex.value < 0 || currentFileIndex.value >= state.files.length - 1) return;
   await selectFile(state.files[currentFileIndex.value + 1].path);
+}
+
+async function openFileInEditor(filePath: string, editor: string) {
+  fileMenuOpen.value = false;
+  
+  try {
+    const response = await fetch(`${API_BASE}/open/editor`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        editor,
+        path: filePath
+      })
+    });
+
+    const result = await response.json();
+    
+    if (!result.ok) {
+      alert(`Failed to open file in ${editor}: ${result.message}`);
+    }
+  } catch (error) {
+    alert(`Error opening file: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function openInEditor(editor: string) {
+  editorMenuOpen.value = false;
+  
+  if (!state.selectedFilePath) {
+    alert('No file selected');
+    return;
+  }
+
+  await openFileInEditor(state.selectedFilePath, editor);
 }
 
 function emitStartSessionFromDiff() {

@@ -38,8 +38,10 @@
           :model="selectedModelLabel"
           :status="activeSession?.status ?? 'disconnected'"
           :git-action-label="promoteActionLabel"
+          :preferred-editor="settings.preferredEditor"
           @diff-current="openCurrentSessionDiff"
           @diff-commits="openCommitsListDiff"
+          @open-editor-settings="openSettings('Integrations')"
           @open-model="state.modelPickerOpen = true"
           @git-action="runPromote"
         />
@@ -55,6 +57,7 @@
             @open-clone="state.cloneDialogOpen = true"
             @open-palette="openCommandPalette"
             @open-theme="state.themeDialogOpen = true"
+            @open-editor="openSettings('Integrations')"
             @open-gittrix="openSettings('Git')"
             @open-model="openSettings('Models')"
             @open-recent="openRecentProject"
@@ -108,9 +111,11 @@
             :diff-style="state.diffStyle"
             :theme-type="diffThemeType"
             :theme-preset="settings.themePreset"
+            :preferred-editor="settings.preferredEditor"
             @update:diff-style="state.diffStyle = $event"
             @open-projects="goHome"
             @start-session-from-diff="startSessionFromDiff"
+            @open-settings="openSettings('Integrations')"
           />
         </main>
       </section>
@@ -144,14 +149,15 @@
       @update:theme="updateTheme"
       @update:provider="updateDefaultProvider"
       @update:model="selectModel(settings.defaultProvider, $event)"
-                @update:keybinding="updateKeybinding"
-                @update:open-mode="settings.defaultOpenMode = $event"
-                @update:gittrix-provider="updateGitTrixProvider"
-                @connect-github="connectGitHub"
-                @disconnect-github="disconnectGitHub"
-                @open-gittrix="openGitTrixFromSettings"
-                @open-model-picker="state.modelPickerOpen = true"
-                @provider:add-auth="saveProviderAuth"
+      @update:keybinding="updateKeybinding"
+      @update:open-mode="settings.defaultOpenMode = $event"
+      @update:gittrix-provider="updateGitTrixProvider"
+      @update:preferred-editor="updatePreferredEditor"
+      @connect-github="connectGitHub"
+      @disconnect-github="disconnectGitHub"
+      @open-gittrix="openGitTrixFromSettings"
+      @open-model-picker="state.modelPickerOpen = true"
+      @provider:add-auth="saveProviderAuth"
       @provider:remove-auth="removeProviderAuth"
     />
 
@@ -464,7 +470,8 @@ const settings = reactive({
   durableProvider: 'local' as 'local' | 'github',
   ephemeralProvider: 'local' as 'local' | 'cloudflare-artifacts',
   promoteStrategy: 'commit' as 'commit' | 'branch' | 'pr' | 'patch',
-  defaultOpenMode: 'diff' as 'diff' | 'session'
+  defaultOpenMode: 'diff' as 'diff' | 'session',
+  preferredEditor: null as string | null
 });
 
 const authState = reactive({
@@ -506,7 +513,7 @@ const state = reactive({
   paletteIndex: 0,
   settingsOpen: false,
   modelPickerOpen: false,
-  settingsTab: 'Models' as 'Models' | 'Git' | 'Appearance' | 'Keybindings',
+  settingsTab: 'Models' as 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings',
   terminalOpen: false,
   openProjectDialogOpen: false,
   themeDialogOpen: false,
@@ -1062,7 +1069,7 @@ async function hydrateSessions() {
   return hydratingSessionsPromise;
 }
 
-function openSettings(tab: 'Models' | 'Git' | 'Appearance' | 'Keybindings' = 'Models') {
+function openSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings' = 'Models') {
   state.settingsTab = tab;
   state.settingsOpen = true;
 }
@@ -1129,12 +1136,14 @@ async function hydrateSettings() {
     durableProvider: 'local' | 'github';
     ephemeralProvider: 'local' | 'cloudflare-artifacts';
     promoteStrategy: 'commit' | 'branch' | 'pr' | 'patch';
+    preferredEditor: string | null;
   }>('/settings');
   settings.themePreset = saved.themePreset;
   applyTheme(saved.themePreset);
   settings.durableProvider = saved.durableProvider;
   settings.ephemeralProvider = saved.ephemeralProvider;
   settings.promoteStrategy = saved.promoteStrategy;
+  settings.preferredEditor = saved.preferredEditor ?? null;
 }
 
 async function hydrateAuth() {
@@ -1173,6 +1182,12 @@ async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider
   settings.durableProvider = saved.durableProvider;
   settings.ephemeralProvider = saved.ephemeralProvider;
   settings.promoteStrategy = saved.promoteStrategy;
+}
+
+async function updatePreferredEditor(value: string | null) {
+  if (settings.preferredEditor === value) return;
+  const saved = await apiPatch<typeof settings>('/settings', { preferredEditor: value });
+  settings.preferredEditor = saved.preferredEditor ?? null;
 }
 
 async function connectGitHub() {
@@ -1986,7 +2001,6 @@ const shortcuts = useGlobalShortcuts({
 });
 
 onMounted(() => {
-  applyTheme(settings.themePreset);
   const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
   if (storedSidebarWidth) {
     const parsedWidth = Number(storedSidebarWidth);

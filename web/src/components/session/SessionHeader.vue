@@ -13,34 +13,11 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-      <div ref="diffMenuRoot" class="relative inline-flex items-center">
-        <button class="header-button header-button-split rounded-r-none pr-2" @click="$emit('diffCurrent')">
-          <GitCompare class="header-icon" />
-          <span>Diff</span>
-        </button>
-        <button
-          class="header-button header-button-split rounded-l-none border-l-0 px-2"
-          :aria-expanded="diffMenuOpen"
-          aria-label="Open diff actions"
-          @click="diffMenuOpen = !diffMenuOpen"
-        >
-          <ChevronDown class="header-icon" />
-        </button>
-
-        <div
-          v-if="diffMenuOpen"
-          class="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[190px] overflow-hidden rounded-lg border border-border/80 bg-card/95 py-1 shadow-lg shadow-black/20"
-        >
-          <button class="menu-item" @click="onDiffMenuSelect('current')">
-            <GitCompare class="menu-icon" />
-            <span>Current session diff</span>
-          </button>
-          <button class="menu-item" @click="onDiffMenuSelect('commits')">
-            <List class="menu-icon" />
-            <span>Commits list</span>
-          </button>
-        </div>
-      </div>
+      <OpenInEditor target="project" :preferred-editor="preferredEditor" @open-settings="$emit('openEditorSettings')" />
+      <button class="header-button" @click="$emit('diffCurrent')">
+        <GitCompare class="header-icon" />
+        <span>Diff</span>
+      </button>
 
       <button class="header-button" @click="$emit('openModel')">
         <span>{{ model }}</span>
@@ -55,13 +32,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { onMounted, onUnmounted, ref } from 'vue';
-import { ChevronDown, CloudUpload, GitCompare, List } from 'lucide-vue-next';
+import { CloudUpload, GitCompare } from 'lucide-vue-next';
+import OpenInEditor from '../shared/OpenInEditor.vue';
 
-const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string }>(), {
+const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string; preferredEditor?: string | null }>(), {
+  preferredEditor: null,
   gitActionLabel: 'Commit'
 });
-const emit = defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: [] }>();
+defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; openEditorSettings: [] }>();
 
 const statusDotClass = computed(() => {
   if (props.status === 'stale') return 'bg-amber-400';
@@ -71,25 +49,6 @@ const statusDotClass = computed(() => {
   return 'bg-emerald-400';
 });
 
-const diffMenuOpen = ref(false);
-const diffMenuRoot = ref<HTMLElement | null>(null);
-
-function onDiffMenuSelect(action: 'current' | 'commits') {
-  diffMenuOpen.value = false;
-  if (action === 'current') emit('diffCurrent');
-  else emit('diffCommits');
-}
-
-function onWindowPointerDown(event: MouseEvent) {
-  if (!diffMenuOpen.value) return;
-  const root = diffMenuRoot.value;
-  if (!root) return;
-  if (!(event.target instanceof Node)) return;
-  if (!root.contains(event.target)) diffMenuOpen.value = false;
-}
-
-onMounted(() => window.addEventListener('mousedown', onWindowPointerDown));
-onUnmounted(() => window.removeEventListener('mousedown', onWindowPointerDown));
 </script>
 
 <style scoped>
