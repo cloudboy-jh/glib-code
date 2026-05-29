@@ -44,6 +44,7 @@ const props = defineProps<{
   target?: 'file' | 'project';
   filePath?: string;
   preferredEditor: string | null;
+  sessionId?: string;
   showObsidian?: boolean;
 }>();
 
@@ -77,7 +78,7 @@ async function openTarget(editor?: string) {
     const response = await fetch(`${API_BASE}/open/editor`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ target, path: props.filePath, editor })
+      body: JSON.stringify({ target, path: props.filePath, editor, sessionId: props.sessionId })
     });
 
     const result = await response.json();

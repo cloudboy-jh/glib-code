@@ -243,6 +243,7 @@ const props = withDefaults(
     themeType?: 'dark' | 'light';
     themePreset?: ThemePreset;
     preferredEditor?: string | null;
+    sessionId?: string;
   }>(),
   { diffStyle: 'split', themeType: 'dark', themePreset: 'catppuccin-mocha', preferredEditor: null }
 );
@@ -429,7 +430,8 @@ async function openFileInEditor(filePath: string, editor: string) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         editor,
-        path: filePath
+        path: filePath,
+        sessionId: props.sessionId
       })
     });
 

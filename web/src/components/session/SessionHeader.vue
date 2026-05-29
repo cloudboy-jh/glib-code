@@ -13,7 +13,7 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-      <OpenInEditor target="project" :preferred-editor="preferredEditor" @open-settings="$emit('openEditorSettings')" />
+      <OpenInEditor target="project" :preferred-editor="preferredEditor" :session-id="sessionId" @open-settings="$emit('openEditorSettings')" />
       <button class="header-button" @click="$emit('diffCurrent')">
         <GitCompare class="header-icon" />
         <span>Diff</span>
@@ -35,7 +35,7 @@ import { computed } from 'vue';
 import { CloudUpload, GitCompare } from 'lucide-vue-next';
 import OpenInEditor from '../shared/OpenInEditor.vue';
 
-const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string; preferredEditor?: string | null }>(), {
+const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
   preferredEditor: null,
   gitActionLabel: 'Commit'
 });

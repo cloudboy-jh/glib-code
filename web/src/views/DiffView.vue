@@ -5,6 +5,7 @@
     :theme-type="themeType"
     :theme-preset="themePreset"
     :preferred-editor="preferredEditor"
+    :session-id="sessionId"
     @update:diff-style="$emit('update:diffStyle', $event)"
     @open-projects="$emit('openProjects')"
     @start-session-from-diff="$emit('startSessionFromDiff', $event)"
@@ -22,6 +23,7 @@ defineProps<{
   themeType: 'dark' | 'light';
   themePreset: ThemePreset;
   preferredEditor: string | null;
+  sessionId?: string;
 }>();
 
 defineEmits<{
