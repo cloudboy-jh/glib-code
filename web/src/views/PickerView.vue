@@ -8,10 +8,7 @@
       @open-project="emit('openProject')"
       @open-clone="emit('openClone')"
       @open-palette="emit('openPalette')"
-      @open-theme="emit('openTheme')"
-      @open-editor="emit('openEditor')"
-      @open-gittrix="emit('openGittrix')"
-      @open-model="emit('openModel')"
+      @open-settings="emit('openSettings', $event)"
       @open-recent="emit('openRecent', $event)"
       @continue-recent-session="emit('continueRecentSession', $event)"
       @start-new-recent-session="emit('startNewRecentSession', $event)"
@@ -35,10 +32,7 @@ const emit = defineEmits<{
   openProject: [];
   openClone: [];
   openPalette: [];
-  openTheme: [];
-  openEditor: [];
-  openGittrix: [];
-  openModel: [];
+  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings'];
   openRecent: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
   continueRecentSession: [payload: { name: string; path: string; sessionId: string }];
   startNewRecentSession: [payload: { name: string; path: string }];

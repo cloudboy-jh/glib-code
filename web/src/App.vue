@@ -1,7 +1,11 @@
 <template>
   <div class="h-[100dvh] w-[100dvw] overflow-hidden bg-background text-foreground">
-    <div class="grid h-full grid-cols-[auto_1fr]">
-      <div class="relative h-full border-r border-border/60 bg-card" :style="{ width: `${sidebarWidth}px` }">
+    <div :class="['grid h-full', currentProject ? 'grid-cols-[auto_1fr]' : 'grid-cols-1']">
+      <div
+        v-if="currentProject"
+        class="relative h-full border-r border-border/60 bg-card"
+        :style="{ width: `${sidebarWidth}px` }"
+      >
         <SessionSidebar
           :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
@@ -57,10 +61,7 @@
             @open-project="state.openProjectDialogOpen = true"
             @open-clone="state.cloneDialogOpen = true"
             @open-palette="openCommandPalette"
-            @open-theme="state.themeDialogOpen = true"
-            @open-editor="openSettings('Integrations')"
-            @open-gittrix="openSettings('Git')"
-            @open-model="openSettings('Models')"
+            @open-settings="openSettings($event)"
             @open-recent="openRecentProject"
             @continue-recent-session="continueRecentSessionFromPicker"
             @start-new-recent-session="startNewRecentSessionFromPicker"

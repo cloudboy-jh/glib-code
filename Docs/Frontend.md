@@ -21,11 +21,15 @@ Primary surfaces:
 - Theme dialog
 - Terminal drawer (UI-only simulation until `/api/term` lands)
 
-Home surface controls in Picker now include:
+Home surface controls in Picker (always-visible grid):
 
-- Theme quick control
-- GitTrix/settings quick control
-- Model/settings quick control
+- Theme → opens Settings modal at Appearance tab
+- Editor → opens Settings modal at Integrations tab
+- GitTrix → opens Settings modal at Git tab
+- Model → opens Settings modal at Models tab
+- Settings → opens Settings modal at default tab
+
+Picker view hides the sidebar; sidebar only appears when a project is open.
 
 ## Data split (real vs mock)
 

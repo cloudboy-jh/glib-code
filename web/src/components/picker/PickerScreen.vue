@@ -39,7 +39,7 @@
           <p class="text-sm font-medium text-foreground">Agent setup</p>
           <p class="mt-1 text-xs text-muted-foreground">Optional for browsing projects and reviewing diffs. Add a key when you want the agent to work.</p>
         </div>
-        <button class="text-xs text-primary underline underline-offset-2" @click="emit('openModel')">Settings</button>
+        <button class="text-xs text-primary underline underline-offset-2" @click="emit('openSettings', 'Models')">Settings</button>
       </div>
       <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
         <select v-model="providerDraft" class="h-9 rounded-md border border-border/70 bg-background px-2 text-xs">
@@ -85,18 +85,21 @@
         <div class="h-px flex-1 bg-border/80" />
       </div>
 
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
-        <button class="picker-row !justify-start" @click="emit('openTheme')">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-5">
+        <button class="picker-row !justify-start" @click="emit('openSettings', 'Appearance')">
           <span class="picker-row-left"><Palette class="h-4 w-4" /><span>Theme</span></span>
         </button>
-        <button class="picker-row !justify-start" @click="emit('openEditor')">
+        <button class="picker-row !justify-start" @click="emit('openSettings', 'Integrations')">
           <span class="picker-row-left"><Code2 class="h-4 w-4" /><span>Editor</span></span>
         </button>
-        <button class="picker-row !justify-start" @click="emit('openGittrix')">
+        <button class="picker-row !justify-start" @click="emit('openSettings', 'Git')">
           <span class="picker-row-left"><SlidersHorizontal class="h-4 w-4" /><span>GitTrix</span></span>
         </button>
-        <button class="picker-row !justify-start" @click="emit('openModel')">
+        <button class="picker-row !justify-start" @click="emit('openSettings', 'Models')">
           <span class="picker-row-left"><Bot class="h-4 w-4" /><span>Model</span></span>
+        </button>
+        <button class="picker-row !justify-start" @click="emit('openSettings')">
+          <span class="picker-row-left"><Settings class="h-4 w-4" /><span>Settings</span></span>
         </button>
       </div>
     </section>
@@ -105,7 +108,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Bot, Code2, Command, FolderOpen, GitBranch, Palette, SlidersHorizontal } from 'lucide-vue-next';
+import { Bot, Code2, Command, FolderOpen, GitBranch, Palette, Settings, SlidersHorizontal } from 'lucide-vue-next';
 import RecentList from './RecentList.vue';
 
 const props = defineProps<{
@@ -122,10 +125,7 @@ const emit = defineEmits<{
   continueRecentSession: [payload: { name: string; path: string; sessionId: string }];
   startNewRecentSession: [payload: { name: string; path: string }];
   forgetRecent: [id: string];
-  openTheme: [];
-  openEditor: [];
-  openGittrix: [];
-  openModel: [];
+  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings'];
   providerAuthSave: [providerId: string, apiKey: string];
 }>();
 
