@@ -196,6 +196,23 @@
           </div>
         </div>
 
+        <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-card/75 p-2 text-xs">
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.selectedFilePath" @click="stageFiles([state.selectedFilePath])">Stage file</button>
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.selectedFilePath" @click="unstageFiles([state.selectedFilePath])">Unstage file</button>
+          <button class="h-7 rounded border border-red-400/50 px-2 text-red-200 hover:bg-red-500/10" :disabled="!state.selectedFilePath" @click="discardFiles([state.selectedFilePath])">Discard file</button>
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.files.length" @click="stageFiles(state.files.map((row) => row.path))">Stage all listed</button>
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.files.length" @click="unstageFiles(state.files.map((row) => row.path))">Unstage all listed</button>
+          <button class="h-7 rounded border border-red-400/50 px-2 text-red-200 hover:bg-red-500/10" :disabled="!state.files.length" @click="discardFiles(state.files.map((row) => row.path))">Discard all listed</button>
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" @click="pullLatest">Pull</button>
+          <input v-model="state.checkoutRef" class="h-7 rounded border border-border/70 bg-background/70 px-2" placeholder="branch/ref" />
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.checkoutRef.trim()" @click="checkoutRef(false)">Checkout</button>
+          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.checkoutRef.trim()" @click="checkoutRef(true)">Create+checkout</button>
+          <input v-model="state.commitMessage" class="h-7 min-w-[220px] rounded border border-border/70 bg-background/70 px-2" placeholder="commit message" />
+          <button class="h-7 rounded border border-primary/60 px-2 text-primary hover:bg-primary/10" :disabled="!state.commitMessage.trim()" @click="commitChanges">Commit</button>
+          <span v-if="state.gitNotice" class="text-muted-foreground">{{ state.gitNotice }}</span>
+          <span v-if="state.gitError" class="text-red-300">{{ state.gitError }}</span>
+        </div>
+
 <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{{ state.files.length }} changed files</span>
           <span class="mx-2">·</span>
@@ -210,8 +227,30 @@
         </div>
 
         <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
+
+        <div v-if="state.selectedCommitRef" class="mt-3">
+          <button class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground" @click="loadCommitDetail">View commit detail</button>
+        </div>
       </section>
     </template>
+
+    <div v-if="state.commitDetailOpen && state.commitDetail" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.commitDetailOpen = false">
+      <div class="w-full max-w-3xl rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-2 flex items-center justify-between">
+          <div class="text-sm font-semibold">Commit {{ state.commitDetail.sha.slice(0, 10) }}</div>
+          <button class="rounded border border-border/70 px-2 py-1 text-[11px]" @click="state.commitDetailOpen = false">Close</button>
+        </div>
+        <div class="mb-2 text-xs text-muted-foreground">{{ state.commitDetail.authorName }} · {{ state.commitDetail.authorEmail }} · {{ state.commitDetail.date }}</div>
+        <div class="mb-1 text-sm font-medium">{{ state.commitDetail.subject }}</div>
+        <pre v-if="state.commitDetail.body" class="mb-3 max-h-36 overflow-auto rounded border border-border/70 bg-background/60 p-2 text-xs">{{ state.commitDetail.body }}</pre>
+        <div class="max-h-64 overflow-auto rounded border border-border/70 bg-background/50 p-2 text-xs">
+          <div v-for="file in state.commitDetail.files" :key="`${file.status}-${file.path}`" class="flex items-center gap-2 py-1">
+            <span class="inline-block w-6 rounded border border-border/70 px-1 text-center">{{ file.status }}</span>
+            <span class="truncate">{{ file.path }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -229,6 +268,7 @@ const diffsWordmarkSrc = diffsWordmark;
 
 type DiffItem = { id: string; ref: string; title: string; shortRef: string };
 type DiffFile = { path: string; status: string };
+type GitApiError = Error & { code?: string; files?: string[] };
 
 function truncatePatch(patch: string) {
   const lines = patch.split('\n');
@@ -263,7 +303,13 @@ const state = reactive({
   selectedCommitRef: '',
   files: [] as DiffFile[],
   selectedFilePath: '',
-  patch: ''
+  patch: '',
+  commitMessage: '',
+  checkoutRef: '',
+  gitNotice: '',
+  gitError: '',
+  commitDetailOpen: false,
+  commitDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> }
 });
 
 const fileMenuOpen = ref(false);
@@ -312,7 +358,7 @@ const truncationCount = computed(() => Number(state.patch.match(/diff truncated 
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) throw await readError(response);
   return response.json() as Promise<T>;
 }
 
@@ -322,8 +368,31 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(`request failed: ${response.status}`);
+  if (!response.ok) throw await readError(response);
   return response.json() as Promise<T>;
+}
+
+async function readError(response: Response): Promise<GitApiError> {
+  const text = await response.text().catch(() => '');
+  try {
+    const parsed = JSON.parse(text || '{}') as { message?: string; code?: string; files?: string[] };
+    const error = new Error(parsed.message || `request failed: ${response.status}`) as GitApiError;
+    error.code = parsed.code;
+    error.files = parsed.files;
+    return error;
+  } catch {
+    return new Error(text || `request failed: ${response.status}`) as GitApiError;
+  }
+}
+
+function describeGitError(error: unknown) {
+  const e = error as GitApiError;
+  if (e.code === 'DIRTY_TREE') return `Dirty tree: ${(e.files ?? []).join(', ') || e.message}`;
+  if (e.code === 'PULL_CONFLICT') return `Pull conflict: ${(e.files ?? []).join(', ') || e.message}`;
+  if (e.code === 'NOTHING_TO_COMMIT') return 'Nothing to commit.';
+  if (e.code === 'MESSAGE_REQUIRED') return 'Commit message required.';
+  if (e.code === 'PROTECTED_PATH') return `Protected path: ${(e.files ?? []).join(', ') || '.glib/**'}`;
+  return e?.message || 'git action failed';
 }
 
 async function loadHistory() {
@@ -377,6 +446,91 @@ async function loadFilesAndPatch() {
     loadedPatchKey = patchKey;
   } finally {
     if (loadingPatchKey === patchKey) loadingPatchKey = '';
+  }
+}
+
+async function stageFiles(files: string[]) {
+  state.gitError = '';
+  try {
+    await apiPost('/git/stage', { files });
+    state.gitNotice = `staged ${files.length} file${files.length === 1 ? '' : 's'}`;
+    await loadFilesAndPatch();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function unstageFiles(files: string[]) {
+  state.gitError = '';
+  try {
+    await apiPost('/git/unstage', { files });
+    state.gitNotice = `unstaged ${files.length} file${files.length === 1 ? '' : 's'}`;
+    await loadFilesAndPatch();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function discardFiles(files: string[]) {
+  if (!files.length) return;
+  if (!confirm(`Discard changes for ${files.join(', ')}?`)) return;
+  state.gitError = '';
+  try {
+    await apiPost('/git/discard', { files });
+    state.gitNotice = `discarded ${files.length} file${files.length === 1 ? '' : 's'}`;
+    await loadFilesAndPatch();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function commitChanges() {
+  state.gitError = '';
+  try {
+    const result = await apiPost<{ sha: string; branch: string }>('/git/commit', { message: state.commitMessage });
+    state.gitNotice = `committed ${result.sha.slice(0, 7)} on ${result.branch}`;
+    state.commitMessage = '';
+    await loadHistory();
+    await loadFilesAndPatch();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function pullLatest() {
+  state.gitError = '';
+  try {
+    await apiPost('/git/pull', {});
+    state.gitNotice = 'pull complete';
+    await loadHistory();
+    await loadFilesAndPatch();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function checkoutRef(create: boolean) {
+  const ref = state.checkoutRef.trim();
+  if (!ref) return;
+  if (create && !confirm(`Create and checkout branch "${ref}"?`)) return;
+  state.gitError = '';
+  try {
+    await apiPost('/git/checkout', { ref, create });
+    state.gitNotice = create ? `created and checked out ${ref}` : `checked out ${ref}`;
+    await resetForProject();
+  } catch (error) {
+    state.gitError = describeGitError(error);
+  }
+}
+
+async function loadCommitDetail() {
+  if (!state.selectedCommitRef) return;
+  state.gitError = '';
+  try {
+    state.commitDetail = await apiGet(`/git/commit/${encodeURIComponent(state.selectedCommitRef)}`);
+    state.commitDetailOpen = true;
+  } catch (error) {
+    state.gitError = describeGitError(error);
   }
 }
 

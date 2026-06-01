@@ -17,7 +17,7 @@ glib-code is an isolated AI coding workspace centered on this loop:
 
 ## Current reality
 
-- Agent runtime uses pi as an RPC subprocess in a sandbox. The in-process SDK path remains a temporary fallback.
+- Agent runtime uses pi as an RPC subprocess in a sandbox (RPC-only runtime path).
 - Session isolation is handled by GitTrix local worktree/clone workspaces.
 - Agent session routes resolve by stored `sessionId` metadata plus explicit `projectPath` fallback, not process-global project state alone.
 - Provider/model capability authority is pi.
@@ -119,8 +119,8 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitT
 1. Finish reload/restart validation after successful GitHub durable promote (`Docs/session-smoke-test.md`).
 2. Terminal WebSocket transport (`/api/term`) with stable reconnect behavior.
 3. Attachments API and frontend upload/reference flow.
-4. Remaining git mutation routes parity (`stage/unstage/discard/pull/checkout`).
-5. Hunk-level session promote selection.
+4. Hunk-level session promote selection.
+5. Full git-workflow UX polish (branch/commit detail ergonomics and conflict messaging).
 6. Reliability pass: live-agent tests, restart recovery checks, multi-tab behavior.
 7. Cloudflare Artifacts adapter hardening once GitTrix backend support lands.
 
@@ -128,4 +128,4 @@ GitTrix contract lives in `cloudboy-jh/gittrix/SPEC.md`. glib-code consumes GitT
 
 - Multi-agent collaborative sessions.
 - Cross-adapter promote chains.
-- In-app conflict resolution/merge UI (conflicts are surfaced; resolution happens in git tooling).
+- In-app conflict resolution/merge UI (conflicts are surfaced with structured route errors; resolution happens in git tooling).

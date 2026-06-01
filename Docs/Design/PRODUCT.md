@@ -10,6 +10,8 @@ Primary users are solo developers running local repositories with an AI pair-pro
 ## Product Purpose
 glib-code is an AI coding workspace that keeps agent edits isolated until the user explicitly promotes accepted changes. It exists to give developers speed without sacrificing control. Success means users can open a repo, configure runtime/settings confidently, run focused sessions, review diffs clearly, and promote only what they trust.
 
+The product now includes core durable-repo git workflow controls (stage/unstage/discard/commit/pull/checkout/branch creation and commit inspection) directly in-app.
+
 ## Brand Personality
 Calm, surgical, trustworthy.
 

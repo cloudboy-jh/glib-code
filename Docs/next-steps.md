@@ -22,7 +22,7 @@
 - [ ] Strengthen session-index hygiene/cleanup for stale project-path entries.
 - [x] Finalize `/api/term` websocket lifecycle/capability/error handling for frontend adoption.
 - [x] Implement `/api/attachments` upload/read/delete routes.
-- [ ] Implement remaining git mutation routes under `/api/git` (stage/unstage/discard/commit/pull/checkout/create-branch/get-commit).
+- [x] Implement remaining git mutation routes under `/api/git` (stage/unstage/discard/commit/pull/checkout/create-branch/get-commit).
 - [ ] Implement `/api/diff/branch-compare`.
 - [ ] Add timeout handling per turn.
 - [x] Complete real local pi RPC parity test against installed `pi` binary.

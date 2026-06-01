@@ -95,7 +95,7 @@ Current project is in-memory only (server process scoped).
 - `GET /api/diff/files`
 - `GET /api/diff/hunks`
 - `POST /api/diff/pack`
-- `POST /api/diff/branch-compare` (501)
+- `POST /api/diff/branch-compare` (501, UI-inaccessible in v1)
 
 Current behavior:
 
@@ -114,16 +114,23 @@ Implemented:
 - `GET /api/git/log`
 - `POST /api/git/push`
 - `POST /api/git/stash`
+- `POST /api/git/stage`
+- `POST /api/git/unstage`
+- `POST /api/git/discard`
+- `POST /api/git/commit`
+- `POST /api/git/pull`
+- `POST /api/git/checkout`
+- `POST /api/git/branches` (create branch)
+- `GET /api/git/commit/:sha`
 
 Behavior:
 
 - `status` includes upstream, ahead/behind, dirty file buckets, and `canPush`.
 - `push` requires an upstream-backed branch and returns branch/upstream/SHA metadata.
 - `stash` ignores `.glib/` changes, includes untracked files, and returns `stash@{0}` when it creates a new stash.
-
-Stubbed (`501`):
-
-- stage/unstage/discard/commit/pull/checkout/create-branch/get-commit
+- stage/commit/discard operations reject protected `.glib/**` paths.
+- checkout rejects over a dirty working tree with structured `DIRTY_TREE` payload.
+- pull returns structured `NO_UPSTREAM`, `DETACHED_HEAD`, or `PULL_CONFLICT` payloads.
 
 ### FS
 
@@ -221,7 +228,7 @@ Responsibilities:
 
 ## Agent integration point
 
-- Agent runtime uses pi RPC subprocesses by default; set `GLIB_PI_RUNTIME=sdk` to use the temporary in-process SDK fallback.
+- Agent runtime uses pi RPC subprocesses unconditionally.
 - `runTurn` executes with cwd set to the session's GitTrix ephemeral path only when session metadata says it is git-backed and `.git` exists; otherwise it falls back to the durable repo path.
 - Agent prompts include repo/session metadata so the model can distinguish durable repo, actual cwd, GitTrix ephemeral workspace, and baseline SHA.
 - `/api/agent/*` routes stay thin; `agent-runtime.ts` owns runtime/sandbox lifecycle.

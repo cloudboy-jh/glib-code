@@ -18,7 +18,7 @@ open repo
 ## Main parts
 
 - Frontend: Vue/Vite web UI and Electron desktop shell.
-- Backend: Bun/Hono API server for repo access, sessions, GitTrix orchestration, settings, auth, and SSE.
+- Backend: Bun/Hono API server for repo access, full durable-repo git mutations, sessions, GitTrix orchestration, settings, auth, and SSE.
 - Agent runtime: pi RPC subprocess running in a sandbox.
 - Workspace boundary: GitTrix creates the ephemeral session workspace and promotes accepted changes back.
 - Durable repo: the user's real checkout or GitHub durable target.
