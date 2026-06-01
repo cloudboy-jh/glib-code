@@ -32,8 +32,14 @@
 - [ ] Move current project state to a client/session-scoped model (not single process-global value).
 - [ ] Harden FS read/tree for large repos and binary files.
 - [ ] Keep readiness checks fast and cached while preserving actionable errors.
-- [ ] Ensure Git + diff route surface matches what frontend advertises.
-- [ ] Typecheck + build pass (`bun run --cwd server check`, `bun run --cwd server build`).
+- [x] Ensure Git + diff route surface matches what frontend advertises.
+- [x] Typecheck + build pass (`bun run --cwd server check`, `bun run --cwd server build`).
+
+## Git UX follow-ups
+
+- [ ] Add inline commit-detail entry in commit history rows (not only from selected commit state).
+- [ ] Add dedicated branch management surface (list/switch/create) beyond toolbar inputs.
+- [ ] Expand structured pull-conflict rendering with quick links to conflicted files.
 
 ## Verification
 
