@@ -33,10 +33,16 @@ Surfaces:
 
 API Reference:
 
+- Readiness & Health
 - Providers
+- Projects
 - Agent
 - Sessions
 - Diff
+- Git
+- Settings
+- Attachments
+- Terminal
 
 Guides:
 
@@ -47,7 +53,9 @@ Guides:
 
 ## Introduction
 
-glib-code is a review-first coding workflow for shipping agent-written changes without losing control of durable git state.
+glib-code is a review-first AI coding workspace where agents work in isolated GitTrix sessions instead of writing directly into your real repo.
+
+Open a repo, start a session, let the agent work, review the diff, then promote only the files you accept.
 
 It is currently in a solid beta state: core diff/session/promote behavior is functional, isolation boundaries are enforced, and day-to-day local usage is reliable.
 
@@ -131,6 +139,7 @@ Current protections:
 - overlap checks against dirty durable files
 - stash-and-continue path for local durable repos
 - handled failure envelopes for UI-safe recovery
+- baseline conflict detection with structured error response
 
 ### Provider/model authority
 
@@ -162,7 +171,7 @@ Current state:
 
 ### Web
 
-Vue/Vite app for project picker, diff workbench, sessions, and promote UI.
+Vue 3 + Vite app for project picker, diff workbench, sessions, and promote UI.
 
 Key UX points:
 
@@ -175,7 +184,7 @@ Key UX points:
 
 ### Server
 
-Bun/Hono API for sessions, agent runtime, diff, providers, and promote.
+Bun + Hono API for sessions, agent runtime, diff, providers, projects, settings, and promote.
 
 Current responsibilities:
 
@@ -185,6 +194,9 @@ Current responsibilities:
 - structured tool result typing (`resultType`, `summary`, `artifact`)
 - GitTrix session orchestration
 - centralized session resolution + route error envelopes
+- project open/init/create/forget and recents
+- provider discovery and auth
+- settings and keybindings persistence
 
 ### Desktop
 
@@ -194,12 +206,29 @@ Electron shell wrapping web/server workflow with native integrations (e.g., fold
 
 ## API Reference
 
+### Readiness & Health
+
+- `GET /api/readiness`
+- `GET /api/health`
+
 ### Providers
 
 - `GET /api/providers`
-- `PATCH /api/providers/defaults`
 - `POST /api/providers/:id/auth`
 - `DELETE /api/providers/:id/auth`
+- `PATCH /api/providers/defaults`
+
+### Projects
+
+- `GET /api/projects/recents`
+- `GET /api/projects/candidates?q=...`
+- `GET /api/projects/recents/status`
+- `POST /api/projects/open`
+- `POST /api/projects/init`
+- `POST /api/projects/create`
+- `DELETE /api/projects/recents/:id`
+- `POST /api/projects/recents/:id/forget`
+- `PATCH /api/projects/:id/provider`
 
 ### Agent
 
@@ -214,8 +243,13 @@ Electron shell wrapping web/server workflow with native integrations (e.g., fold
 - `GET /api/sessions`
 - `GET /api/sessions?scope=all`
 - `GET /api/sessions/:id?projectPath=...`
+- `GET /api/sessions/:id/export?format=...`
+- `POST /api/sessions/:id/fork`
+- `PATCH /api/sessions/:id`
+- `DELETE /api/sessions/:id`
 - `GET /api/sessions/:id/diff?projectPath=...`
 - `POST /api/sessions/:id/promote?projectPath=...`
+- `POST /api/sessions/:id/evict`
 
 ### Diff
 
@@ -225,6 +259,38 @@ Electron shell wrapping web/server workflow with native integrations (e.g., fold
 - `GET /api/diff/hunks`
 - `POST /api/diff/pack`
 
+### Git
+
+- `GET /api/git/status`
+- `POST /api/git/push`
+- `POST /api/git/stash`
+- `GET /api/git/branches`
+- `GET /api/git/log?limit=...`
+- `POST /api/git/stage` (not implemented)
+- `POST /api/git/unstage` (not implemented)
+- `POST /api/git/discard` (not implemented)
+- `POST /api/git/commit` (not implemented)
+- `POST /api/git/pull` (not implemented)
+- `POST /api/git/checkout` (not implemented)
+- `POST /api/git/branches` (not implemented)
+- `GET /api/git/commit/:sha` (not implemented)
+
+### Settings
+
+- `GET /api/settings`
+- `PATCH /api/settings`
+- `POST /api/settings/reset`
+
+### Attachments
+
+- `POST /api/attachments` — multipart file upload
+- `GET /api/attachments/:id` — read/download
+- `DELETE /api/attachments/:id` — remove
+
+### Terminal
+
+- `GET /api/term` — WebSocket upgrade. Protocol: `hello`/`run`/`ping` from client; `ready`/`ack`/`output`/`exit`/`error`/`pong` from server.
+
 ---
 
 ## Guides
@@ -233,16 +299,17 @@ Electron shell wrapping web/server workflow with native integrations (e.g., fold
 
 Requirements:
 
-- Bun
+- Bun 1.x
 - Git
-- pi runtime/CLI
+- pi CLI/runtime for agent sessions
 - provider key for agent sessions
 
 Commands:
 
 ```bash
 bun install
-bun run dev
+bun run dev        # server + web
+bun run dev:desktop # server + web + Electron
 ```
 
 Defaults:
@@ -265,12 +332,12 @@ Use GitTrix as isolation boundary:
 
 ```txt
 glib-code/
-├── web/
-├── server/
-├── shared/
-├── desktop/
-├── scripts/
-└── Docs/
+├── server/     # Bun + Hono API, GitTrix orchestration, pi runtime bridge
+├── web/        # Vue 3 + Vite frontend, diff workbench, session UI, settings
+├── desktop/    # Electron shell for packaged local app
+├── shared/     # Shared types, schemas, theme presets, event contracts
+├── scripts/    # Workspace dev orchestrator
+└── Docs/       # Living docs + implementation checklists
 ```
 
 ## Overall status
@@ -282,15 +349,20 @@ Operationally complete for core beta loop:
 - session lifecycle APIs are wired and exercised in UI
 - GitTrix isolation is active for normal local session creation
 - promote supports guarded mutation paths and optional push
+- provider auth and model selection are runtime-driven via pi
+- settings persistence and keybindings are implemented
 
 Primary active gaps:
 
-- document sessions list scope contract centrally
-- add path normalization edge-case coverage (drive casing/slash/trailing slash)
-- harden `scope=all` listing performance and add pagination/limits
-- add telemetry for session-list latency and empty-result causes
-- finish active hunk/multi-file context wiring in diff workbench
-- finalize `/api/term` websocket lifecycle and frontend terminal swap-over
+- `/api/term` websocket lifecycle and frontend terminal swap-over
+- `/api/attachments` upload/read/delete routes
+- remaining git mutation routes (stage/unstage/discard/commit/pull/checkout)
+- `/api/diff/branch-compare`
+- hunk-level session promote selection
+- `scope=all` listing performance and pagination/limits
+- path normalization edge-case coverage (drive casing/slash/trailing slash)
+- telemetry for session-list latency and empty-result causes
+- Cloudflare Artifacts adapter hardening
 
 ## Product principles
 
