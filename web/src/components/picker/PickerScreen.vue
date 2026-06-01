@@ -33,34 +33,6 @@
       </div>
     </section>
 
-    <section v-if="authenticatedProviderCount === 0" class="mb-8 rounded-lg border border-border/70 bg-background/35 p-3">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-sm font-medium text-foreground">Agent setup</p>
-          <p class="mt-1 text-xs text-muted-foreground">Optional for browsing projects and reviewing diffs. Add a key when you want the agent to work.</p>
-        </div>
-        <button class="text-xs text-primary underline underline-offset-2" @click="emit('openSettings', 'Models')">Settings</button>
-      </div>
-      <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
-        <select v-model="providerDraft" class="h-9 rounded-md border border-border/70 bg-background px-2 text-xs">
-          <option v-for="provider in providerOptions" :key="provider.id" :value="provider.id">{{ provider.label }}</option>
-        </select>
-        <input
-          v-model="apiKeyDraft"
-          type="password"
-          class="h-9 rounded-md border border-border/70 bg-background px-3 text-xs"
-          placeholder="Paste API key"
-        />
-        <button
-          class="h-9 rounded-md border border-border/80 bg-primary/90 px-3 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!providerDraft || !apiKeyDraft.trim()"
-          @click="saveProviderKey"
-        >
-          Save
-        </button>
-      </div>
-    </section>
-
     <section>
       <div class="mb-3 flex items-center gap-3">
         <span class="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Recent Projects</span>
@@ -113,7 +85,6 @@ import RecentList from './RecentList.vue';
 
 const props = defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
-  providers: Array<{ id: string; hasAuth: boolean; modelIds: string[] }>;
   sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' }>>;
   logoSrc?: string;
 }>();
@@ -126,30 +97,11 @@ const emit = defineEmits<{
   startNewRecentSession: [payload: { name: string; path: string }];
   forgetRecent: [id: string];
   openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings'];
-  providerAuthSave: [providerId: string, apiKey: string];
 }>();
 
 const pickerIndex = ref(0);
-const providerDraft = ref('openrouter');
-const apiKeyDraft = ref('');
 const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
-const authenticatedProviderCount = computed(() => props.providers.filter((provider) => provider.hasAuth).length);
-const providerOptions = computed(() => {
-  if (props.providers.length) return props.providers.map((provider) => ({ id: provider.id, label: provider.id }));
-  return [{ id: 'openrouter', label: 'OpenRouter' }];
-});
-
-watch(
-  () => props.providers,
-  (next) => {
-    if (!next.length) return;
-    if (!next.some((provider) => provider.id === providerDraft.value)) {
-      providerDraft.value = next.find((provider) => provider.id === 'openrouter')?.id ?? next[0]?.id ?? 'openrouter';
-    }
-  },
-  { immediate: true }
-);
 
 watch(totalPickerRows, (count) => {
   if (pickerIndex.value >= count) pickerIndex.value = Math.max(count - 1, 0);
@@ -184,12 +136,6 @@ function onPickerKeydown(event: KeyboardEvent) {
   }
 }
 
-function saveProviderKey() {
-  const key = apiKeyDraft.value.trim();
-  if (!providerDraft.value || !key) return;
-  emit('providerAuthSave', providerDraft.value, key);
-  apiKeyDraft.value = '';
-}
 </script>
 
 <style scoped>

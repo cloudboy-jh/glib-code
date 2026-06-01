@@ -55,7 +55,6 @@
           <PickerView
             v-if="!currentProject"
             :recents="recents"
-            :providers="providerCapabilities.providers"
             :sessions-by-path="pickerSessionsByPath"
             :logo-src="logoWordmarkSrc"
             @open-project="state.openProjectDialogOpen = true"
@@ -66,7 +65,6 @@
             @continue-recent-session="continueRecentSessionFromPicker"
             @start-new-recent-session="startNewRecentSessionFromPicker"
             @forget-recent="forgetRecentProject"
-            @provider-auth-save="saveProviderAuth"
           />
 
           <SessionView
@@ -362,7 +360,7 @@ import { canonicalizeProjectPath, usePickerSessions } from './composables/usePic
 import { useSessionOrchestrator } from './composables/useSessionOrchestrator';
 import { useSessionStreaming } from './composables/useSessionStreaming';
 import { applyTheme } from './lib/theme';
-import { THEME_PRESETS } from '@glib-code/shared/theme/presets';
+import { THEME_PRESETS, THEME_PRESET_IDS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import { ChevronDown } from 'lucide-vue-next';
 import logoIcon from '../../glibcode-iconlogo.png';
@@ -378,6 +376,8 @@ const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient();
+const demoMode = new URLSearchParams(window.location.search).get('demo');
+const isThemeCycleDemo = demoMode === 'theme-cycle';
 
 type Session = {
   id: string;
@@ -447,6 +447,30 @@ type TimelineEntry = {
 type RecentStatus = 'ok' | 'missing_path' | 'missing_git';
 type RecentEntry = { id: string; name: string; path: string; lastOpenedAt: string; status: RecentStatus };
 type ProviderCapability = { id: string; hasAuth: boolean; modelIds: string[] };
+
+const DEMO_RECENTS: RecentEntry[] = [
+  {
+    id: 'demo-recent-1',
+    name: 'glib-code',
+    path: 'C:/Users/johns/OneDrive/Desktop/glib-code',
+    lastOpenedAt: '2026-05-28T19:04:00.000Z',
+    status: 'ok'
+  },
+  {
+    id: 'demo-recent-2',
+    name: 'dashkit-admin',
+    path: 'C:/Users/johns/Dev/dashkit-admin',
+    lastOpenedAt: '2026-05-28T18:22:00.000Z',
+    status: 'ok'
+  },
+  {
+    id: 'demo-recent-3',
+    name: 'worker-sandbox',
+    path: 'C:/Users/johns/Dev/worker-sandbox',
+    lastOpenedAt: '2026-05-28T17:40:00.000Z',
+    status: 'ok'
+  }
+];
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
 
@@ -577,6 +601,9 @@ const forms = reactive({
   palette: '',
   terminal: ''
 });
+
+let themeCycleTimer: ReturnType<typeof setInterval> | null = null;
+let themeCycleOriginalTheme: ThemePreset | null = null;
 
 const paletteCommands = [
   { id: 'mode.diff', label: 'Switch to Diff mode' },
@@ -1112,6 +1139,11 @@ function replaceRecents(next: RecentEntry[]) {
   recents.splice(0, recents.length, ...next);
 }
 
+function ensureDemoRecents() {
+  if (!isThemeCycleDemo || recents.length > 0) return;
+  replaceRecents(DEMO_RECENTS.map((entry) => ({ ...entry })));
+}
+
 async function hydrateRecents() {
   const rows = await apiGet<Array<{ id: string; name: string; path: string; lastOpenedAt: string }>>('/projects/recents');
   const statuses = await apiGet<Array<{ id: string; status: RecentStatus }>>('/projects/recents/status');
@@ -1165,11 +1197,44 @@ async function hydrateGitStatus() {
   gitState.branch = status.current ?? '';
 }
 
-async function updateTheme(theme: ThemePreset) {
+async function updateTheme(theme: ThemePreset, options: { persist?: boolean } = {}) {
   if (settings.themePreset === theme) return;
   settings.themePreset = theme;
   applyTheme(theme);
+  if (options.persist === false) return;
   await apiPatch('/settings', { themePreset: theme });
+}
+
+function startThemeCycleDemo() {
+  if (!isThemeCycleDemo || themeCycleTimer) return;
+  themeCycleOriginalTheme = settings.themePreset;
+  if (currentProject.value) goHome();
+  state.mode = 'diff';
+  state.themeDialogOpen = false;
+  state.paletteOpen = false;
+  state.settingsOpen = false;
+  state.modelPickerOpen = false;
+  state.openProjectDialogOpen = false;
+  state.cloneDialogOpen = false;
+
+  let themeIndex = THEME_PRESET_IDS.indexOf(settings.themePreset);
+  if (themeIndex < 0) themeIndex = 0;
+
+  themeCycleTimer = setInterval(() => {
+    themeIndex = (themeIndex + 1) % THEME_PRESET_IDS.length;
+    void updateTheme(THEME_PRESET_IDS[themeIndex], { persist: false });
+  }, 900);
+}
+
+function stopThemeCycleDemo() {
+  if (themeCycleTimer) {
+    clearInterval(themeCycleTimer);
+    themeCycleTimer = null;
+  }
+  if (!themeCycleOriginalTheme) return;
+  settings.themePreset = themeCycleOriginalTheme;
+  applyTheme(themeCycleOriginalTheme);
+  themeCycleOriginalTheme = null;
 }
 
 async function updateGitTrixProvider(key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string) {
@@ -2011,9 +2076,21 @@ onMounted(() => {
       state.sidebarWidth = clampSidebarWidth(parsedWidth);
     }
   }
-  void hydrateRecents().catch(() => undefined);
+  void hydrateRecents()
+    .catch(() => undefined)
+    .finally(() => {
+      ensureDemoRecents();
+    });
   void hydratePickerSessions().catch(() => undefined);
-  void hydrateSettings().catch(() => undefined);
+  if (isThemeCycleDemo) {
+    void hydrateSettings()
+      .catch(() => undefined)
+      .finally(() => {
+        startThemeCycleDemo();
+      });
+  } else {
+    void hydrateSettings().catch(() => undefined);
+  }
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
   shortcuts.bind();
@@ -2036,6 +2113,7 @@ watch(
 );
 
 onUnmounted(() => {
+  stopThemeCycleDemo();
   stopSidebarResize?.();
   for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   shortcuts.unbind();
