@@ -22,11 +22,15 @@
         :prompt="prompt"
         :meta="selectedModelLabel"
         :context-chips="activeContextChips"
+        :attachments="attachments"
         :disabled="composerDisabled"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
         @execute-command="$emit('runComposerCommand', $event)"
         @remove-context-chip="$emit('removeContextChip', $event)"
+        @attach="$emit('openAttachmentPicker')"
+        @remove-attachment="$emit('removeAttachment', $event)"
+        @retry-attachment="$emit('retryAttachment', $event)"
       />
     </div>
   </template>
@@ -117,6 +121,7 @@ defineProps<{
   prompt: string;
   selectedModelLabel: string;
   activeContextChips: Array<{ id: string; label: string }>;
+  attachments: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
   composerDisabled: boolean;
   sessionContinueOpen: boolean;
   recentProjectSessions: Array<{ id: string; title: string; time: string }>;
@@ -136,6 +141,9 @@ defineEmits<{
   sendPrompt: [];
   runComposerCommand: [value: string];
   removeContextChip: [id: string];
+  openAttachmentPicker: [];
+  removeAttachment: [id: string];
+  retryAttachment: [id: string];
   toggleContinue: [];
   createSession: [];
   selectSession: [id: string];

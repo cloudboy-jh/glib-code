@@ -63,6 +63,8 @@ const slashCommands = [
   { id: 'cmd-sessions', value: 'sessions', label: 'Sessions', description: 'Browse or switch sessions.', aliases: ['resume', 'continue'] },
   { id: 'cmd-diff', value: 'diff', label: 'Switch to diffs', description: 'Jump to the diff review surface.' },
   { id: 'cmd-session', value: 'session', label: 'Switch to session', description: 'Stay in the session workspace.' },
+  { id: 'cmd-attach', value: 'attach', label: 'Attach files', description: 'Open file picker and upload attachments.' },
+  { id: 'cmd-attachments', value: 'attachments', label: 'Attachments', description: 'Focus attachment list.' },
   { id: 'cmd-undo', value: 'undo', label: 'Undo', description: 'Undo the previous step.' },
   { id: 'cmd-redo', value: 'redo', label: 'Redo', description: 'Redo the last undone step.' },
   { id: 'cmd-share', value: 'share', label: 'Share', description: 'Share the current session.' },

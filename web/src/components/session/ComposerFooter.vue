@@ -6,6 +6,7 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <button class="command-chip" :disabled="disabled" @click="$emit('attach')">Attach</button>
       <UiButton class="h-9 rounded-full px-4" :disabled="disabled" @click="$emit('send')">Send</UiButton>
     </div>
   </div>
@@ -15,7 +16,7 @@
 import UiButton from '../ui/button.vue';
 
 defineProps<{ meta: string; disabled?: boolean }>();
-defineEmits<{ send: []; openCommands: [] }>();
+defineEmits<{ send: []; openCommands: []; attach: [] }>();
 </script>
 
 <style scoped>
@@ -37,5 +38,9 @@ defineEmits<{ send: []; openCommands: [] }>();
   border-color: hsl(var(--border));
   background: hsl(var(--muted) / 0.75);
   color: hsl(var(--foreground));
+}
+
+.command-chip:disabled {
+  opacity: 0.45;
 }
 </style>

@@ -79,6 +79,7 @@
             :prompt="forms.prompt"
             :selected-model-label="selectedModelLabel"
             :active-context-chips="activeContextChips"
+            :attachments="composerAttachments"
             :composer-disabled="composerDisabled"
             :session-continue-open="state.sessionContinueOpen"
             :recent-project-sessions="recentProjectSessions"
@@ -95,6 +96,9 @@
             @send-prompt="sendPrompt"
             @run-composer-command="runComposerCommand"
             @remove-context-chip="removeContextChip"
+            @open-attachment-picker="openAttachmentPicker"
+            @remove-attachment="removeAttachment"
+            @retry-attachment="retryAttachment"
             @toggle-continue="state.sessionContinueOpen = !state.sessionContinueOpen"
             @create-session="createSession"
             @select-session="selectSessionFromSidebar"
@@ -210,11 +214,15 @@
     <TerminalDrawer
       v-if="state.terminalOpen"
       :input="forms.terminal"
-      :output="terminalOutput"
+      :output="terminal.output"
+      :status="terminal.status"
+      :error="terminal.error"
       @close="state.terminalOpen = false"
       @run="runTerminal"
       @update:input="forms.terminal = $event"
     />
+
+    <input ref="attachmentInputRef" type="file" multiple class="hidden" @change="onAttachmentInputChange" />
 
     <OpenProjectDialog
       v-if="state.openProjectDialogOpen"
@@ -602,6 +610,31 @@ const forms = reactive({
   terminal: ''
 });
 
+type ComposerAttachment = {
+  localId: string;
+  id?: string;
+  name: string;
+  size: number;
+  mime: string;
+  status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing';
+  error?: string;
+  file?: File;
+};
+
+const composerAttachments = reactive<ComposerAttachment[]>([]);
+const attachmentInputRef = ref<HTMLInputElement | null>(null);
+
+const terminal = reactive({
+  status: 'closed' as 'connecting' | 'open' | 'reconnecting' | 'closed' | 'error' | 'unavailable',
+  output: 'No commands run yet.',
+  error: '',
+  sessionId: '',
+  reconnectAttempts: 0
+});
+
+let terminalSocket: WebSocket | null = null;
+let terminalReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
 let themeCycleTimer: ReturnType<typeof setInterval> | null = null;
 let themeCycleOriginalTheme: ThemePreset | null = null;
 
@@ -712,7 +745,6 @@ const filteredPaletteCommands = computed(() => {
   return options.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
 });
 
-const terminalOutput = computed(() => (forms.terminal ? `$ ${forms.terminal}\n\n(simulated output)` : 'No commands run yet.'));
 const sidebarWidth = computed(() => (sidebarUiCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
 const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();
@@ -741,7 +773,12 @@ const { connectSessionStream, syncActiveSessionStream, disconnectSessionStream, 
 });
 
 const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
-const composerDisabled = computed(() => Boolean(state.activeSessionId && (staleSessionIds.has(state.activeSessionId) || sendingSessionIds.has(state.activeSessionId))));
+const composerDisabled = computed(() => Boolean(
+  state.activeSessionId
+  && (staleSessionIds.has(state.activeSessionId)
+    || sendingSessionIds.has(state.activeSessionId)
+    || composerAttachments.some((item) => item.status === 'uploading'))
+));
 const promoteHasExplicitFiles = computed(() => promote.files.length > 0);
 const promoteSelectionLabel = computed(() => {
   if (promote.loading) return 'Loading session diff…';
@@ -1730,11 +1767,13 @@ async function sendPrompt() {
     await apiPost(`/agent/sessions/${encodeURIComponent(sessionId)}/send`, {
       prompt: sentPrompt,
       context: bundle?.payload,
+      attachments: composerAttachments.filter((item) => item.status === 'uploaded' && item.id).map((item) => item.id),
       projectPath: session.projectPath
     });
     if (state.activeSessionId === sessionId && forms.prompt === sentPrompt) {
       forms.prompt = '';
       draftBySessionId[sessionId] = '';
+      composerAttachments.splice(0, composerAttachments.length);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send prompt';
@@ -1881,9 +1920,176 @@ async function abortTurn() {
   await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
 }
 
+function terminalWsUrl() {
+  const base = API_BASE.replace(/\/$/, '');
+  const wsBase = base.replace(/^http/i, 'ws');
+  return `${wsBase}/term`;
+}
+
+function openAttachmentPicker() {
+  attachmentInputRef.value?.click();
+}
+
+async function uploadAttachment(item: ComposerAttachment) {
+  if (!item.file) return;
+  item.status = 'uploading';
+  item.error = '';
+  const body = new FormData();
+  body.set('file', item.file, item.name);
+  try {
+    const response = await fetch(`${API_BASE}/attachments`, { method: 'POST', body });
+    if (!response.ok) throw new Error(await response.text());
+    const payload = await response.json() as { id: string };
+    item.id = payload.id;
+    item.status = 'uploaded';
+  } catch (error) {
+    item.status = 'failed';
+    item.error = error instanceof Error ? error.message : 'Upload failed';
+  }
+}
+
+function onAttachmentInputChange(event: Event) {
+  const files = (event.target as HTMLInputElement).files;
+  if (!files?.length) return;
+  for (const file of Array.from(files)) {
+    const item: ComposerAttachment = {
+      localId: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      mime: file.type,
+      status: 'queued',
+      file
+    };
+    composerAttachments.push(item);
+    void uploadAttachment(item);
+  }
+  (event.target as HTMLInputElement).value = '';
+}
+
+async function removeAttachment(localId: string) {
+  const idx = composerAttachments.findIndex((item) => item.localId === localId);
+  if (idx < 0) return;
+  const item = composerAttachments[idx];
+  if (item.id) {
+    item.status = 'removing';
+    try {
+      await apiDelete(`/attachments/${encodeURIComponent(item.id)}`);
+    } catch {
+      item.status = 'failed';
+      item.error = 'Delete failed';
+      return;
+    }
+  }
+  composerAttachments.splice(idx, 1);
+}
+
+function retryAttachment(localId: string) {
+  const item = composerAttachments.find((entry) => entry.localId === localId);
+  if (!item) return;
+  void uploadAttachment(item);
+}
+
+function clearTerminalReconnectTimer() {
+  if (!terminalReconnectTimer) return;
+  clearTimeout(terminalReconnectTimer);
+  terminalReconnectTimer = null;
+}
+
+function closeTerminalSocket() {
+  clearTerminalReconnectTimer();
+  if (terminalSocket) {
+    terminalSocket.onopen = null;
+    terminalSocket.onclose = null;
+    terminalSocket.onerror = null;
+    terminalSocket.onmessage = null;
+    terminalSocket.close();
+    terminalSocket = null;
+  }
+}
+
+function scheduleTerminalReconnect() {
+  clearTerminalReconnectTimer();
+  if (!state.terminalOpen) return;
+  if (terminal.reconnectAttempts >= 6) {
+    terminal.status = 'error';
+    terminal.error = 'Terminal disconnected. Retry limit reached.';
+    return;
+  }
+  const delay = Math.min(1000 * 2 ** terminal.reconnectAttempts, 8000);
+  terminal.status = 'reconnecting';
+  terminalReconnectTimer = setTimeout(() => {
+    terminal.reconnectAttempts += 1;
+    openTerminalSocket(true);
+  }, delay);
+}
+
+function openTerminalSocket(isReconnect = false) {
+  closeTerminalSocket();
+  terminal.status = isReconnect ? 'reconnecting' : 'connecting';
+  terminal.error = '';
+
+  let ws: WebSocket;
+  try {
+    ws = new WebSocket(terminalWsUrl());
+  } catch {
+    terminal.status = 'unavailable';
+    terminal.error = 'Terminal transport unavailable';
+    return;
+  }
+
+  terminalSocket = ws;
+  ws.onopen = () => {
+    terminal.status = 'open';
+    terminal.reconnectAttempts = 0;
+    ws.send(JSON.stringify({ type: 'hello', sessionId: terminal.sessionId || undefined }));
+  };
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(String(event.data)) as Record<string, unknown>;
+      if (data.type === 'ack' && typeof data.sessionId === 'string') {
+        terminal.sessionId = data.sessionId;
+        return;
+      }
+      if (data.type === 'error') {
+        terminal.error = typeof data.message === 'string' ? data.message : 'Terminal error';
+        terminal.status = data.retryable ? terminal.status : 'error';
+        return;
+      }
+      if (data.type === 'output' && typeof data.text === 'string') {
+        terminal.output = `${terminal.output === 'No commands run yet.' ? '' : `${terminal.output}\n`}${data.text}`.trimStart();
+        return;
+      }
+      if (data.type === 'exit' && typeof data.id === 'string') {
+        const code = typeof data.code === 'number' ? data.code : 1;
+        terminal.output = `${terminal.output}\n[exit ${data.id}: ${code}]`;
+      }
+    } catch {
+      terminal.error = 'Received invalid terminal response';
+    }
+  };
+  ws.onerror = () => {
+    terminal.error = 'Terminal connection failed';
+  };
+  ws.onclose = () => {
+    terminalSocket = null;
+    if (!state.terminalOpen) {
+      terminal.status = 'closed';
+      return;
+    }
+    scheduleTerminalReconnect();
+  };
+}
+
 function runTerminal() {
-  if (!forms.terminal.trim()) return;
-  forms.terminal = `${forms.terminal}`;
+  const command = forms.terminal.trim();
+  if (!command) return;
+  if (!terminalSocket || terminal.status !== 'open') {
+    terminal.error = 'Terminal is not connected';
+    return;
+  }
+  const id = crypto.randomUUID().slice(0, 8);
+  terminal.output = `${terminal.output === 'No commands run yet.' ? '' : `${terminal.output}\n`}$ ${command}`.trimStart();
+  terminalSocket.send(JSON.stringify({ type: 'run', id, command }));
 }
 
 function runPalette(id: string) {
@@ -2008,6 +2214,11 @@ function runComposerCommand(command: string) {
   if (command === 'stop' || command === 'abort') {
     void abortTurn();
   }
+
+  if (command === 'attach' || command === 'attachments') {
+    openAttachmentPicker();
+    return;
+  }
 }
 
 const shortcuts = useGlobalShortcuts({
@@ -2112,9 +2323,23 @@ watch(
   (next) => applyTheme(next)
 );
 
+watch(
+  () => state.terminalOpen,
+  (open) => {
+    if (open) {
+      openTerminalSocket();
+      return;
+    }
+    closeTerminalSocket();
+    terminal.status = 'closed';
+    terminal.error = '';
+  }
+);
+
 onUnmounted(() => {
   stopThemeCycleDemo();
   stopSidebarResize?.();
+  closeTerminalSocket();
   for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   shortcuts.unbind();
 });
