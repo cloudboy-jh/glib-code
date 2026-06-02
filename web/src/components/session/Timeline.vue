@@ -53,52 +53,33 @@
           </template>
         </div>
 
-        <div v-if="e.toolCalls?.length" class="mt-2 space-y-2">
-          <details
+        <div v-if="e.toolCalls?.length" class="mt-2 space-y-px">
+          <div
             v-for="tool in groupToolCalls(e.toolCalls)"
             :key="tool.groupId"
-            :class="[
-              'group overflow-hidden rounded-lg border border-border/60 bg-background/45',
-              tool.status === 'running' ? 'border-sky-500/40 bg-sky-500/10' : ''
-            ]"
           >
-            <summary :class="[
-              'flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-muted/35',
-              tool.status === 'running' ? 'animate-pulse' : ''
-            ]">
-              <span class="flex min-w-0 items-center gap-2">
-                <span :class="['h-1.5 w-1.5 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
-                <span class="truncate font-medium text-foreground/90">{{ tool.title }}</span>
-                <span v-if="tool.count > 1" class="rounded border border-border/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">×{{ tool.count }}</span>
-              </span>
-              <span class="shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/65">
-                {{ tool.status }}
-              </span>
-            </summary>
-
-            <div class="border-t border-border/50 px-3 py-2">
-              <div v-if="tool.command || tool.cwd" class="mb-2 space-y-1 text-[11px] text-muted-foreground">
-                <div v-if="tool.command" class="truncate"><span class="text-muted-foreground/70">command</span> {{ tool.command }}</div>
-                <div v-if="tool.cwd" class="truncate"><span class="text-muted-foreground/70">cwd</span> {{ tool.cwd }}</div>
-              </div>
-              <div v-if="tool.status === 'running'" class="text-xs text-muted-foreground">Running…</div>
-              <div v-else-if="tool.renderKind === 'diff' && tool.diff" class="space-y-2">
-                <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
-                <DiffView :patch="tool.diff" diff-style="unified" :theme-preset="themePreset" :theme-type="themeType" />
-              </div>
-              <div v-else-if="tool.preview">
-                <div class="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">{{ tool.renderKind }}</div>
-                <pre :class="['max-h-48 overflow-auto rounded-md p-2 text-[11px] leading-5', tool.status === 'failed' ? 'bg-red-950/20 text-red-200/90' : 'bg-black/20 text-muted-foreground']">{{ tool.preview }}</pre>
-              </div>
-              <details v-if="tool.rawInput || tool.rawOutput" class="mt-2 rounded-md border border-border/50 bg-black/10">
-                <summary class="cursor-pointer px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">Inspect</summary>
-                <div class="space-y-2 border-t border-border/50 p-2">
-                  <pre v-if="tool.rawInput" class="max-h-36 overflow-auto rounded bg-black/20 p-2 text-[11px] text-muted-foreground">{{ tool.rawInput }}</pre>
-                  <pre v-if="tool.rawOutput" class="max-h-48 overflow-auto rounded bg-black/20 p-2 text-[11px] text-muted-foreground">{{ tool.rawOutput }}</pre>
-                </div>
-              </details>
+            <!-- Single compact row -->
+            <div :class="['flex items-center gap-2 rounded-md px-2 py-1.5 text-xs', tool.status === 'running' ? 'animate-pulse' : '']">
+              <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
+              <span class="min-w-0 flex-1 truncate text-muted-foreground/80">{{ tool.title }}</span>
+              <span v-if="tool.count > 1" class="shrink-0 text-[10px] text-muted-foreground/50">×{{ tool.count }}</span>
+              <!-- -N +N diff badge — click opens session diff for this file -->
+              <button
+                v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
+                class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/50"
+                @click="$emit('openFileDiff', tool.fileTarget)"
+              >
+                <span class="text-red-400/80">-{{ diffStats(tool.diff).del }}</span>
+                <span class="text-emerald-400/80">+{{ diffStats(tool.diff).add }}</span>
+              </button>
             </div>
-          </details>
+
+            <!-- Error output only -->
+            <pre
+              v-if="tool.status === 'failed' && tool.preview"
+              class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
+            >{{ tool.preview }}</pre>
+          </div>
         </div>
       </article>
     </div>
@@ -137,12 +118,21 @@ const props = defineProps<{
       rawInput?: string;
       rawOutput?: string;
       diff?: string;
+      fileTarget?: string;
       isError?: boolean;
     }>;
   }>;
   themePreset?: ThemePreset;
   themeType?: 'dark' | 'light';
 }>();
+
+defineEmits<{ openFileDiff: [fileTarget: string | undefined] }>();
+
+function diffStats(patch: string) {
+  const add = (patch.match(/^\+(?!\+\+)/gm) ?? []).length;
+  const del = (patch.match(/^-(?!--)/gm) ?? []).length;
+  return { add, del, total: add + del };
+}
 
 const scrollerRef = ref<HTMLDivElement | null>(null);
 const followLive = ref(true);

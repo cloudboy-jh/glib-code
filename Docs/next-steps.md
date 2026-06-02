@@ -11,6 +11,10 @@
 - [x] Wire image/file uploads to `/api/attachments` endpoints.
 - [ ] Ensure command palette actions are disabled when backend capability is missing.
 - [ ] Remove remaining mock-only critical workflow paths.
+- [ ] Wire `sessionDiff.focusFile` into pierre file navigation so `-N +N` badge click scrolls overlay to the specific file.
+- [ ] Extract `detailsDiffToUnifiedPatch` to `shared/` — currently duplicated in server and web.
+- [ ] Verify `details.filePath` is populated by agent runtime so patch headers show real filename not "file".
+- [ ] Session diff overlay: add split/unified toggle and file list sidebar (parity with full DiffWorkbench).
 
 ## Backend
 

@@ -16,7 +16,7 @@
           <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="$emit('createReplacementSession')">New replacement</button>
         </div>
       </div>
-      <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" />
+      <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
       <Composer
         :context="contextLabel"
         :prompt="prompt"
@@ -152,5 +152,6 @@ defineEmits<{
   openModelSettings: [];
   useCompatibleModel: [value: { providerId: string; modelId: string }];
   openModelPicker: [];
-}>();
+  openFileDiff: [fileTarget: string | undefined];
+}>(); 
 </script>

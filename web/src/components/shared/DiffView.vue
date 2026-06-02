@@ -15,7 +15,7 @@ type DiffThemeVars = Record<string, string>;
 
 const DIFF_THEME_VARS_BY_PRESET: Record<ThemePreset, DiffThemeVars> = {
   'tokyo-night': {
-    '--diffs-bg-buffer-override': 'hsl(var(--card))',
+    '--diffs-bg-buffer-override': 'hsl(var(--background))',
     '--diffs-bg-hover-override': 'hsl(var(--muted) / 0.34)',
     '--diffs-bg-context-override': 'hsl(var(--muted) / 0.2)',
     '--diffs-bg-separator-override': 'hsl(var(--muted) / 0.35)',
@@ -32,7 +32,7 @@ const DIFF_THEME_VARS_BY_PRESET: Record<ThemePreset, DiffThemeVars> = {
     '--diffs-bg-deletion-emphasis-override': 'hsl(0 76% 56% / 0.28)'
   },
   'catppuccin-mocha': {
-    '--diffs-bg-buffer-override': 'hsl(var(--card))',
+    '--diffs-bg-buffer-override': 'hsl(var(--background))',
     '--diffs-bg-hover-override': 'hsl(var(--muted) / 0.35)',
     '--diffs-bg-context-override': 'hsl(var(--muted) / 0.2)',
     '--diffs-bg-separator-override': 'hsl(var(--muted) / 0.35)',
@@ -49,7 +49,7 @@ const DIFF_THEME_VARS_BY_PRESET: Record<ThemePreset, DiffThemeVars> = {
     '--diffs-bg-deletion-emphasis-override': 'hsl(0 78% 58% / 0.28)'
   },
   'gruvbox-dark': {
-    '--diffs-bg-buffer-override': 'hsl(var(--card))',
+    '--diffs-bg-buffer-override': 'hsl(var(--background))',
     '--diffs-bg-hover-override': 'hsl(var(--muted) / 0.35)',
     '--diffs-bg-context-override': 'hsl(var(--muted) / 0.2)',
     '--diffs-bg-separator-override': 'hsl(var(--muted) / 0.35)',
@@ -66,7 +66,7 @@ const DIFF_THEME_VARS_BY_PRESET: Record<ThemePreset, DiffThemeVars> = {
     '--diffs-bg-deletion-emphasis-override': 'hsl(4 62% 52% / 0.3)'
   },
   nord: {
-    '--diffs-bg-buffer-override': 'hsl(var(--card))',
+    '--diffs-bg-buffer-override': 'hsl(var(--background))',
     '--diffs-bg-hover-override': 'hsl(var(--muted) / 0.35)',
     '--diffs-bg-context-override': 'hsl(var(--muted) / 0.2)',
     '--diffs-bg-separator-override': 'hsl(var(--muted) / 0.35)',
@@ -114,9 +114,9 @@ const parsedPatch = computed<FileDiffMetadata | undefined>(() => {
 });
 
 const diffCssVars = computed<Record<string, string>>(() => ({
-  '--shiki-bg': 'hsl(var(--card))',
-  '--shiki-dark-bg': 'hsl(var(--card))',
-  '--shiki-light-bg': 'hsl(var(--card))',
+  '--shiki-bg': 'hsl(var(--background))',
+  '--shiki-dark-bg': 'hsl(var(--background))',
+  '--shiki-light-bg': 'hsl(var(--background))',
   ...(DIFF_THEME_VARS_BY_PRESET[props.themePreset] ?? DIFF_THEME_VARS_BY_PRESET['catppuccin-mocha'])
 }));
 

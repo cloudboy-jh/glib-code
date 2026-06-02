@@ -14,14 +14,24 @@
 
     <div class="flex items-center gap-1.5">
       <OpenInEditor target="project" :preferred-editor="preferredEditor" :session-id="sessionId" @open-settings="$emit('openEditorSettings')" />
-      <button class="header-button" @click="$emit('diffCurrent')">
-        <GitCompare class="header-icon" />
-        <span>Session Diff</span>
-      </button>
-      <button class="header-button" @click="$emit('diffCommits')">
-        <GitCompare class="header-icon" />
-        <span>Repo History</span>
-      </button>
+
+      <div ref="diffMenuRef" class="relative">
+        <button class="header-button" @click="diffMenuOpen = !diffMenuOpen">
+          <GitCompare class="header-icon" />
+          <span>Diffs</span>
+          <ChevronDown :class="['menu-icon transition-transform', diffMenuOpen ? 'rotate-180' : '']" />
+        </button>
+        <div v-if="diffMenuOpen" class="absolute right-0 top-full z-30 mt-1 w-36 overflow-hidden rounded-lg border border-border/80 bg-card/95 shadow-lg shadow-black/30" @click="diffMenuOpen = false">
+          <button class="menu-item" @click="$emit('diffCurrent')">
+            <GitCompare class="menu-icon" />
+            Session
+          </button>
+          <button class="menu-item" @click="$emit('diffCommits')">
+            <GitBranch class="menu-icon" />
+            Repo
+          </button>
+        </div>
+      </div>
 
       <button class="header-button" @click="$emit('openModel')">
         <span>{{ model }}</span>
@@ -35,9 +45,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { CloudUpload, GitCompare } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { ChevronDown, CloudUpload, GitBranch, GitCompare } from 'lucide-vue-next';
 import OpenInEditor from '../shared/OpenInEditor.vue';
+
+const diffMenuOpen = ref(false);
+const diffMenuRef = ref<HTMLDivElement | null>(null);
+
+function onClickOutside(event: MouseEvent) {
+  if (diffMenuRef.value && !diffMenuRef.value.contains(event.target as Node)) {
+    diffMenuOpen.value = false;
+  }
+}
+
+onMounted(() => document.addEventListener('mousedown', onClickOutside));
+onUnmounted(() => document.removeEventListener('mousedown', onClickOutside));
 
 const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
   preferredEditor: null,

@@ -107,6 +107,7 @@
             @open-model-settings="openSettings('Models')"
             @use-compatible-model="selectModel($event.providerId, $event.modelId)"
             @open-model-picker="state.modelPickerOpen = true"
+            @open-file-diff="openFileDiff"
           />
 
           <DiffView
@@ -333,6 +334,29 @@
       </div>
     </div>
 
+    <div v-if="state.sessionDiffOverlayOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="state.sessionDiffOverlayOpen = false">
+      <div class="flex h-full max-h-[calc(100vh-2rem)] w-full max-w-[min(1500px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40 sm:max-h-[calc(100vh-3rem)]">
+        <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
+          <div>
+            <div class="text-sm font-medium">Session diff</div>
+            <div class="mt-0.5 text-[11px] text-muted-foreground">
+              <span v-if="sessionDiff.loading">Loading…</span>
+              <span v-else-if="sessionDiff.error" class="text-red-300">{{ sessionDiff.error }}</span>
+              <span v-else-if="!sessionDiff.diff.trim()">No changes</span>
+              <span v-else>{{ sessionDiff.files.length }} file{{ sessionDiff.files.length === 1 ? '' : 's' }} changed</span>
+            </div>
+          </div>
+          <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.sessionDiffOverlayOpen = false">Close</button>
+        </div>
+        <div class="min-h-0 flex-1 overflow-hidden p-3">
+          <div v-if="sessionDiff.loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
+          <div v-else-if="sessionDiff.error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">{{ sessionDiff.error }}</div>
+          <div v-else-if="!sessionDiff.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
+          <SharedDiffView v-else :patch="sessionDiff.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
+        </div>
+      </div>
+    </div>
+
     <div v-if="state.conflictDialogOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.conflictDialogOpen = false">
       <div class="w-full max-w-xl rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
         <div class="mb-2 text-sm font-semibold">Baseline conflict</div>
@@ -453,6 +477,7 @@ type TimelineEntry = {
     rawInput?: string;
     rawOutput?: string;
     diff?: string;
+    fileTarget?: string;
     isError?: boolean;
   }>;
 };
@@ -566,6 +591,7 @@ const state = reactive({
   promoteDialogOpen: false,
   conflictDialogOpen: false,
   sessionContinueOpen: false,
+  sessionDiffOverlayOpen: false,
   agentSetupMessage: '',
   agentSetupKind: 'agent' as 'agent' | 'gittrix'
 });
@@ -610,6 +636,14 @@ const conflict = reactive({
   conflictingFiles: [] as string[],
   durableSha: '',
   baselineSha: ''
+});
+
+const sessionDiff = reactive({
+  diff: '',
+  files: [] as string[],
+  focusFile: '',
+  loading: false,
+  error: ''
 });
 
 const forms = reactive({
@@ -948,14 +982,18 @@ function redactTimelineText(value: string) {
 }
 
 function parseToolResult(output: string) {
-  const redacted = redactTimelineText(output.trim());
-  if (!redacted) return '';
+  const raw = output.trim();
+  if (!raw) return '';
   try {
-    const parsed = JSON.parse(redacted) as { content?: Array<{ type?: string; text?: string }>; stdout?: string; stderr?: string; text?: string; error?: string };
-    if (Array.isArray(parsed.content)) return parsed.content.map((part) => typeof part.text === 'string' ? part.text : '').filter(Boolean).join('\n');
-    return parsed.stdout || parsed.stderr || parsed.text || parsed.error || JSON.stringify(parsed, null, 2);
+    const parsed = JSON.parse(raw) as { content?: Array<{ type?: string; text?: string }>; stdout?: string; stderr?: string; text?: string; error?: string; details?: unknown };
+    if (Array.isArray(parsed.content)) {
+      const text = parsed.content.map((part) => typeof part.text === 'string' ? part.text : '').filter(Boolean).join('\n');
+      return redactTimelineText(text);
+    }
+    const fallback = parsed.stdout || parsed.stderr || parsed.text || parsed.error;
+    return redactTimelineText(fallback ? String(fallback) : JSON.stringify(parsed, null, 2));
   } catch {
-    return redacted;
+    return redactTimelineText(raw);
   }
 }
 
@@ -981,13 +1019,89 @@ function stripMarkdownArtifacts(value: string) {
     .trim();
 }
 
+// Convert the server's line-number diff format to unified patch format for pierre.
+// Input lines look like:
+//   "  1 context line"   → context
+//   "+ 3 added line"     → addition
+//   "- 3 removed line"   → deletion
+function detailsDiffToUnifiedPatch(diff: string, filePath: string): string {
+  const lines = diff.split('\n');
+  const hunks: string[] = [];
+  let oldLine = 1;
+  let newLine = 1;
+  let hunkOldStart = -1;
+  let hunkNewStart = -1;
+  const hunkLines: string[] = [];
+
+  function flushHunk() {
+    if (!hunkLines.length) return;
+    const addCount = hunkLines.filter((l) => l.startsWith('+')).length;
+    const delCount = hunkLines.filter((l) => l.startsWith('-')).length;
+    const ctxCount = hunkLines.filter((l) => l.startsWith(' ')).length;
+    hunks.push(`@@ -${hunkOldStart},${ctxCount + delCount} +${hunkNewStart},${ctxCount + addCount} @@`);
+    hunks.push(...hunkLines);
+    hunkLines.length = 0;
+    hunkOldStart = -1;
+    hunkNewStart = -1;
+  }
+
+  for (const raw of lines) {
+    // skip trailing ellipsis lines
+    if (/^\s*\.\.\./.test(raw)) continue;
+
+    const addMatch = raw.match(/^\+\s*(\d+) (.*)$/);
+    const delMatch = raw.match(/^-\s*(\d+) (.*)$/);
+    const ctxMatch = raw.match(/^\s{2}(\d+) (.*)$/);
+
+    if (addMatch) {
+      const lineNum = Number(addMatch[1]);
+      if (hunkOldStart < 0) { hunkOldStart = oldLine; hunkNewStart = lineNum; }
+      hunkLines.push(`+${addMatch[2]}`);
+      newLine = lineNum + 1;
+    } else if (delMatch) {
+      const lineNum = Number(delMatch[1]);
+      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = newLine; }
+      hunkLines.push(`-${delMatch[2]}`);
+      oldLine = lineNum + 1;
+    } else if (ctxMatch) {
+      const lineNum = Number(ctxMatch[1]);
+      // gap in context = flush previous hunk and start fresh
+      if (hunkLines.length && lineNum > oldLine + 1 && lineNum > newLine + 1) {
+        flushHunk();
+      }
+      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = lineNum; }
+      hunkLines.push(` ${ctxMatch[2]}`);
+      oldLine = lineNum + 1;
+      newLine = lineNum + 1;
+    }
+  }
+  flushHunk();
+
+  if (!hunks.length) return '';
+  const fname = filePath.replace(/\\/g, '/');
+  return `diff --git a/${fname} b/${fname}\n--- a/${fname}\n+++ b/${fname}\n${hunks.join('\n')}`;
+}
+
+function parseDetailsDiff(rawOutput: string, filePath: string): string {
+  try {
+    const parsed = JSON.parse(rawOutput) as { details?: { diff?: unknown } };
+    const diff = parsed?.details?.diff;
+    if (typeof diff !== 'string' || !diff.trim()) return '';
+    return detailsDiffToUnifiedPatch(diff, filePath);
+  } catch {
+    return '';
+  }
+}
+
 function classifyToolCall(event: Extract<AgentEvent, { type: 'tool_call' }>) {
   const input = event.input as { command?: unknown; cwd?: unknown; filePath?: unknown; path?: unknown };
   const command = typeof input.command === 'string' ? input.command : undefined;
   const cwd = typeof input.cwd === 'string' ? input.cwd : undefined;
   const rawInput = Object.keys(event.input ?? {}).length ? redactTimelineText(JSON.stringify(event.input, null, 2)) : '';
-  const rawOutput = event.output?.trim() ? redactTimelineText(event.output.trim()) : '';
-  const output = parseToolResult(rawOutput);
+  // Keep rawJsonOutput unredacted so JSON.parse works; redact only for display
+  const rawJsonOutput = event.output?.trim() ?? '';
+  const rawOutput = rawJsonOutput ? redactTimelineText(rawJsonOutput) : '';
+  const output = parseToolResult(rawJsonOutput);
   const failed = Boolean((event.metadata as { isError?: unknown })?.isError);
   const typedResult = event.resultType;
   const artifact = event.artifact as { patch?: unknown; text?: unknown; json?: unknown } | undefined;
@@ -999,21 +1113,29 @@ function classifyToolCall(event: Extract<AgentEvent, { type: 'tool_call' }>) {
   const title = `${event.tool}${titleTarget ? ` · ${titleTarget}` : ''}`;
   const summary = event.summary ? stripMarkdownArtifacts(event.summary) : '';
 
-  if (!rawOutput) return { title, status: 'running' as const, renderKind: 'terminal' as const, command, cwd, rawInput, rawOutput, preview: '' };
-  if (typedResult === 'diff' && typedPatch) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: typedPatch, preview: summary || summarizeLines(typedPatch, 4) };
+  if (!rawJsonOutput) return { title, fileTarget, status: 'running' as const, renderKind: 'terminal' as const, command, cwd, rawInput, rawOutput, preview: '' };
+  if (typedResult === 'diff' && typedPatch) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: typedPatch, preview: summary || summarizeLines(typedPatch, 4) };
   if (typedResult === 'json' && typedJson !== undefined) {
     const asText = redactTimelineText(JSON.stringify(typedJson, null, 2));
-    return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'json' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(asText) };
+    return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'json' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(asText) };
   }
-  if (typedResult === 'code' && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'code' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
-  if ((typedResult === 'terminal' || typedResult === 'text') && typedText) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
-  if (typedResult === 'error') return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText || output)) };
-  if (isUnifiedDiff(output)) return { title, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: output, preview: summarizeLines(output, 4) };
-  if (failed) return { title, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(output)) };
+  if (typedResult === 'code' && typedText) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'code' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
+  if ((typedResult === 'terminal' || typedResult === 'text') && typedText) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText)) };
+  if (typedResult === 'error') return { title, fileTarget, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summary || summarizeLines(stripMarkdownArtifacts(typedText || output)) };
+
+  // details.diff: edit/write tools emit {content:[...], details:{diff:"..."}}
+  if (fileTarget) {
+    const detailsPatch = parseDetailsDiff(rawJsonOutput, fileTarget);
+    if (detailsPatch) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: detailsPatch, preview: summary };
+  }
+
+  // bash/shell tools that return unified diff inside content[].text
+  if (isUnifiedDiff(output)) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: output, preview: summarizeLines(output, 4) };
+  if (failed) return { title, fileTarget, status: 'failed' as const, renderKind: 'error' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(output)) };
   const trimmed = output.trim();
-  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) return { title, status: 'done' as const, renderKind: 'json' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(trimmed) };
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) return { title, fileTarget, status: 'done' as const, renderKind: 'json' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(trimmed) };
   const codeLike = /```|\b(import|export|function|const|let|class|type|interface)\b|^\s*[{};]/m.test(trimmed) && trimmed.split('\n').length > 3;
-  return { title, status: 'done' as const, renderKind: codeLike ? 'code' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(trimmed)) };
+  return { title, fileTarget, status: 'done' as const, renderKind: codeLike ? 'code' as const : 'terminal' as const, command, cwd, rawInput, rawOutput, preview: summarizeLines(stripMarkdownArtifacts(trimmed)) };
 }
 
 function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
@@ -1510,18 +1632,31 @@ function openCommandPalette() {
   state.paletteIndex = 0;
 }
 
-async function openCurrentSessionDiff() {
-  if (!currentProject.value) return;
-  const workingRows = await apiGet<Array<{ file: string; status?: string }>>(`/diff/files?source=uncommitted&projectPath=${encodeURIComponent(currentProject.value.path)}`).catch(() => []);
-  if (!workingRows.length) {
-    openCommitsListDiff();
-    return;
+async function openFileDiff(fileTarget: string | undefined) {
+  await openCurrentSessionDiff(fileTarget || undefined);
+}
+
+async function openCurrentSessionDiff(fileTarget?: string) {
+  if (!state.activeSessionId) return;
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
+
+  state.sessionDiffOverlayOpen = true;
+  sessionDiff.diff = '';
+  sessionDiff.files = [];
+  sessionDiff.focusFile = fileTarget ?? '';
+  sessionDiff.loading = true;
+  sessionDiff.error = '';
+
+  try {
+    const payload = await apiGet<{ diff: string; files?: string[] }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
+    sessionDiff.diff = payload.diff ?? '';
+    sessionDiff.files = payload.files?.length ? payload.files : filesFromPatch(sessionDiff.diff);
+  } catch (error) {
+    sessionDiff.error = error instanceof Error ? error.message : 'Failed to load session diff';
+  } finally {
+    sessionDiff.loading = false;
   }
-  const touched = latestTurnTouchedFiles();
-  const workingFiles = new Set(workingRows.map((row) => row.file));
-  const preferredFiles = touched.filter((file) => workingFiles.has(file));
-  state.diffOpenRequest = { token: Date.now(), mode: 'session', files: preferredFiles };
-  state.mode = 'diff';
 }
 
 function openCommitsListDiff() {
@@ -2317,6 +2452,13 @@ const shortcuts = useGlobalShortcuts({
       return false;
     },
     () => {
+      if (state.sessionDiffOverlayOpen) {
+        state.sessionDiffOverlayOpen = false;
+        return true;
+      }
+      return false;
+    },
+    () => {
       if (state.modelPickerOpen) {
         state.modelPickerOpen = false;
         return true;
@@ -2327,6 +2469,9 @@ const shortcuts = useGlobalShortcuts({
 });
 
 onMounted(() => {
+  // Always re-classify tool calls on fresh load (classification logic may have changed)
+  hydratedVersionBySessionId.clear();
+
   const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
   if (storedSidebarWidth) {
     const parsedWidth = Number(storedSidebarWidth);

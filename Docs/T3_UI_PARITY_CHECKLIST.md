@@ -1,6 +1,6 @@
 # UI Parity / Consistency Checklist
 
-Last updated: 2026-05-27
+Last updated: 2026-06-02
 
 This is now a practical checklist for current `web/` implementation quality, not a source-locked mirror document.
 
@@ -34,7 +34,11 @@ This is now a practical checklist for current `web/` implementation quality, not
 - [x] Unavailable providers/models are not selectable for agent execution.
 - [x] Provider/model error states are explicit and actionable.
 - [x] Tool-call previews are free of markdown/raw text artifacts in the primary card view.
-- [x] Tool calls are not dumped as raw text; they render as compact expandable cards.
+- [x] Tool calls render as compact single-row items with -N +N diff badge, no accordion.
+- [x] Edit/write tool diffs render via pierre in session diff overlay, not inline in chat.
+- [x] Session diff accessible as full-screen overlay from header Diffs → Session dropdown.
+- [x] Diff viewer background matches active theme (not hardcoded black).
+- [ ] `-N +N` badge click scrolls session diff overlay to the specific file.
 
 ## Overlay behavior
 
