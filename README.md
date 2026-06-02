@@ -7,32 +7,32 @@
 </p>
 
 <p align="center">
-  <img src="./readme-screenshot.png" alt="glib-code app screenshot" width="1100" />
+  <img src="./glib-code-theme-cycle1.gif" alt="glib-code app screenshot" width="1100" />
 </p>
 
 # glib-code
 
-glib-code is an AI coding workspace where agents work in isolated GitTrix sessions instead of writing directly into your real repo.
+glib-code is an AI coding workspace where agents make changes in a safe sandbox, so your real code stays untouched until you approve.
 
-Open a repo, start a session, let the agent work, review the diff, then promote only the files you accept.
+Open a repo, start a session, let the agent work, review the diff, then accept only the files you want.
 
 ## What it does
 
-- Opens or clones local git repos.
-- Reviews commit and working-tree diffs before prompting.
-- Runs pi-backed agent sessions in isolated GitTrix workspaces.
-- Streams assistant text, errors, and tool calls into a session timeline.
-- Reviews session diffs before promote.
-- Commits all or selected files back to the durable repo.
-- Supports provider key management, model selection, GitHub durable promote, and local push/stash flows.
+- Opens or clones local Git repositories.
+- Lets you review commit history and current working changes before you prompt the agent.
+- Runs each agent session in an isolated workspace (powered by GitTrix under the hood).
+- Streams assistant output, errors, and tool activity into a live timeline.
+- Shows a session diff so you can inspect exactly what changed.
+- Applies only selected files back to your real repo when you approve.
+- Supports provider key management, model selection, GitHub push flows, and local push/stash flows.
 
 ## How it works
 
 ```txt
-open repo -> start session -> isolated agent edits -> review diff -> promote accepted files
+open repo -> start session -> agent edits in sandbox -> review diff -> apply accepted files
 ```
 
-Agent writes land in an ephemeral workspace first. Your real checkout only changes when you promote.
+Agent writes go to a temporary workspace first. Your real checkout only changes when you apply approved files.
 
 Deeper system details live in `Docs/Architecture.md`.
 
@@ -68,7 +68,7 @@ Default dev URLs:
 - API server: `http://127.0.0.1:4273`
 - Web app: `http://127.0.0.1:5173`
 
-Add a provider key in `Settings -> Models` before starting an agent session. Project picker and diff review work without a provider key.
+Add a provider key in `Settings -> Models` before starting an agent session. Project picker and diff review still work without a provider key.
 
 ## Scripts
 
@@ -84,8 +84,8 @@ bun run check       # typecheck all workspaces
 ## Repository layout
 
 ```txt
-server/            Bun + Hono API, GitTrix orchestration, pi runtime bridge
-web/               Vue frontend, diff workbench, session UI, settings
+server/            Bun + Hono API, sandbox/session orchestration, pi runtime bridge
+web/               Vue frontend, diff workbench, session timeline, settings
 desktop/           Electron shell for packaged local app
 shared/            Shared types, schemas, theme presets, event contracts
 Docs/              Product, architecture, backend, frontend, agent, planning docs
