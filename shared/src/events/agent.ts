@@ -52,4 +52,15 @@ export type AgentEvent =
       at: string;
     }
   | { type: "step_end"; turnId: string; stepId: string; reason?: "stop" | "tool-calls"; cost: number; tokens: TokenUsage; at: string }
-  | { type: "error"; turnId: string; name: string; message?: string; retryable?: boolean; at: string };
+  | {
+      type: "error";
+      turnId: string;
+      name: string;
+      message?: string;
+      retryable?: boolean;
+      code?: string;
+      source?: "provider" | "runtime" | "sandbox" | "tool";
+      provider?: string;
+      model?: string;
+      at: string;
+    };

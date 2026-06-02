@@ -9,7 +9,7 @@ export function useSessionOrchestrator(options: {
   apiDelete: (path: string) => Promise<void>;
   hydrateRecents: () => Promise<void>;
   hydrateSessions: () => Promise<void>;
-  queueProjectOpen: (projectName: string, path: string, mode: Mode, opts?: { skipAutoCreate?: boolean }) => Promise<void>;
+  queueProjectOpen: (projectName: string, path: string, mode: Mode, opts?: { skipAutoCreate?: boolean; branch?: string; projectId?: string }) => Promise<void>;
   createSession: () => Promise<unknown>;
   selectSessionFromSidebar: (sessionId: string) => void;
   sessions: Array<{ id: string }>;
@@ -26,8 +26,10 @@ export function useSessionOrchestrator(options: {
       if (opened.needsInit) return { ok: false as const, reason: 'missing_git' as const };
       return {
         ok: true as const,
+        id: opened.id,
         name: opened.name ?? normalizedPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'project',
-        path: opened.path ?? normalizedPath
+        path: opened.path ?? normalizedPath,
+        branch: opened.branch ?? 'main'
       };
     } catch {
       if (import.meta.env.DEV) {

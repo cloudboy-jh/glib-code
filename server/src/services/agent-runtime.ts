@@ -560,6 +560,8 @@ export async function runTurn(params: {
   provider?: string;
   onEvent: (event: AgentEvent) => Promise<void> | void;
 }) {
+  const MAX_NETWORK_RETRIES = 2;
+  const RETRY_DELAYS_MS = [800, 1800];
   let unsub = () => {};
   log("agent", "turn starting", { sessionId: params.sessionId, turnId: params.turnId, provider: params.provider, model: params.model, cwd: params.cwd });
 
@@ -587,7 +589,33 @@ export async function runTurn(params: {
       abort: () => abortRuntime()
     });
 
-    await promptRuntime(params.prompt);
+    let attempt = 0;
+    while (true) {
+      try {
+        await promptRuntime(params.prompt);
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const networkError = /network connection lost|connection lost|econnreset|etimedout|socket hang up|fetch failed|upstream/i.test(message);
+        if (!networkError || attempt >= MAX_NETWORK_RETRIES) throw error;
+        const retryEvent: AgentEvent = {
+          type: "error",
+          turnId: params.turnId,
+          name: "provider_network",
+          message: `Provider connection lost. Retrying (${attempt + 1}/${MAX_NETWORK_RETRIES + 1})…`,
+          retryable: true,
+          code: "PROVIDER_NETWORK_RETRY",
+          source: "provider",
+          provider: params.provider,
+          model: params.model,
+          at: nowIso()
+        };
+        await params.onEvent(retryEvent);
+        broadcast(params.sessionId, retryEvent);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1800));
+        attempt += 1;
+      }
+    }
     if (runningTurns.get(params.sessionId)?.turnId !== params.turnId) return { turnId: params.turnId, ok: true };
     const end: AgentEvent = { type: "turn_end", turnId: params.turnId, reason: "stop", at: nowIso() };
     await params.onEvent(end);
@@ -603,6 +631,9 @@ export async function runTurn(params: {
         name: "pi_error",
         message: error instanceof Error ? error.message : "failed to run pi",
         retryable: false,
+        source: "runtime",
+        provider: params.provider,
+        model: params.model,
         at: nowIso()
       };
       await params.onEvent(evt);

@@ -23,6 +23,7 @@
               <span class="text-3xl font-semibold tracking-tight">Commit History</span>
             </div>
             <div class="mb-3 text-sm text-muted-foreground">{{ state.items.length }} commits</div>
+            <div v-if="state.historyError" class="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2 py-1 text-xs text-red-200">{{ state.historyError }}</div>
 
             <div class="space-y-1 rounded-md bg-background/35 p-1 text-[16px]">
               <button
@@ -57,7 +58,7 @@
             @click="state.phase = 'history'"
           >
             <CornerDownLeft class="h-3.5 w-3.5" />
-            <span>Commits</span>
+            <span>Repo History</span>
             <span v-if="state.openSource === 'commit' && state.selectedCommitRef" class="rounded border border-primary/40 px-1.5 py-[1px] font-mono text-[10px] text-primary/90">
               {{ state.selectedCommitRef.slice(0, 7) }}
             </span>
@@ -71,13 +72,13 @@
               :class="['h-7 rounded px-2 text-[11px]', state.openSource === 'commit' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="openSelectedCommit()"
             >
-              Commit
+              Repo History
             </button>
             <button
               :class="['h-7 rounded px-2 text-[11px]', state.openSource === 'uncommitted' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="openWorkingTree()"
             >
-              Open changes
+              Session Diff
             </button>
           </div>
 
@@ -196,21 +197,55 @@
           </div>
         </div>
 
-        <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-card/75 p-2 text-xs">
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.selectedFilePath" @click="stageFiles([state.selectedFilePath])">Stage file</button>
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.selectedFilePath" @click="unstageFiles([state.selectedFilePath])">Unstage file</button>
-          <button class="h-7 rounded border border-red-400/50 px-2 text-red-200 hover:bg-red-500/10" :disabled="!state.selectedFilePath" @click="discardFiles([state.selectedFilePath])">Discard file</button>
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.files.length" @click="stageFiles(state.files.map((row) => row.path))">Stage all listed</button>
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.files.length" @click="unstageFiles(state.files.map((row) => row.path))">Unstage all listed</button>
-          <button class="h-7 rounded border border-red-400/50 px-2 text-red-200 hover:bg-red-500/10" :disabled="!state.files.length" @click="discardFiles(state.files.map((row) => row.path))">Discard all listed</button>
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" @click="pullLatest">Pull</button>
-          <input v-model="state.checkoutRef" class="h-7 rounded border border-border/70 bg-background/70 px-2" placeholder="branch/ref" />
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.checkoutRef.trim()" @click="checkoutRef(false)">Checkout</button>
-          <button class="h-7 rounded border border-border/70 px-2 hover:bg-muted/60" :disabled="!state.checkoutRef.trim()" @click="checkoutRef(true)">Create+checkout</button>
-          <input v-model="state.commitMessage" class="h-7 min-w-[220px] rounded border border-border/70 bg-background/70 px-2" placeholder="commit message" />
-          <button class="h-7 rounded border border-primary/60 px-2 text-primary hover:bg-primary/10" :disabled="!state.commitMessage.trim()" @click="commitChanges">Commit</button>
-          <span v-if="state.gitNotice" class="text-muted-foreground">{{ state.gitNotice }}</span>
-          <span v-if="state.gitError" class="text-red-300">{{ state.gitError }}</span>
+        <div v-if="isWorkingView" class="mb-3 space-y-2 rounded-md border border-border/70 bg-card/75 p-2 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <div ref="changesMenuRef" class="relative">
+              <button class="inline-flex h-7 items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 hover:bg-muted/60 disabled:opacity-40" :disabled="!hasSelection || isBusy" @click="toggleMenu('changes')">
+                <span>File actions</span>
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <div v-if="menuOpen === 'changes'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[170px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+                <button class="menu-item" @click="menuStageSelected">Stage file</button>
+                <button class="menu-item" @click="menuUnstageSelected">Unstage file</button>
+                <button class="menu-item menu-item-danger" @click="menuDiscardSelected">Discard file</button>
+              </div>
+            </div>
+
+            <div ref="bulkMenuRef" class="relative">
+              <button class="inline-flex h-7 items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 hover:bg-muted/60 disabled:opacity-40" :disabled="!hasFiles || isBusy" @click="toggleMenu('bulk')">
+                <span>All changes</span>
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <div v-if="menuOpen === 'bulk'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[170px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+                <button class="menu-item" @click="menuStageAll">Stage all listed</button>
+                <button class="menu-item" @click="menuUnstageAll">Unstage all listed</button>
+                <button class="menu-item menu-item-danger" @click="menuDiscardAll">Discard all listed</button>
+              </div>
+            </div>
+
+            <div ref="branchMenuRef" class="relative">
+              <button class="inline-flex h-7 items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 hover:bg-muted/60 disabled:opacity-40" :disabled="isBusy" @click="toggleMenu('branch')">
+                <span>Branch</span>
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <div v-if="menuOpen === 'branch'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[230px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+                <button class="menu-item" @click="menuPull">Pull latest</button>
+                <input v-model="state.checkoutRef" class="mx-1 my-1 h-7 w-[calc(100%-8px)] rounded border border-border/70 bg-background/70 px-2 text-xs" placeholder="branch/ref" :disabled="isBusy" />
+                <button class="menu-item" :disabled="!state.checkoutRef.trim() || isBusy" @click="menuCheckout(false)">Checkout ref</button>
+                <button class="menu-item" :disabled="!state.checkoutRef.trim() || isBusy" @click="menuCheckout(true)">Create + checkout</button>
+              </div>
+            </div>
+
+            <div class="ml-auto flex items-center gap-1.5 rounded border border-border/70 bg-background/40 p-1">
+              <span class="px-1.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Commit</span>
+              <input v-model="state.commitMessage" class="h-7 min-w-[240px] rounded border border-border/70 bg-background/70 px-2" placeholder="commit message" :disabled="isBusy" />
+              <button class="h-7 rounded border border-primary/60 px-2 text-primary hover:bg-primary/10 disabled:opacity-40" :disabled="!canCommit || isBusy" @click="commitChanges">Commit</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="state.gitError || state.gitNotice" class="mb-3 rounded-md border px-2.5 py-1.5 text-xs" :class="state.gitError ? 'border-red-500/35 bg-red-500/10 text-red-200' : 'border-border/70 bg-background/60 text-muted-foreground'">
+          {{ state.gitError || state.gitNotice }}
         </div>
 
 <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -228,7 +263,7 @@
 
         <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
 
-        <div v-if="state.selectedCommitRef" class="mt-3">
+        <div v-if="isCommitView && state.selectedCommitRef" class="mt-3">
           <button class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground" @click="loadCommitDetail">View commit detail</button>
         </div>
       </section>
@@ -280,6 +315,7 @@ const props = withDefaults(
   defineProps<{
     currentProject: { id: string; name: string; branch: string; path: string };
     diffStyle?: 'split' | 'unified';
+    openRequest?: { token: number; mode: 'session' | 'history'; files?: string[] } | null;
     themeType?: 'dark' | 'light';
     themePreset?: ThemePreset;
     preferredEditor?: string | null;
@@ -308,13 +344,23 @@ const state = reactive({
   checkoutRef: '',
   gitNotice: '',
   gitError: '',
+  pendingAction: '',
+  historyError: '',
   commitDetailOpen: false,
   commitDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> }
+});
+
+const gitMeta = reactive({
+  stagedCount: 0
 });
 
 const fileMenuOpen = ref(false);
 const fileMenuRef = ref<HTMLElement | null>(null);
 const editorMenuOpen = ref(false);
+const menuOpen = ref<'' | 'changes' | 'bulk' | 'branch'>('');
+const changesMenuRef = ref<HTMLElement | null>(null);
+const bulkMenuRef = ref<HTMLElement | null>(null);
+const branchMenuRef = ref<HTMLElement | null>(null);
 let loadFilesAndPatchSeq = 0;
 let loadedFilesKey = '';
 let loadedPatchKey = '';
@@ -329,14 +375,20 @@ function onDocPointerDown(event: PointerEvent) {
   const target = event.target as Node | null;
   if (!target) return;
   if (!fileMenuRef.value?.contains(target)) fileMenuOpen.value = false;
+  if (!changesMenuRef.value?.contains(target) && !bulkMenuRef.value?.contains(target) && !branchMenuRef.value?.contains(target)) menuOpen.value = '';
   editorMenuOpen.value = false;
 }
 
 function onDocKeyDown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     fileMenuOpen.value = false;
+    menuOpen.value = '';
     editorMenuOpen.value = false;
   }
+}
+
+function toggleMenu(next: '' | 'changes' | 'bulk' | 'branch') {
+  menuOpen.value = menuOpen.value === next ? '' : next;
 }
 
 const visibleStart = computed(() => {
@@ -349,6 +401,13 @@ const visibleStart = computed(() => {
 
 const visibleItems = computed(() => state.items.slice(visibleStart.value, visibleStart.value + 7));
 const currentFileIndex = computed(() => state.files.findIndex((row) => row.path === state.selectedFilePath));
+const isCommitView = computed(() => state.phase === 'open' && state.openSource === 'commit');
+const isWorkingView = computed(() => state.phase === 'open' && state.openSource === 'uncommitted');
+const hasSelection = computed(() => Boolean(state.selectedFilePath));
+const hasFiles = computed(() => state.files.length > 0);
+const hasStaged = computed(() => gitMeta.stagedCount > 0);
+const canCommit = computed(() => state.commitMessage.trim().length > 0 && hasStaged.value);
+const isBusy = computed(() => Boolean(state.pendingAction));
 const diffStats = computed(() => ({
   hunks: (state.patch.match(/^@@/gm) ?? []).length,
   additions: (state.patch.match(/^\+[^+]/gm) ?? []).length,
@@ -396,20 +455,28 @@ function describeGitError(error: unknown) {
 }
 
 async function loadHistory() {
-  const rows = await apiGet<Array<{ id: string; ref?: string; title?: string }>>(`/diff/items?source=commits&limit=120&projectPath=${encodeURIComponent(props.currentProject.path)}`);
-  state.items = rows.map((row) => ({
-    id: row.id,
-    ref: row.ref ?? row.id,
-    title: row.title ?? row.id,
-    shortRef: (row.ref ?? row.id).slice(0, 7)
-  }));
-  if (!state.items.length) {
+  state.historyError = '';
+  try {
+    const rows = await apiGet<Array<{ id: string; ref?: string; title?: string }>>(`/diff/items?source=commits&limit=120&projectPath=${encodeURIComponent(props.currentProject.path)}`);
+    state.items = rows.map((row) => ({
+      id: row.id,
+      ref: row.ref ?? row.id,
+      title: row.title ?? row.id,
+      shortRef: (row.ref ?? row.id).slice(0, 7)
+    }));
+    if (!state.items.length) {
+      state.cursor = 0;
+      state.selectedCommitRef = '';
+      return;
+    }
+    state.cursor = Math.min(state.cursor, state.items.length - 1);
+    state.selectedCommitRef = state.items[state.cursor]?.ref ?? '';
+  } catch (error) {
+    state.items = [];
     state.cursor = 0;
     state.selectedCommitRef = '';
-    return;
+    state.historyError = error instanceof Error ? error.message : 'Failed to load commit history';
   }
-  state.cursor = Math.min(state.cursor, state.items.length - 1);
-  state.selectedCommitRef = state.items[state.cursor]?.ref ?? '';
 }
 
 async function loadFilesAndPatch() {
@@ -449,77 +516,131 @@ async function loadFilesAndPatch() {
   }
 }
 
-async function stageFiles(files: string[]) {
+function prioritizeFiles(files: DiffFile[], preferredFiles: string[]) {
+  if (!preferredFiles.length || files.length <= 1) return files;
+  const preferredSet = new Set(preferredFiles);
+  const preferred = files.filter((file) => preferredSet.has(file.path));
+  const rest = files.filter((file) => !preferredSet.has(file.path));
+  return [...preferred, ...rest];
+}
+
+async function loadGitStatus() {
+  try {
+    const status = await apiGet<{ staged?: string[] }>('/git/status');
+    gitMeta.stagedCount = Array.isArray(status?.staged) ? status.staged.length : 0;
+  } catch {
+    gitMeta.stagedCount = 0;
+  }
+}
+
+function beginGitAction(name: string) {
+  state.pendingAction = name;
   state.gitError = '';
+}
+
+function endGitAction() {
+  state.pendingAction = '';
+}
+
+function clearGitMessage() {
+  state.gitError = '';
+  state.gitNotice = '';
+}
+
+async function stageFiles(files: string[]) {
+  if (!isWorkingView.value || !files.length) return;
+  beginGitAction('stage');
   try {
     await apiPost('/git/stage', { files });
     state.gitNotice = `staged ${files.length} file${files.length === 1 ? '' : 's'}`;
     await loadFilesAndPatch();
+    await loadGitStatus();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
 async function unstageFiles(files: string[]) {
-  state.gitError = '';
+  if (!isWorkingView.value || !files.length) return;
+  beginGitAction('unstage');
   try {
     await apiPost('/git/unstage', { files });
     state.gitNotice = `unstaged ${files.length} file${files.length === 1 ? '' : 's'}`;
     await loadFilesAndPatch();
+    await loadGitStatus();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
 async function discardFiles(files: string[]) {
+  if (!isWorkingView.value) return;
   if (!files.length) return;
   if (!confirm(`Discard changes for ${files.join(', ')}?`)) return;
-  state.gitError = '';
+  beginGitAction('discard');
   try {
     await apiPost('/git/discard', { files });
     state.gitNotice = `discarded ${files.length} file${files.length === 1 ? '' : 's'}`;
     await loadFilesAndPatch();
+    await loadGitStatus();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
 async function commitChanges() {
-  state.gitError = '';
+  if (!isWorkingView.value || !canCommit.value) return;
+  beginGitAction('commit');
   try {
     const result = await apiPost<{ sha: string; branch: string }>('/git/commit', { message: state.commitMessage });
     state.gitNotice = `committed ${result.sha.slice(0, 7)} on ${result.branch}`;
     state.commitMessage = '';
     await loadHistory();
     await loadFilesAndPatch();
+    await loadGitStatus();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
 async function pullLatest() {
-  state.gitError = '';
+  if (!isWorkingView.value) return;
+  beginGitAction('pull');
   try {
     await apiPost('/git/pull', {});
     state.gitNotice = 'pull complete';
     await loadHistory();
     await loadFilesAndPatch();
+    await loadGitStatus();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
 async function checkoutRef(create: boolean) {
+  if (!isWorkingView.value) return;
   const ref = state.checkoutRef.trim();
   if (!ref) return;
   if (create && !confirm(`Create and checkout branch "${ref}"?`)) return;
-  state.gitError = '';
+  beginGitAction('checkout');
   try {
     await apiPost('/git/checkout', { ref, create });
     state.gitNotice = create ? `created and checked out ${ref}` : `checked out ${ref}`;
     await resetForProject();
   } catch (error) {
     state.gitError = describeGitError(error);
+  } finally {
+    endGitAction();
   }
 }
 
@@ -541,17 +662,105 @@ function selectHistoryRow(index: number) {
 
 async function openSelectedCommit() {
   loadFilesAndPatchSeq++;
+  clearGitMessage();
   state.phase = 'open';
   state.openSource = 'commit';
   state.selectedCommitRef = state.items[state.cursor]?.ref ?? state.selectedCommitRef;
   await loadFilesAndPatch();
 }
 
-async function openWorkingTree() {
+async function openWorkingTree(preferredFiles: string[] = []) {
   loadFilesAndPatchSeq++;
+  clearGitMessage();
   state.phase = 'open';
   state.openSource = 'uncommitted';
   await loadFilesAndPatch();
+  if (preferredFiles.length && state.files.length) {
+    state.files = prioritizeFiles(state.files, preferredFiles);
+    const preferred = preferredFiles.find((file) => state.files.some((row) => row.path === file));
+    if (preferred && preferred !== state.selectedFilePath) {
+      state.selectedFilePath = preferred;
+      loadedPatchKey = '';
+      await loadFilesAndPatch();
+    }
+  }
+  await loadGitStatus();
+}
+
+async function applyOpenRequest(request?: { token: number; mode: 'session' | 'history'; files?: string[] } | null) {
+  if (!request) return;
+  if (request.mode === 'history') {
+    state.phase = 'history';
+    return;
+  }
+  await openWorkingTree(request.files ?? []);
+}
+
+function stageSelected() {
+  if (!state.selectedFilePath) return;
+  void stageFiles([state.selectedFilePath]);
+}
+
+function unstageSelected() {
+  if (!state.selectedFilePath) return;
+  void unstageFiles([state.selectedFilePath]);
+}
+
+function discardSelected() {
+  if (!state.selectedFilePath) return;
+  void discardFiles([state.selectedFilePath]);
+}
+
+function stageAll() {
+  void stageFiles(state.files.map((row) => row.path));
+}
+
+function unstageAll() {
+  void unstageFiles(state.files.map((row) => row.path));
+}
+
+function discardAll() {
+  void discardFiles(state.files.map((row) => row.path));
+}
+
+function menuStageSelected() {
+  menuOpen.value = '';
+  stageSelected();
+}
+
+function menuUnstageSelected() {
+  menuOpen.value = '';
+  unstageSelected();
+}
+
+function menuDiscardSelected() {
+  menuOpen.value = '';
+  discardSelected();
+}
+
+function menuStageAll() {
+  menuOpen.value = '';
+  stageAll();
+}
+
+function menuUnstageAll() {
+  menuOpen.value = '';
+  unstageAll();
+}
+
+function menuDiscardAll() {
+  menuOpen.value = '';
+  discardAll();
+}
+
+function menuPull() {
+  menuOpen.value = '';
+  void pullLatest();
+}
+
+function menuCheckout(create: boolean) {
+  menuOpen.value = '';
+  void checkoutRef(create);
 }
 
 async function selectFile(path: string) {
@@ -637,11 +846,15 @@ watch(() => props.currentProject.path, () => {
   void resetForProject();
 });
 
+watch(() => props.openRequest?.token, () => {
+  void applyOpenRequest(props.openRequest);
+});
+
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDown);
   document.addEventListener('keydown', onDocKeyDown);
 
-  void resetForProject();
+  void resetForProject().then(() => applyOpenRequest(props.openRequest));
 });
 
 onUnmounted(() => {
@@ -663,5 +876,33 @@ onUnmounted(() => {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+}
+
+.menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  color: hsl(var(--foreground));
+}
+
+.menu-item:hover {
+  background: hsl(var(--muted) / 0.7);
+}
+
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menu-item-danger {
+  color: rgb(252 165 165);
+}
+
+.menu-item-danger:hover {
+  background: rgb(239 68 68 / 0.12);
 }
 </style>

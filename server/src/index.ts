@@ -11,13 +11,14 @@ app.use("*", async (c, next) => {
   const started = performance.now();
   const method = c.req.method;
   const path = new URL(c.req.url).pathname;
-  log("requests", "start", { method, path });
+  const reqId = Math.random().toString(36).slice(2, 8);
+  log("requests", "start", { reqId, method, path });
 
   try {
     await next();
-    log("requests", "end", { method, path, status: c.res.status, durationMs: Math.round(performance.now() - started) });
+    log("requests", "end", { reqId, method, path, status: c.res.status, durationMs: Math.round(performance.now() - started) });
   } catch (error) {
-    logError("requests", "error", error, { method, path, durationMs: Math.round(performance.now() - started) });
+    logError("requests", "error", error, { reqId, method, path, durationMs: Math.round(performance.now() - started) });
     throw error;
   }
 });

@@ -34,18 +34,18 @@
       </div>
 
       <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
-        <SessionHeader
-          v-if="currentProject && state.mode === 'session'"
+          <SessionHeader
+            v-if="currentProject && state.mode === 'session'"
           :title="activeSession?.title ?? 'No active session'"
           :project="currentProject.name"
           :branch="currentProject.branch"
           :model="selectedModelLabel"
-          :status="activeSession?.status ?? 'disconnected'"
-          :git-action-label="promoteActionLabel"
-          :preferred-editor="settings.preferredEditor"
-          :session-id="activeSession?.id"
-          @diff-current="openCurrentSessionDiff"
-          @diff-commits="openCommitsListDiff"
+            :status="activeSession?.status ?? 'disconnected'"
+            :git-action-label="promoteActionLabel"
+            :preferred-editor="settings.preferredEditor"
+            :session-id="activeSession?.id"
+            @diff-current="openCurrentSessionDiff"
+            @diff-commits="openCommitsListDiff"
           @open-editor-settings="openSettings('Integrations')"
           @open-model="state.modelPickerOpen = true"
           @git-action="runPromote"
@@ -113,6 +113,7 @@
             v-else
             :current-project="currentProject"
             :diff-style="state.diffStyle"
+            :open-request="state.diffOpenRequest"
             :theme-type="diffThemeType"
             :theme-preset="settings.themePreset"
             :preferred-editor="settings.preferredEditor"
@@ -243,9 +244,12 @@
       v-if="state.cloneDialogOpen"
       :url="picker.cloneUrl"
       :destination="picker.cloneDestination"
-      @close="state.cloneDialogOpen = false"
+      :mode="picker.cloneMode"
+      :error="picker.cloneError"
+      @close="state.cloneDialogOpen = false; picker.cloneError = ''"
       @update:url="picker.cloneUrl = $event"
       @update:destination="picker.cloneDestination = $event"
+      @update:mode="picker.cloneMode = $event"
       @clone="cloneRepository"
     />
 
@@ -436,6 +440,7 @@ type TimelineEntry = {
   kind: string;
   text: string;
   time: string;
+  at?: string;
   level?: 'info' | 'error';
   toolCalls?: Array<{
     id: string;
@@ -487,7 +492,9 @@ const recents = reactive<RecentEntry[]>([]);
 const picker = reactive({
   openPath: '',
   cloneUrl: '',
-  cloneDestination: 'C:/repos'
+  cloneDestination: 'C:/repos',
+  cloneMode: 'diff' as 'diff' | 'session',
+  cloneError: ''
 });
 
 const sessions = reactive<Session[]>([]);
@@ -555,6 +562,7 @@ const state = reactive({
   cloneDialogOpen: false,
   diffStyle: 'split' as 'split' | 'unified',
   contextViewerOpen: false,
+  diffOpenRequest: null as null | { token: number; mode: 'session' | 'history'; files?: string[] },
   promoteDialogOpen: false,
   conflictDialogOpen: false,
   sessionContinueOpen: false,
@@ -858,9 +866,30 @@ function ensureAssistantTurn(sessionId: string, turnId: string, at?: string) {
   const id = `${turnId}-assistant`;
   const existing = findTimelineEntry(sessionId, id);
   if (existing) return existing;
-  const entry: TimelineEntry = { id, kind: 'Assistant', text: 'Working…', time: timeLabel(at), level: 'info' };
+  const entry: TimelineEntry = { id, kind: 'Assistant', text: 'Working…', time: timeLabel(at), at, level: 'info' };
   appendTimelineEvent(sessionId, entry);
   return entry;
+}
+
+function touchedFilesFromEntry(entry: TimelineEntry) {
+  const files = new Set<string>();
+  for (const tool of entry.toolCalls ?? []) {
+    if (tool.diff?.trim()) {
+      for (const path of filesFromPatch(tool.diff)) files.add(path);
+    }
+  }
+  return [...files];
+}
+
+function latestTurnTouchedFiles() {
+  const timeline = activeTimeline.value;
+  for (let index = timeline.length - 1; index >= 0; index -= 1) {
+    const entry = timeline[index];
+    if (entry.kind !== 'Assistant') continue;
+    const files = touchedFilesFromEntry(entry);
+    if (files.length) return files;
+  }
+  return [] as string[];
 }
 
 function filesFromPatch(patch: string) {
@@ -997,7 +1026,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   if (event.type === 'user_turn') {
     const id = `${event.turnId}-user`;
     if (!findTimelineEntry(sessionId, id)) {
-      appendTimelineEvent(sessionId, { id, kind: 'User', text: event.prompt, time: timeLabel(event.at), level: 'info' });
+      appendTimelineEvent(sessionId, { id, kind: 'User', text: event.prompt, time: timeLabel(event.at), at: event.at, level: 'info' });
     }
     return;
   }
@@ -1008,11 +1037,13 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   }
   if (event.type === 'text_part') {
     const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    if (!entry.at) entry.at = event.at;
     entry.text = entry.text === 'Working…' ? event.text : `${entry.text}${event.text}`;
     return;
   }
   if (event.type === 'tool_call') {
     const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    if (!entry.at) entry.at = event.at;
     if (entry.text === 'Working…') entry.text = '';
     const calls = entry.toolCalls ?? (entry.toolCalls = []);
     const existing = calls.find((call) => call.id === event.callId);
@@ -1030,6 +1061,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   }
   if (event.type === 'error') {
     const entry = ensureAssistantTurn(sessionId, event.turnId, event.at);
+    if (!entry.at) entry.at = event.at;
     entry.kind = 'Error';
     entry.text = event.message ?? event.name;
     entry.level = 'error';
@@ -1042,7 +1074,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
       entry.level = event.reason === 'error' ? 'error' : 'info';
     }
     if (event.reason === 'aborted' && !findTimelineEntry(sessionId, `${event.turnId}-aborted`)) {
-      appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), level: 'info' });
+      appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), at: event.at, level: 'info' });
     }
     setSessionStatus(sessionId, event.reason === 'error' || event.reason === 'aborted' ? 'disconnected' : 'connected');
   }
@@ -1412,10 +1444,10 @@ function startSidebarResize(event: MouseEvent) {
   window.addEventListener('mouseup', onMouseUp);
 }
 
-function openProject(projectName: string, path: string, mode: 'diff' | 'session') {
+function openProject(projectName: string, path: string, mode: 'diff' | 'session', branch = 'main', projectId?: string) {
   const normalizedPath = path.replace(/\\/g, '/');
-  const id = normalizedPath;
-  currentProject.value = { id, name: projectName, branch: 'main', path: normalizedPath };
+  const id = projectId || normalizedPath;
+  currentProject.value = { id, name: projectName, branch, path: normalizedPath };
 
   const existingRecent = recents.find((r) => r.path === path);
   if (!existingRecent) {
@@ -1431,11 +1463,11 @@ function openProject(projectName: string, path: string, mode: 'diff' | 'session'
   clearActiveSession();
 }
 
-async function queueProjectOpen(projectName: string, path: string, mode: 'diff' | 'session', options?: { skipAutoCreate?: boolean }) {
+async function queueProjectOpen(projectName: string, path: string, mode: 'diff' | 'session', options?: { skipAutoCreate?: boolean; branch?: string; projectId?: string }) {
   state.openProjectDialogOpen = false;
   state.cloneDialogOpen = false;
 
-  openProject(projectName, path, mode);
+  openProject(projectName, path, mode, options?.branch ?? 'main', options?.projectId);
   await hydrateSessions().catch(() => undefined);
   if (!options?.skipAutoCreate && mode === 'session' && !state.activeSessionId) {
     if (sessions.length === 0) {
@@ -1454,17 +1486,22 @@ async function openExistingProject(payload: { mode: 'diff' | 'session' }) {
   if (!path) return;
   const opened = await sessionOrchestrator.resolveProjectOpen(path);
   if (!opened.ok) return;
-  await queueProjectOpen(opened.name, opened.path, payload.mode);
+  await queueProjectOpen(opened.name, opened.path, payload.mode, { branch: opened.branch, projectId: opened.id });
   void hydrateRecents();
 }
 
-async function cloneRepository() {
+async function cloneRepository(mode: 'diff' | 'session') {
+  picker.cloneError = '';
   const url = picker.cloneUrl.trim();
   const destination = picker.cloneDestination.trim();
   if (!url || !destination) return;
-
-  const rawName = url.replace(/\.git$/i, '').split('/').filter(Boolean).pop() ?? 'repo';
-  await queueProjectOpen(rawName, `${destination.replace(/\\/g, '/')}/${rawName}`, settings.defaultOpenMode);
+  try {
+    const cloned = await apiPost<{ id: string; name: string; path: string; branch: string }>('/projects/clone', { url, destination });
+    await queueProjectOpen(cloned.name, cloned.path, mode, { branch: cloned.branch, projectId: cloned.id });
+    void hydrateRecents();
+  } catch (error) {
+    picker.cloneError = error instanceof Error ? error.message : 'Clone failed';
+  }
 }
 
 function openCommandPalette() {
@@ -1473,13 +1510,23 @@ function openCommandPalette() {
   state.paletteIndex = 0;
 }
 
-function openCurrentSessionDiff() {
+async function openCurrentSessionDiff() {
   if (!currentProject.value) return;
+  const workingRows = await apiGet<Array<{ file: string; status?: string }>>(`/diff/files?source=uncommitted&projectPath=${encodeURIComponent(currentProject.value.path)}`).catch(() => []);
+  if (!workingRows.length) {
+    openCommitsListDiff();
+    return;
+  }
+  const touched = latestTurnTouchedFiles();
+  const workingFiles = new Set(workingRows.map((row) => row.file));
+  const preferredFiles = touched.filter((file) => workingFiles.has(file));
+  state.diffOpenRequest = { token: Date.now(), mode: 'session', files: preferredFiles };
   state.mode = 'diff';
 }
 
 function openCommitsListDiff() {
   if (!currentProject.value) return;
+  state.diffOpenRequest = { token: Date.now(), mode: 'history' };
   state.mode = 'diff';
 }
 

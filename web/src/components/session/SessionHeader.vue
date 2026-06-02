@@ -5,9 +5,9 @@
       <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
         <span class="rounded-md border border-border/80 bg-background/55 px-1.5 py-0.5 text-[10px]">{{ project }}</span>
         <span>{{ branch }}</span>
-        <span class="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background/45 px-1.5 py-0.5 text-[10px]">
+        <span :class="['inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]', statusBadgeClass]">
           <span :class="['h-1.5 w-1.5 rounded-full', statusDotClass]" />
-          {{ status }}
+          {{ statusLabel }}
         </span>
       </div>
     </div>
@@ -16,7 +16,11 @@
       <OpenInEditor target="project" :preferred-editor="preferredEditor" :session-id="sessionId" @open-settings="$emit('openEditorSettings')" />
       <button class="header-button" @click="$emit('diffCurrent')">
         <GitCompare class="header-icon" />
-        <span>Diff</span>
+        <span>Session Diff</span>
+      </button>
+      <button class="header-button" @click="$emit('diffCommits')">
+        <GitCompare class="header-icon" />
+        <span>Repo History</span>
       </button>
 
       <button class="header-button" @click="$emit('openModel')">
@@ -47,6 +51,22 @@ const statusDotClass = computed(() => {
   if (props.status === 'connecting') return 'bg-violet-400';
   if (props.status === 'disconnected') return 'bg-zinc-500';
   return 'bg-emerald-400';
+});
+
+const statusLabel = computed(() => {
+  if (props.status === 'running') return 'Agent is live';
+  if (props.status === 'connecting') return 'Connecting';
+  if (props.status === 'stale') return 'Stream stale';
+  if (props.status === 'disconnected') return 'Disconnected';
+  return 'Connected';
+});
+
+const statusBadgeClass = computed(() => {
+  if (props.status === 'running') return 'border-sky-500/45 bg-sky-500/15 text-sky-100';
+  if (props.status === 'stale') return 'border-amber-500/40 bg-amber-500/12 text-amber-100';
+  if (props.status === 'connecting') return 'border-violet-500/35 bg-violet-500/12 text-violet-100';
+  if (props.status === 'disconnected') return 'border-border/70 bg-background/45 text-muted-foreground';
+  return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-100';
 });
 
 </script>

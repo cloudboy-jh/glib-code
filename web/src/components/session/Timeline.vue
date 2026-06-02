@@ -1,5 +1,5 @@
 <template>
-  <div ref="scrollerRef" class="min-h-0 flex-1 overflow-auto overflow-x-hidden px-4 py-4 sm:px-5">
+  <div ref="scrollerRef" class="min-h-0 flex-1 overflow-auto overflow-x-hidden px-4 py-4 sm:px-5" @scroll="onScroll">
     <div v-if="entries.length === 0" class="grid h-full place-items-center">
       <p class="text-sm text-muted-foreground/35">Send a message to start the conversation.</p>
     </div>
@@ -10,6 +10,22 @@
         :key="e.id"
         class="rounded-xl border border-border/70 bg-card/60 px-4 py-3"
       >
+        <div
+          v-if="e.id === activeAssistantId"
+          class="sticky top-2 z-10 mb-2 rounded-lg border border-sky-500/35 bg-sky-500/10 px-3 py-2 backdrop-blur-sm"
+        >
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-sky-100">
+            <span class="inline-flex items-center gap-2 font-medium">
+              <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-300/40 border-t-sky-200" />
+              {{ activeToolsSummary.phase }}
+            </span>
+            <span class="text-sky-100/70">{{ activeToolsSummary.total }} tool calls</span>
+            <span class="text-sky-100/70">{{ activeToolsSummary.running }} running</span>
+            <span class="text-sky-100/70">{{ activeToolsSummary.elapsed }}</span>
+          </div>
+          <div class="mt-1 truncate text-[11px] text-sky-100/85">Running: {{ activeToolsSummary.runningTool }}</div>
+        </div>
+
         <div class="mb-1.5 flex items-center justify-between gap-3">
           <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/90">{{ e.kind }}</span>
           <span class="shrink-0 text-[11px] text-muted-foreground/65">{{ e.time }}</span>
@@ -20,7 +36,15 @@
         </div>
         <div v-else-if="e.text" class="space-y-2">
           <template v-for="(block, blockIndex) in parseMessageBlocks(e.text)" :key="`${e.id}-block-${blockIndex}`">
-            <p v-if="block.kind === 'text'" class="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">{{ block.value }}</p>
+            <div v-if="block.kind === 'text'" class="space-y-1.5">
+              <template v-for="(line, lineIndex) in renderMarkdownLite(block.value)" :key="`${e.id}-line-${blockIndex}-${lineIndex}`">
+                <h3 v-if="line.kind === 'h3'" class="text-sm font-semibold text-foreground/95">{{ line.value }}</h3>
+                <h2 v-else-if="line.kind === 'h2'" class="text-base font-semibold text-foreground/95">{{ line.value }}</h2>
+                <h1 v-else-if="line.kind === 'h1'" class="text-lg font-semibold text-foreground/95">{{ line.value }}</h1>
+                <p v-else-if="line.kind === 'li'" class="break-words pl-4 text-sm leading-6 text-foreground/95">• {{ line.value }}</p>
+                <p v-else class="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">{{ line.value }}</p>
+              </template>
+            </div>
             <div v-else-if="block.kind === 'diff'" class="space-y-1">
               <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
               <DiffView :patch="block.value" diff-style="unified" :theme-preset="themePreset" :theme-type="themeType" />
@@ -31,14 +55,21 @@
 
         <div v-if="e.toolCalls?.length" class="mt-2 space-y-2">
           <details
-            v-for="tool in e.toolCalls"
-            :key="tool.id"
-            class="group overflow-hidden rounded-lg border border-border/60 bg-background/45"
+            v-for="tool in groupToolCalls(e.toolCalls)"
+            :key="tool.groupId"
+            :class="[
+              'group overflow-hidden rounded-lg border border-border/60 bg-background/45',
+              tool.status === 'running' ? 'border-sky-500/40 bg-sky-500/10' : ''
+            ]"
           >
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-muted/35">
+            <summary :class="[
+              'flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-muted/35',
+              tool.status === 'running' ? 'animate-pulse' : ''
+            ]">
               <span class="flex min-w-0 items-center gap-2">
                 <span :class="['h-1.5 w-1.5 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
                 <span class="truncate font-medium text-foreground/90">{{ tool.title }}</span>
+                <span v-if="tool.count > 1" class="rounded border border-border/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">×{{ tool.count }}</span>
               </span>
               <span class="shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/65">
                 {{ tool.status }}
@@ -71,11 +102,19 @@
         </div>
       </article>
     </div>
+
+    <button
+      v-if="pendingCount > 0 || !followLive"
+      class="fixed bottom-24 right-8 z-20 rounded-md border border-border/70 bg-card/95 px-3 py-1.5 text-xs text-foreground shadow-lg shadow-black/30 hover:bg-muted/60"
+      @click="jumpToLatest"
+    >
+      {{ pendingCount > 0 ? `${pendingCount} new event${pendingCount === 1 ? '' : 's'} · Jump to latest` : 'Resume live' }}
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import DiffView from '../shared/DiffView.vue';
 
@@ -85,6 +124,7 @@ const props = defineProps<{
     kind: string;
     text: string;
     time: string;
+    at?: string;
     level?: 'info' | 'error';
     toolCalls?: Array<{
       id: string;
@@ -105,6 +145,41 @@ const props = defineProps<{
 }>();
 
 const scrollerRef = ref<HTMLDivElement | null>(null);
+const followLive = ref(true);
+const pendingCount = ref(0);
+const nowMs = ref(Date.now());
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+const activeAssistantEntry = computed(() => {
+  for (let index = props.entries.length - 1; index >= 0; index -= 1) {
+    const entry = props.entries[index];
+    if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
+    if ((entry.toolCalls ?? []).some((tool) => tool.status === 'running')) return entry;
+  }
+  return null;
+});
+
+const activeAssistantId = computed(() => activeAssistantEntry.value?.id ?? '');
+
+const activeToolsSummary = computed(() => {
+  const entry = activeAssistantEntry.value;
+  if (!entry) return { total: 0, running: 0, runningTool: '', phase: 'Running commands', elapsed: '00:00' };
+  const tools = entry.toolCalls ?? [];
+  const runningTools = tools.filter((tool) => tool.status === 'running');
+  const runningTool = runningTools[runningTools.length - 1]?.title ?? tools[tools.length - 1]?.title ?? 'Working';
+  const phase = inferPhase(runningTool);
+  const startedAtMs = entry.at ? Date.parse(entry.at) : Number.NaN;
+  const elapsed = Number.isFinite(startedAtMs)
+    ? formatElapsed(Math.max(0, nowMs.value - startedAtMs))
+    : '00:00';
+  return {
+    total: tools.length,
+    running: runningTools.length,
+    runningTool,
+    phase,
+    elapsed
+  };
+});
 
 function parseMessageBlocks(text: string) {
   const blocks: Array<{ kind: 'text' | 'diff' | 'code'; value: string }> = [];
@@ -129,6 +204,50 @@ function parseMessageBlocks(text: string) {
   return blocks.length ? blocks : [{ kind: 'text' as const, value: text }];
 }
 
+function renderMarkdownLite(text: string) {
+  return text
+    .split('\n')
+    .map((raw) => raw.trimEnd())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      if (line.startsWith('### ')) return { kind: 'h3' as const, value: line.slice(4).trim() };
+      if (line.startsWith('## ')) return { kind: 'h2' as const, value: line.slice(3).trim() };
+      if (line.startsWith('# ')) return { kind: 'h1' as const, value: line.slice(2).trim() };
+      if (/^[-*]\s+/.test(line)) return { kind: 'li' as const, value: line.replace(/^[-*]\s+/, '').trim() };
+      return { kind: 'p' as const, value: line };
+    });
+}
+
+function groupToolCalls(tools: NonNullable<(typeof props.entries)[number]['toolCalls']>) {
+  const grouped: Array<(typeof tools)[number] & { groupId: string; count: number }> = [];
+  for (const tool of tools) {
+    const key = `${tool.title}|${tool.status}|${tool.command ?? ''}|${tool.cwd ?? ''}`;
+    const prev = grouped[grouped.length - 1];
+    if (prev && `${prev.title}|${prev.status}|${prev.command ?? ''}|${prev.cwd ?? ''}` === key) {
+      prev.count += 1;
+      if (tool.preview && tool.preview.length >= (prev.preview?.length ?? 0)) prev.preview = tool.preview;
+      if (tool.rawOutput && tool.rawOutput.length >= (prev.rawOutput?.length ?? 0)) prev.rawOutput = tool.rawOutput;
+      continue;
+    }
+    grouped.push({ ...tool, groupId: tool.id, count: 1 });
+  }
+  return grouped;
+}
+
+function inferPhase(toolTitle: string) {
+  const value = toolTitle.toLowerCase();
+  if (/(read|grep|glob|search|list|fetch|get|open)/.test(value)) return 'Reading files';
+  if (/(write|patch|edit|apply|replace|delete|rename|create file|update file)/.test(value)) return 'Writing patch';
+  return 'Running commands';
+}
+
+function formatElapsed(ms: number) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 function isNearBottom(el: HTMLDivElement, threshold = 80) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;
 }
@@ -137,18 +256,45 @@ async function scrollToBottom(force = false) {
   await nextTick();
   const el = scrollerRef.value;
   if (!el) return;
-  if (!force && !isNearBottom(el)) return;
+  if (!force && !followLive.value) return;
   el.scrollTop = el.scrollHeight;
+  pendingCount.value = 0;
+}
+
+function onScroll() {
+  const el = scrollerRef.value;
+  if (!el) return;
+  followLive.value = isNearBottom(el, 60);
+  if (followLive.value) pendingCount.value = 0;
+}
+
+async function jumpToLatest() {
+  followLive.value = true;
+  await scrollToBottom(true);
 }
 
 watch(
   () => props.entries.map((entry) => `${entry.id}:${entry.text.length}:${entry.level ?? 'info'}:${entry.toolCalls?.map((tool) => `${tool.id}:${tool.status}:${tool.preview?.length ?? 0}:${tool.rawOutput?.length ?? 0}:${tool.diff?.length ?? 0}`).join(',') ?? ''}`).join('|'),
   async () => {
-    await scrollToBottom(true);
+    if (followLive.value) {
+      await scrollToBottom(true);
+    } else {
+      pendingCount.value += 1;
+    }
   }
 );
 
 onMounted(async () => {
+  elapsedTimer = setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
   await scrollToBottom(true);
+});
+
+onUnmounted(() => {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
 });
 </script>

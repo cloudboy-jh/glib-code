@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { ensureRepoGlibIgnore } from "../lib/paths";
@@ -69,6 +69,82 @@ export async function createProject(parent: string, name: string) {
   await writeFile(join(full, ".gitignore"), ".glib/\nnode_modules/\n.env*\ndist/\nbuild/\n", "utf8");
   await ensureRepoGlibIgnore(full);
   return openProject(full);
+}
+
+function repoNameFromUrl(url: string) {
+  const trimmed = url.trim();
+  if (/^file:\/\//i.test(trimmed)) {
+    try {
+      const filePath = new URL(trimmed).pathname;
+      const parsed = basename(filePath.replace(/\\/g, "/"));
+      return parsed.replace(/\.git$/i, "") || "repo";
+    } catch {
+      // fallback below
+    }
+  }
+  if (/^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.includes("\\")) {
+    return basename(trimmed).replace(/\.git$/i, "") || "repo";
+  }
+  const last = trimmed.replace(/\/$/, "").split("/").filter(Boolean).pop() ?? "repo";
+  return last.replace(/\.git$/i, "") || "repo";
+}
+
+function isCloneSource(remote: string) {
+  if (/^https?:\/\//i.test(remote)) return true;
+  if (/^git@/i.test(remote)) return true;
+  if (/^ssh:\/\//i.test(remote)) return true;
+  if (/^file:\/\//i.test(remote)) return true;
+  return existsSync(resolve(remote));
+}
+
+export async function cloneProject(url: string, destination: string) {
+  const remote = url.trim();
+  if (!isCloneSource(remote)) {
+    const error = new Error("invalid clone url");
+    (error as Error & { code?: string }).code = "INVALID_URL";
+    throw error;
+  }
+
+  const parent = resolve(destination.trim());
+  if (!parent) {
+    const error = new Error("destination path required");
+    (error as Error & { code?: string }).code = "INVALID_INPUT";
+    throw error;
+  }
+  if (!existsSync(parent)) {
+    try {
+      await mkdir(parent, { recursive: true });
+    } catch {
+      const error = new Error("destination path could not be created");
+      (error as Error & { code?: string }).code = "DESTINATION_CREATE_FAILED";
+      throw error;
+    }
+  }
+
+  const target = resolve(join(parent, repoNameFromUrl(remote)));
+  if (existsSync(target)) {
+    const files = await readdir(target).catch(() => []);
+    if (files.length > 0) {
+      const error = new Error("clone target already exists");
+      (error as Error & { code?: string }).code = "TARGET_EXISTS";
+      throw error;
+    }
+  }
+
+  const cloned = await run(["git", "clone", remote, target]);
+  if (cloned.code !== 0) {
+    const error = new Error(cloned.err || "clone failed");
+    (error as Error & { code?: string }).code = "CLONE_FAILED";
+    throw error;
+  }
+
+  const opened = await openProject(target);
+  if (!opened.ok) {
+    const error = new Error("cloned repo could not be opened");
+    (error as Error & { code?: string }).code = "OPEN_FAILED";
+    throw error;
+  }
+  return opened.project;
 }
 
 export async function forgetProject(path: string) {

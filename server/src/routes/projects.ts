@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createProject, forgetProject, initProject, openProject, projectCandidates } from "../services/projects";
+import { cloneProject, createProject, forgetProject, initProject, openProject, projectCandidates } from "../services/projects";
 import {
   getRecents,
   putRecent,
@@ -53,6 +53,22 @@ export const projectsRoutes = new Hono()
     setCurrentProject(result.project.id);
     await putRecent({ id: result.project.id, name: result.project.name, path: result.project.path });
     return c.json(result.project);
+  })
+  .post("/clone", async (c) => {
+    const body = await c.req.json().catch(() => null) as { url?: string; destination?: string } | null;
+    if (!body?.url || !body?.destination) return c.json({ ok: false, message: "url and destination required", code: "INVALID_INPUT" }, 400);
+    try {
+      const project = await cloneProject(body.url, body.destination);
+      registerProject(project);
+      setCurrentProject(project.id);
+      await putRecent({ id: project.id, name: project.name, path: project.path });
+      return c.json(project, 201);
+    } catch (error) {
+      const e = error as Error & { code?: string };
+      const code = e.code || "CLONE_FAILED";
+      const status = code === "INVALID_URL" || code === "TARGET_EXISTS" || code === "INVALID_INPUT" || code === "DESTINATION_CREATE_FAILED" ? 400 : 500;
+      return c.json({ ok: false, code, message: e.message || "clone failed" }, status);
+    }
   })
   .delete("/recents/:id", async (c) => {
     await removeRecent(c.req.param("id"));

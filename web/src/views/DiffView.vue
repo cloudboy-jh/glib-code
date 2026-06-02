@@ -2,6 +2,7 @@
   <DiffWorkbench
     :current-project="currentProject"
     :diff-style="diffStyle"
+    :open-request="openRequest"
     :theme-type="themeType"
     :theme-preset="themePreset"
     :preferred-editor="preferredEditor"
@@ -20,6 +21,7 @@ import DiffWorkbench from '../components/diff/DiffWorkbench.vue';
 defineProps<{
   currentProject: { id: string; name: string; path: string; branch: string } | null;
   diffStyle: 'split' | 'unified';
+  openRequest?: { token: number; mode: 'session' | 'history'; files?: string[] } | null;
   themeType: 'dark' | 'light';
   themePreset: ThemePreset;
   preferredEditor: string | null;
