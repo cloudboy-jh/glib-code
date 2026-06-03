@@ -98,6 +98,7 @@
             @run-composer-command="runComposerCommand"
             @remove-context-chip="removeContextChip"
             @open-attachment-picker="openAttachmentPicker"
+            @show-tree="pushTreeArtifact"
             @remove-attachment="removeAttachment"
             @retry-attachment="retryAttachment"
             @toggle-continue="state.sessionContinueOpen = !state.sessionContinueOpen"
@@ -488,7 +489,7 @@ type TimelineEntry = {
     id: string;
     title: string;
     status: 'running' | 'done' | 'failed';
-    renderKind: 'diff' | 'code' | 'json' | 'terminal' | 'text' | 'error';
+    renderKind: 'diff' | 'code' | 'json' | 'terminal' | 'text' | 'tree' | 'error';
     command?: string;
     cwd?: string;
     preview?: string;
@@ -497,6 +498,8 @@ type TimelineEntry = {
     diff?: string;
     fileTarget?: string;
     isError?: boolean;
+    treePaths?: string[];
+    treeGitStatus?: Record<string, string>;
   }>;
 };
 
@@ -1129,16 +1132,22 @@ function classifyToolCall(event: Extract<AgentEvent, { type: 'tool_call' }>) {
   const output = parseToolResult(rawJsonOutput);
   const failed = Boolean((event.metadata as { isError?: unknown })?.isError);
   const typedResult = event.resultType;
-  const artifact = event.artifact as { patch?: unknown; text?: unknown; json?: unknown } | undefined;
+  const artifact = event.artifact as { patch?: unknown; text?: unknown; json?: unknown; tree?: unknown } | undefined;
   const typedPatch = typeof artifact?.patch === 'string' ? artifact.patch : '';
   const typedText = typeof artifact?.text === 'string' ? artifact.text : '';
   const typedJson = artifact && 'json' in artifact ? artifact.json : undefined;
+  const typedTree = artifact?.tree as { paths?: unknown; gitStatus?: unknown } | undefined;
   const fileTarget = typeof input.filePath === 'string' ? input.filePath : typeof input.path === 'string' ? input.path : '';
   const titleTarget = command ? command.split(/\s+/).slice(0, 4).join(' ') : fileTarget;
   const title = `${event.tool}${titleTarget ? ` · ${titleTarget}` : ''}`;
   const summary = event.summary ? stripMarkdownArtifacts(event.summary) : '';
 
   if (!rawJsonOutput) return { title, fileTarget, status: 'running' as const, renderKind: 'terminal' as const, command, cwd, rawInput, rawOutput, preview: '' };
+  if (typedResult === 'tree' && typedTree && Array.isArray(typedTree.paths)) {
+    const treePaths = typedTree.paths as string[];
+    const treeGitStatus = (typedTree.gitStatus && typeof typedTree.gitStatus === 'object') ? typedTree.gitStatus as Record<string, string> : undefined;
+    return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'tree' as const, command, cwd, rawInput, rawOutput, preview: summary || `${treePaths.length} paths`, treePaths, treeGitStatus };
+  }
   if (typedResult === 'diff' && typedPatch) return { title, fileTarget, status: failed ? 'failed' as const : 'done' as const, renderKind: failed ? 'error' as const : 'diff' as const, command, cwd, rawInput, rawOutput, diff: typedPatch, preview: summary || summarizeLines(typedPatch, 4) };
   if (typedResult === 'json' && typedJson !== undefined) {
     const asText = redactTimelineText(JSON.stringify(typedJson, null, 2));
@@ -2449,6 +2458,59 @@ function pushTimelineInfo(sessionId: string, text: string) {
   list.push({ id: `info_${Date.now()}`, kind: 'info', text, time: new Date().toLocaleTimeString() });
 }
 
+function mapGitStatusToTree(status: { staged?: string[]; modified?: string[]; deleted?: string[]; not_added?: string[]; conflicted?: string[] }): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of status.staged ?? []) out[f] = 'added';
+  for (const f of status.modified ?? []) out[f] = 'modified';
+  for (const f of status.deleted ?? []) out[f] = 'deleted';
+  for (const f of status.not_added ?? []) out[f] = 'untracked';
+  for (const f of status.conflicted ?? []) out[f] = 'modified';
+  return out;
+}
+
+async function pushTreeArtifact(scopedPaths?: string[], scopedGitStatus?: Record<string, string>) {
+  const sid = state.activeSessionId;
+  if (!sid) return;
+  const list = timelineBySessionId[sid] ?? (timelineBySessionId[sid] = []);
+
+  let paths = scopedPaths;
+  let gitStatus = scopedGitStatus ?? {};
+
+  if (!paths) {
+    try {
+      const res = await apiGet<{ ok: boolean; paths: string[] }>('/fs/paths');
+      paths = res.paths ?? [];
+    } catch {
+      paths = [];
+    }
+  }
+
+  if (!scopedGitStatus) {
+    try {
+      const status = await apiGet<{ staged?: string[]; modified?: string[]; deleted?: string[]; not_added?: string[]; conflicted?: string[] }>('/git/status');
+      if (status) gitStatus = mapGitStatusToTree(status);
+    } catch {
+      // keep empty gitStatus
+    }
+  }
+
+  list.push({
+    id: `tree_${Date.now()}`,
+    kind: 'System',
+    text: '',
+    time: new Date().toLocaleTimeString(),
+    toolCalls: [{
+      id: `tc_tree_${Date.now()}`,
+      title: 'File tree',
+      status: 'done',
+      renderKind: 'tree',
+      preview: `${paths.length} paths`,
+      treePaths: paths,
+      treeGitStatus: gitStatus
+    }]
+  });
+}
+
 function runComposerCommand(command: string, args?: string) {  if (command === 'help') {
     openCommandPalette();
     return;
@@ -2485,6 +2547,12 @@ function runComposerCommand(command: string, args?: string) {  if (command === '
   if (command === 'diff') {
     if (!currentProject.value) return;
     state.mode = 'diff';
+    return;
+  }
+
+  if (command === 'tree') {
+    if (!currentProject.value) return;
+    void pushTreeArtifact();
     return;
   }
 

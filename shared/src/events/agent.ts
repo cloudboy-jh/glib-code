@@ -23,13 +23,14 @@ export type ToolName =
   | "task"
   | string;
 
-export type ToolResultType = "diff" | "terminal" | "json" | "code" | "text" | "error";
+export type ToolResultType = "diff" | "terminal" | "json" | "code" | "text" | "tree" | "error";
 
 export type ToolResultArtifact = {
   patch?: string;
   text?: string;
   json?: unknown;
   language?: string;
+  tree?: { paths: string[]; gitStatus?: Record<string, string> };
 };
 
 export type AgentEvent =

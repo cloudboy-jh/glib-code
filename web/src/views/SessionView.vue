@@ -30,6 +30,7 @@
         @execute-command="(v, a) => $emit('runComposerCommand', v, a)"
         @remove-context-chip="$emit('removeContextChip', $event)"
         @attach="$emit('openAttachmentPicker')"
+        @show-tree="$emit('showTree')"
         @remove-attachment="$emit('removeAttachment', $event)"
         @retry-attachment="$emit('retryAttachment', $event)"
       />
@@ -143,6 +144,7 @@ defineEmits<{
   runComposerCommand: [value: string, args?: string];
   removeContextChip: [id: string];
   openAttachmentPicker: [];
+  showTree: [];
   removeAttachment: [id: string];
   retryAttachment: [id: string];
   toggleContinue: [];

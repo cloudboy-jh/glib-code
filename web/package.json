@@ -11,6 +11,7 @@
   "dependencies": {
     "@glib-code/shared": "workspace:*",
     "@pierre/diffs": "^1.1.17",
+    "@pierre/trees": "^1.0.0-beta.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "hono": "^4.7.7",

@@ -1,6 +1,6 @@
 # glib-code Spec (Current)
 
-Last updated: 2026-05-18
+Last updated: 2026-06-03
 
 glib-code is an isolated AI coding workspace centered on this loop:
 
@@ -33,6 +33,7 @@ glib-code is an isolated AI coding workspace centered on this loop:
 - Shared contracts/tokens: `shared/`
 - Session isolation + promote boundary: GitTrix
 - Diff rendering: `@pierre/diffs`
+- File tree rendering: `@pierre/trees`
 
 ## Architecture
 
@@ -94,7 +95,8 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 - Settings + keybindings persistence
 - Model picker + provider key management
 - GitHub account/device auth for GitHub durable promote
-- Session timeline with streamed assistant text, errors, and compact tool-call cards
+- Session timeline with streamed assistant text, errors, and compact tool-call cards (diff, code, json, terminal, tree, error)
+- Inline file-tree artifacts in timeline via composer button, `/tree` command, or agent-emitted scoped tree
 - Session diff review and commit-all/file-selected promote
 - Local dirty-repo stash-and-continue plus local upstream push after promote
 - Readiness and health endpoints

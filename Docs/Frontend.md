@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-05-27
+Last updated: 2026-06-03
 
 For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers the current frontend implementation.
 
@@ -99,6 +99,7 @@ Current behavior:
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
 - The active workbench starts sessions from the currently opened file or the whole diff. Hunk/multi-file payload handling exists above the component, but the current selector UI is not wired in.
+- Composer footer has icon buttons for file tree (FolderTree) and attach (Paperclip), plus a Send button. The tree button and `/tree` slash command push a full-repo file-tree artifact into the session timeline.
 - Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
 - Session promote modal uses a full-width diff surface, optional header file picker for multi-file diffs, and `Commit all` / `Commit selected` actions.
 - Diff mode hides the global session header; `DiffWorkbench` owns diff-specific controls.
@@ -122,8 +123,9 @@ Current state:
 
 - Session shell/layout is in place.
 - Timeline renders user/assistant/error entries plus compact expandable tool-call cards.
-- Tool-call cards classify diff/code/json/terminal/error output, hide raw payloads under Inspect, and render unified diffs with `DiffView.vue` / `@pierre/diffs`.
-- Composer sends real prompts and supports `/stop`/`/abort` command handling.
+- Tool-call cards classify diff/code/json/terminal/tree/error output, hide raw payloads under Inspect, and render unified diffs with `DiffView.vue` / `@pierre/diffs`.
+- Tool-call cards with `renderKind: 'tree'` render inline file-tree artifacts using `FileTreeView.vue` / `@pierre/trees`.
+- Composer sends real prompts and supports `/tree` and `/stop`/`/abort` command handling.
 - Session create/send/stream flows use backend agent routes.
 - Session creation is guarded so repeated clicks or keyboard actions reuse the in-flight request instead of creating duplicate sessions.
 - Session hydration closes streams for sessions outside the active project.
@@ -133,6 +135,28 @@ Current state:
 - Composer drafts are scoped per session.
 - Header/sidebar show compact session states: connected, connecting, disconnected, stale, running.
 - Empty session state explains active model/provider key failures and offers key/model actions.
+
+## File tree artifact
+
+Files:
+
+- `components/shared/FileTreeView.vue`
+- `@pierre/trees` (vanilla model)
+
+Behavior:
+
+- Vue wrapper over the vanilla `FileTree` class from `@pierre/trees`, mirroring how `DiffView.vue` wraps `@pierre/diffs`.
+- Owns a `FileTree` instance, renders into a ref'd host via `render({ containerWrapper })`, calls `cleanUp()` on unmount, re-renders on prop changes via `resetPaths()` + `setGitStatus()`.
+- Props: `paths: string[]`, `gitStatus: Record<string, string>`, `themePreset`.
+- Container height is computed from path count (22px compact row height), clamped 120–520px. Trees uses virtualized rendering and requires a concrete container height.
+- Density: `compact`. Icons: `complete` with per-file-type colors. All directories start collapsed.
+- Theme computed from glib-code's `THEME_PRESETS` tokens via `themeToTreeStyles()` (VS Code–style color keys) plus CSS variable overrides. No hardcoded per-preset map.
+- Three triggers with scope separation:
+  - Composer footer "Tree" button → full repo tree (fetches `/api/fs/paths` + `/api/git/status`).
+  - `/tree` slash command → same as button, full repo tree.
+  - Agent-emitted `tool_call` with `resultType: 'tree'` and `artifact.tree` → scoped tree (touched paths + ancestor directories with git status badges).
+- Same `FileTreeView.vue` component, two input shapes. Trigger decides scope. No user-facing scope toggle.
+- Out of scope: persistent tree rail/sidebar, file editing, rename/drag/drop/context-menu, click-to-open-diff (not yet wired).
 
 ## Settings + keybindings
 

@@ -34,6 +34,24 @@ async function tree(path: string): Promise<any> {
   return { name: path.split(/[\\/]/).pop(), path, type: "directory", children };
 }
 
+async function flattenPaths(root: string, base: string, relBase: string): Promise<string[]> {
+  const names = await readdir(root);
+  const out: string[] = [];
+  for (const name of names) {
+    if (name === ".git" || name === ".glib") continue;
+    const full = join(root, name);
+    const rel = relBase ? `${relBase}/${name}` : name;
+    const s = await stat(full);
+    if (s.isDirectory()) {
+      out.push(`${rel}/`);
+      out.push(...await flattenPaths(full, base, rel));
+    } else {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
 export const fsRoutes = new Hono()
   .get("/tree", async (c) => {
     const root = await activeProjectPath();
@@ -44,6 +62,13 @@ export const fsRoutes = new Hono()
     if (!inRepo(root, full)) return c.json({ ok: false, message: "path escape blocked" }, 400);
 
     return c.json(await tree(full));
+  })
+  .get("/paths", async (c) => {
+    const root = await activeProjectPath();
+    if (!root) return c.json({ ok: false, message: "no project open" }, 404);
+
+    const paths = await flattenPaths(root, root, "");
+    return c.json({ ok: true, paths });
   })
   .get("/read", async (c) => {
     const root = await activeProjectPath();

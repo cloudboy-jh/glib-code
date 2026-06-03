@@ -6,17 +6,19 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <button class="command-chip" :disabled="disabled" @click="$emit('attach')">Attach</button>
+      <button class="command-chip" :disabled="disabled" @click="$emit('tree')"><FolderTree class="h-3.5 w-3.5" /></button>
+      <button class="command-chip" :disabled="disabled" @click="$emit('attach')"><Paperclip class="h-3.5 w-3.5" /></button>
       <UiButton class="h-9 rounded-full px-4" :disabled="disabled" @click="$emit('send')">Send</UiButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { FolderTree, Paperclip } from 'lucide-vue-next';
 import UiButton from '../ui/button.vue';
 
 defineProps<{ meta: string; disabled?: boolean }>();
-defineEmits<{ send: []; openCommands: []; attach: [] }>();
+defineEmits<{ send: []; openCommands: []; attach: []; tree: [] }>();
 </script>
 
 <style scoped>

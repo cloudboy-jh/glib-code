@@ -18,7 +18,7 @@ The server is a Hono API with route modules in `src/routes`, implementation modu
 - `diff`: durable repo diff browsing and packed diff context
 - `git`: durable repo git status/log/branches
 - `repo`: current repo shell
-- `fs`: current repo file browsing
+- `fs`: current repo file browsing (tree, paths, read)
 - `auth`: GitHub auth status
 - `readiness`/`health`: runtime readiness checks
 - `attachments`, `keybindings`, `term`: app support endpoints

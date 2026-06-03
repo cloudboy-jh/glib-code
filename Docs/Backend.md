@@ -1,6 +1,6 @@
 # Backend (Current Implementation)
 
-Last updated: 2026-05-18
+Last updated: 2026-06-03
 
 For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers backend route and service implementation details.
 
@@ -135,12 +135,15 @@ Behavior:
 ### FS
 
 - `GET /api/fs/tree?path=...`
+- `GET /api/fs/paths`
 - `GET /api/fs/read?path=...`
 
 Notes:
 
+- `tree` returns nested `{ name, path, type, children }` JSON.
+- `paths` returns flat `{ ok: true, paths: string[] }` of relative paths for the file tree component. Directories get a trailing `/`. Excludes `.git` and `.glib/`.
 - Path escape blocked by `inRepo()` check.
-- `.git` directory hidden from tree listing.
+- `.git` and `.glib/` directories hidden from tree/paths listings.
 - Read returns UTF-8 only today.
 
 ### Settings

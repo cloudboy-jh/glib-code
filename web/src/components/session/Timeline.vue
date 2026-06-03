@@ -79,6 +79,14 @@
               v-if="tool.status === 'failed' && tool.preview"
               class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
             >{{ tool.preview }}</pre>
+
+            <!-- File tree artifact -->
+            <div
+              v-if="tool.renderKind === 'tree' && tool.treePaths?.length"
+              class="mx-2 mb-1"
+            >
+              <FileTreeView :paths="tool.treePaths" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
+            </div>
           </div>
         </div>
       </article>
@@ -98,6 +106,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import DiffView from '../shared/DiffView.vue';
+import FileTreeView from '../shared/FileTreeView.vue';
 
 const props = defineProps<{
   entries: Array<{
@@ -111,7 +120,7 @@ const props = defineProps<{
       id: string;
       title: string;
       status: 'running' | 'done' | 'failed';
-      renderKind: 'diff' | 'code' | 'json' | 'terminal' | 'text' | 'error';
+      renderKind: 'diff' | 'code' | 'json' | 'terminal' | 'text' | 'tree' | 'error';
       command?: string;
       cwd?: string;
       preview?: string;
@@ -120,6 +129,8 @@ const props = defineProps<{
       diff?: string;
       fileTarget?: string;
       isError?: boolean;
+      treePaths?: string[];
+      treeGitStatus?: Record<string, string>;
     }>;
   }>;
   themePreset?: ThemePreset;

@@ -15,6 +15,8 @@
 - [ ] Extract `detailsDiffToUnifiedPatch` to `shared/` — currently duplicated in server and web.
 - [ ] Verify `details.filePath` is populated by agent runtime so patch headers show real filename not "file".
 - [ ] Session diff overlay: add split/unified toggle and file list sidebar (parity with full DiffWorkbench).
+- [ ] File tree: add click-to-open-diff for individual file rows (currently no row click behavior).
+- [ ] File tree: wire agent-emitted scoped tree through server `tool_call` events (currently client-side only for user-invoked; agent path is type-wired but no agent tool emits it yet).
 
 ## Backend
 
@@ -35,6 +37,7 @@
 - [ ] Persist project provider/model overrides beyond current server process or remove them from contract.
 - [ ] Move current project state to a client/session-scoped model (not single process-global value).
 - [ ] Harden FS read/tree for large repos and binary files.
+- [ ] Add tests for `/api/fs/paths` endpoint (flat path listing for file tree).
 - [ ] Keep readiness checks fast and cached while preserving actionable errors.
 - [x] Ensure Git + diff route surface matches what frontend advertises.
 - [x] Typecheck + build pass (`bun run --cwd server check`, `bun run --cwd server build`).

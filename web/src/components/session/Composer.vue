@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <ComposerFooter :meta="meta" :disabled="disabled" @send="$emit('send')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" />
+      <ComposerFooter :meta="meta" :disabled="disabled" @send="$emit('send')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
     </div>
   </div>
 </template>
@@ -64,7 +64,7 @@ const props = withDefaults(
   { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], attachments: () => [], disabled: false, isRunning: false }
 );
 
-const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
+const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; showTree: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
 
 function handleCommand(value: string, args?: string) {
   emit('executeCommand', value, args);

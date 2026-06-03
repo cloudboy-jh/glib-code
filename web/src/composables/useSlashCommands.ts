@@ -22,6 +22,7 @@ const COMMANDS: SlashCommand[] = [
   { id: 'cmd-archive', value: 'archive', label: 'Archive', description: 'Archive and clean up session.', category: 'session' },
 
   { id: 'cmd-diff', value: 'diff', label: 'Switch to diffs', description: 'Jump to the diff review surface.', category: 'navigation' },
+  { id: 'cmd-tree', value: 'tree', label: 'File tree', description: 'Show the project file tree.', category: 'navigation' },
   { id: 'cmd-session', value: 'session', label: 'Switch to session', description: 'Stay in the session workspace.', category: 'navigation' },
   { id: 'cmd-models', value: 'model', label: 'Model', description: 'Open the model picker.', category: 'navigation', aliases: ['models'], inlineArgs: true, argHint: 'provider/model' },
   { id: 'cmd-themes', value: 'theme', label: 'Theme', description: 'Open the theme picker.', category: 'navigation', aliases: ['themes'] },

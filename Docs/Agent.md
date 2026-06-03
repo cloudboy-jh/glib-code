@@ -1,6 +1,6 @@
 # Agent Integration
 
-Last updated: 2026-05-18
+Last updated: 2026-06-03
 
 For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers pi/sandbox/session runtime details.
 
@@ -57,7 +57,7 @@ pi subprocess in sandbox
   -> persisted timeline + SSE broadcast
 ```
 
-`AgentEvent` stays stable so the frontend does not care whether events came from SDK callbacks or RPC stdout.
+`AgentEvent` stays stable so the frontend does not care whether events came from SDK callbacks or RPC stdout. `ToolResultType` includes `'tree'` for agent-emitted scoped file-tree artifacts; `ToolResultArtifact` includes an optional `tree: { paths, gitStatus }` field for this purpose.
 
 Text chunk events use collision-proof part IDs. Do not derive `text_part.partId` from wall-clock time because pi can emit several deltas in the same millisecond and the frontend dedupes by event identity.
 

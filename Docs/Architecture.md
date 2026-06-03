@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-18
+Last updated: 2026-06-03
 
 glib-code is a local-first AI coding workspace with one hard boundary: agent writes happen outside the durable repo until the user reviews and promotes them.
 
@@ -42,7 +42,7 @@ GitHub device auth tokens live at `<configDir>/auth/github.json`.
 
 ## Runtime boundaries
 
-- Frontend owns interaction, session timeline rendering, diff review, and promote UI.
+- Frontend owns interaction, session timeline rendering, diff review, file-tree artifacts, and promote UI.
 - Backend owns API routes, project/session state, GitTrix orchestration, and SSE streams.
 - pi owns provider/model discovery and agent execution.
 - Sandbox owns where pi runs.
