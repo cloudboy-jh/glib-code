@@ -6,6 +6,11 @@ export type TokenUsage = {
   cacheWrite: number;
 };
 
+export type SessionCosts = {
+  totalCost: number;
+  totalTokens: TokenUsage;
+};
+
 export type ToolName =
   | "bash"
   | "read"

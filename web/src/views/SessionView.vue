@@ -24,9 +24,10 @@
         :context-chips="activeContextChips"
         :attachments="attachments"
         :disabled="composerDisabled"
+        :is-running="composerDisabled"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
-        @execute-command="$emit('runComposerCommand', $event)"
+        @execute-command="(v, a) => $emit('runComposerCommand', v, a)"
         @remove-context-chip="$emit('removeContextChip', $event)"
         @attach="$emit('openAttachmentPicker')"
         @remove-attachment="$emit('removeAttachment', $event)"
@@ -139,7 +140,7 @@ defineEmits<{
   createReplacementSession: [];
   updatePrompt: [value: string];
   sendPrompt: [];
-  runComposerCommand: [value: string];
+  runComposerCommand: [value: string, args?: string];
   removeContextChip: [id: string];
   openAttachmentPicker: [];
   removeAttachment: [id: string];

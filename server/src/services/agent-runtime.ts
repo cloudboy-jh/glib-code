@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@glib-code/shared/events/agent";
+import type { AgentEvent, TokenUsage } from "@glib-code/shared/events/agent";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import { getPiCore, validateProviderAuth } from "./pi-core";
 import { attachPiRpc } from "./pi-rpc";
@@ -34,6 +34,7 @@ const toolCallsById = new Map<string, { input: object; tool: string; title: stri
 const toolCallIdBySignature = new Map<string, string>();
 const normalizedToolCallIdByRaw = new Map<string, string>();
 const pendingToolCallIdsByTurnTool = new Map<string, string[]>();
+const turnUsageAccumulator = new Map<string, { cost: number; tokens: TokenUsage }>();
 let textPartSeq = 0;
 let sandboxFactory: SandboxFactory | null = null;
 
@@ -42,6 +43,13 @@ const PI_RPC_ARGS = process.env.GLIB_PI_RPC_ARGS?.split(" ").filter(Boolean) ?? 
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+type SessionInfoChangedCallback = (sessionId: string, name: string) => void;
+let sessionInfoChangedCallback: SessionInfoChangedCallback | null = null;
+
+export function onSessionInfoChanged(cb: SessionInfoChangedCallback) {
+  sessionInfoChangedCallback = cb;
 }
 
 export function subscribe(sessionId: string, fn: Subscriber) {
@@ -87,6 +95,57 @@ export async function disposeRuntimeSession(sessionId: string) {
   await sandboxed.sandbox.destroy().catch((error) => logError("agent", "failed to destroy sandbox", error, { sessionId }));
 }
 
+export function getPiClient(sessionId: string) {
+  return sandboxSessions.get(sessionId)?.pi ?? null;
+}
+
+export async function getSessionStatsFromPi(sessionId: string) {
+  const sandboxed = sandboxSessions.get(sessionId);
+  if (!sandboxed) return null;
+  try {
+    const stats = await sandboxed.pi.getSessionStats();
+    return stats as Record<string, unknown>;
+  } catch (error) {
+    logError("agent", "failed to get session stats from pi", error, { sessionId });
+    return null;
+  }
+}
+
+export async function setSessionNameFromPi(sessionId: string, name: string) {
+  const sandboxed = sandboxSessions.get(sessionId);
+  if (!sandboxed) return;
+  try {
+    await sandboxed.pi.setSessionName(name);
+  } catch (error) {
+    logError("agent", "failed to set session name in pi", error, { sessionId });
+  }
+}
+
+export async function compactSessionInPi(sessionId: string, customInstructions?: string) {
+  const sandboxed = sandboxSessions.get(sessionId);
+  if (!sandboxed) return null;
+  try {
+    const result = await sandboxed.pi.compact(customInstructions);
+    return result as Record<string, unknown>;
+  } catch (error) {
+    logError("agent", "failed to compact session in pi", error, { sessionId });
+    return null;
+  }
+}
+
+export async function getPiCommands(sessionId: string) {
+  const sandboxed = sandboxSessions.get(sessionId);
+  if (!sandboxed) return [];
+  try {
+    const result = await sandboxed.pi.getCommands();
+    const data = result as { commands?: Array<{ name: string; description?: string; source: string }> };
+    return data?.commands ?? [];
+  } catch (error) {
+    logError("agent", "failed to get commands from pi", error, { sessionId });
+    return [];
+  }
+}
+
 function isAssistantMessage(message: unknown) {
   const msg = message as { role?: unknown } | undefined;
   return msg?.role === "assistant";
@@ -109,6 +168,23 @@ function extractMessageError(message: unknown) {
   const msg = message as { errorMessage?: unknown; role?: unknown } | undefined;
   if (!isAssistantMessage(msg)) return "";
   return typeof msg?.errorMessage === "string" ? msg.errorMessage : "";
+}
+
+function extractUsage(message: unknown): { cost: number; tokens: TokenUsage } | null {
+  const msg = message as { usage?: unknown; role?: unknown } | undefined;
+  if (!isAssistantMessage(msg)) return null;
+  const usage = msg?.usage as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; totalTokens?: number; cost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; total?: number } } | undefined;
+  if (!usage) return null;
+  return {
+    cost: usage.cost?.total ?? 0,
+    tokens: {
+      input: usage.input ?? 0,
+      output: usage.output ?? 0,
+      reasoning: 0,
+      cacheRead: usage.cacheRead ?? 0,
+      cacheWrite: usage.cacheWrite ?? 0
+    }
+  };
 }
 
 function currentMessageKey(turnId: string) {
@@ -412,6 +488,7 @@ function cleanupTurnState(turnId: string) {
   currentAssistantMessageKeyByTurn.delete(turnId);
   turnHasAssistantText.delete(turnId);
   errorEmittedByTurn.delete(turnId);
+  turnUsageAccumulator.delete(turnId);
   for (const key of [...streamedTextByMessage.keys()]) {
     if (key.startsWith(`${turnId}:`)) streamedTextByMessage.delete(key);
   }
@@ -450,6 +527,17 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   if (event.type === "turn_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
+    const usage = extractUsage((event as any).message);
+    if (usage) {
+      return {
+        type: "turn_end",
+        turnId,
+        reason: "stop",
+        cost: usage.cost,
+        tokens: usage.tokens,
+        at: nowIso()
+      };
+    }
     return null;
   }
   if (event.type === "agent_end") {
@@ -469,6 +557,19 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   if (event.type === "message_end") {
     const errorMessage = extractMessageError((event as any).message);
     if (errorMessage) return rememberError(turnId, errorMessage);
+
+    const usage = extractUsage((event as any).message);
+    if (usage) {
+      const acc = turnUsageAccumulator.get(turnId) ?? { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } };
+      acc.cost += usage.cost;
+      acc.tokens.input += usage.tokens.input;
+      acc.tokens.output += usage.tokens.output;
+      acc.tokens.reasoning += usage.tokens.reasoning;
+      acc.tokens.cacheRead += usage.tokens.cacheRead;
+      acc.tokens.cacheWrite += usage.tokens.cacheWrite;
+      turnUsageAccumulator.set(turnId, acc);
+    }
+
     const finalText = extractMessageText((event as any).message);
     const key = currentMessageKey(turnId);
     const streamed = streamedTextByMessage.get(key) ?? "";
@@ -652,6 +753,9 @@ export async function runTurn(params: {
     const abortRuntime = runtime.pi.abort.bind(runtime.pi);
 
     unsub = subscribeToRuntime(async (evt: AgentSessionEvent | PiEvent) => {
+      if (evt.type === "session_info_changed" && typeof (evt as any).name === "string") {
+        sessionInfoChangedCallback?.(params.sessionId, (evt as any).name);
+      }
       const mapped = mapPiEvent(params.turnId, evt);
       if (!mapped) return;
       logMappedAgentEvent(params.sessionId, mapped);

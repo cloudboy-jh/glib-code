@@ -22,6 +22,7 @@
           @toggle-collapse="toggleSidebarCollapse"
           @delete="confirmDeleteSession"
           @export="openExportDialog"
+          @rename="openRenameDialog"
         />
 
         <button
@@ -77,7 +78,7 @@
             :theme-type="diffThemeType"
             :context-label="contextLabel"
             :prompt="forms.prompt"
-            :selected-model-label="selectedModelLabel"
+             :selected-model-label="composerMetaLabel"
             :active-context-chips="activeContextChips"
             :attachments="composerAttachments"
             :composer-disabled="composerDisabled"
@@ -213,6 +214,27 @@
       </div>
     </div>
 
+    <div v-if="renameDialog.open" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="closeRenameDialog">
+      <div class="w-full max-w-sm rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-3 text-sm font-semibold">Rename session</div>
+        <input
+          v-model="renameDialog.value"
+          type="text"
+          placeholder="Session title"
+          class="mb-3 w-full rounded-lg border border-input/80 bg-background/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none"
+          :disabled="renameDialog.busy"
+          @keydown.enter="confirmRename"
+          @keydown.escape="closeRenameDialog"
+        />
+        <div class="flex justify-end gap-2">
+          <button type="button" class="rounded-md border border-border/70 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="closeRenameDialog">Cancel</button>
+          <button type="button" class="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50" :disabled="renameDialog.busy || !renameDialog.value.trim()" @click="confirmRename">
+            {{ renameDialog.busy ? 'Renaming…' : 'Rename' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <TerminalDrawer
       v-if="state.terminalOpen"
       :input="forms.terminal"
@@ -334,28 +356,19 @@
       </div>
     </div>
 
-    <div v-if="state.sessionDiffOverlayOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="state.sessionDiffOverlayOpen = false">
-      <div class="flex h-full max-h-[calc(100vh-2rem)] w-full max-w-[min(1500px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40 sm:max-h-[calc(100vh-3rem)]">
-        <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
-          <div>
-            <div class="text-sm font-medium">Session diff</div>
-            <div class="mt-0.5 text-[11px] text-muted-foreground">
-              <span v-if="sessionDiff.loading">Loading…</span>
-              <span v-else-if="sessionDiff.error" class="text-red-300">{{ sessionDiff.error }}</span>
-              <span v-else-if="!sessionDiff.diff.trim()">No changes</span>
-              <span v-else>{{ sessionDiff.files.length }} file{{ sessionDiff.files.length === 1 ? '' : 's' }} changed</span>
-            </div>
-          </div>
-          <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.sessionDiffOverlayOpen = false">Close</button>
-        </div>
-        <div class="min-h-0 flex-1 overflow-hidden p-3">
-          <div v-if="sessionDiff.loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
-          <div v-else-if="sessionDiff.error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">{{ sessionDiff.error }}</div>
-          <div v-else-if="!sessionDiff.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
-          <SharedDiffView v-else :patch="sessionDiff.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
-        </div>
-      </div>
-    </div>
+    <SessionDiffOverlay
+      :open="state.sessionDiffOverlayOpen"
+      :diff="sessionDiff.diff"
+      :files="sessionDiff.files"
+      :focus-file="sessionDiff.focusFile"
+      :loading="sessionDiff.loading"
+      :error="sessionDiff.error"
+      :diff-style="state.diffStyle"
+      :theme-type="diffThemeType"
+      :theme-preset="settings.themePreset"
+      @close="state.sessionDiffOverlayOpen = false"
+      @update:diff-style="state.diffStyle = $event"
+    />
 
     <div v-if="state.conflictDialogOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.conflictDialogOpen = false">
       <div class="w-full max-w-xl rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
@@ -387,6 +400,7 @@ import SettingsModal from './components/settings/SettingsModal.vue';
 import ModelPicker from './components/settings/ModelPicker.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
 import SessionSidebar from './components/session/SessionSidebar.vue';
+import SessionDiffOverlay from './components/session/SessionDiffOverlay.vue';
 import DiffView from './views/DiffView.vue';
 import PickerView from './views/PickerView.vue';
 import SessionView from './views/SessionView.vue';
@@ -415,34 +429,38 @@ const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient();
 const demoMode = new URLSearchParams(window.location.search).get('demo');
 const isThemeCycleDemo = demoMode === 'theme-cycle';
 
-type Session = {
-  id: string;
-  title: string;
-  time: string;
-  updatedAt?: string;
-  status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
-  repo: string;
-  project: string;
-  projectPath: string;
-  gittrixSessionId?: string;
-  ephemeralPath?: string;
-  baselineSha?: string;
-};
+ type Session = {
+   id: string;
+   title: string;
+   time: string;
+   updatedAt?: string;
+   status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
+   repo: string;
+   project: string;
+   projectPath: string;
+   gittrixSessionId?: string;
+   ephemeralPath?: string;
+   baselineSha?: string;
+   totalCost?: number;
+   totalTokens?: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number };
+ };
 
-type SessionMetaApi = {
-  id: string;
-  projectId: string;
-  projectPath: string;
-  title: string;
-  model: string;
-  provider: string;
-  gittrixSessionId?: string;
-  ephemeralPath?: string;
-  baselineSha?: string;
-  status: 'idle' | 'running' | 'aborted' | 'error' | 'done';
-  createdAt: string;
-  updatedAt: string;
-};
+ type SessionMetaApi = {
+   id: string;
+   projectId: string;
+   projectPath: string;
+   title: string;
+   model: string;
+   provider: string;
+   gittrixSessionId?: string;
+   ephemeralPath?: string;
+   baselineSha?: string;
+   status: 'idle' | 'running' | 'aborted' | 'error' | 'done';
+   totalCost?: number;
+   totalTokens?: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number };
+   createdAt: string;
+   updatedAt: string;
+ };
 
 type ContextBundle = {
   id: string;
@@ -607,6 +625,13 @@ const deleteDialog = reactive({
   sessionId: '',
   title: '',
   error: '',
+  busy: false
+});
+
+const renameDialog = reactive({
+  open: false,
+  sessionId: '',
+  value: '',
   busy: false
 });
 
@@ -1191,7 +1216,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   }
   if (event.type === 'turn_end') {
     const entry = findTimelineEntry(sessionId, `${event.turnId}-assistant`);
-    if (entry?.text === 'Working…' || (entry && !entry.text.trim() && entry.toolCalls?.length)) {
+    if (entry?.text === 'Working…') {
       entry.text = event.reason === 'stop' ? 'Tool run completed, but the agent did not return a final answer.' : `Turn ended (${event.reason})`;
       entry.level = event.reason === 'error' ? 'error' : 'info';
     }
@@ -1199,6 +1224,21 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
       appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), at: event.at, level: 'info' });
     }
     setSessionStatus(sessionId, event.reason === 'error' || event.reason === 'aborted' ? 'disconnected' : 'connected');
+    if (event.cost != null && event.tokens) {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session) {
+        session.totalCost = (session.totalCost ?? 0) + event.cost;
+        const prev = session.totalTokens ?? { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 };
+        session.totalTokens = {
+          input: prev.input + event.tokens.input,
+          output: prev.output + event.tokens.output,
+          reasoning: prev.reasoning + event.tokens.reasoning,
+          cacheRead: prev.cacheRead + event.tokens.cacheRead,
+          cacheWrite: prev.cacheWrite + event.tokens.cacheWrite,
+        };
+      }
+    }
+    void refreshSessionMeta(sessionId);
   }
 }
 
@@ -1216,8 +1256,25 @@ function mapApiSession(meta: SessionMetaApi): Session {
     projectPath: normalizedPath,
     gittrixSessionId: meta.gittrixSessionId,
     ephemeralPath: meta.ephemeralPath,
-    baselineSha: meta.baselineSha
+    baselineSha: meta.baselineSha,
+    totalCost: meta.totalCost,
+    totalTokens: meta.totalTokens
   };
+}
+
+async function refreshSessionMeta(sessionId: string) {
+  const session = sessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  const query = session.projectPath ? `?projectPath=${encodeURIComponent(session.projectPath)}` : '';
+  try {
+    const doc = await apiGet<{ meta: SessionMetaApi; events: AgentEvent[] }>(`/sessions/${encodeURIComponent(sessionId)}${query}`);
+    session.title = doc.meta.title;
+    session.totalCost = doc.meta.totalCost;
+    session.totalTokens = doc.meta.totalTokens;
+    session.updatedAt = doc.meta.updatedAt;
+  } catch {
+    // best effort
+  }
 }
 
 async function hydrateSessionDoc(sessionId: string) {
@@ -1235,6 +1292,13 @@ async function hydrateSessionDoc(sessionId: string) {
     seenEventKeysBySessionId.set(sessionId, new Set<string>());
     for (const evt of doc.events) reduceAgentEventToTimeline(sessionId, evt);
     hydratedVersionBySessionId.set(sessionId, doc.meta.updatedAt);
+    const sessionEntry = sessions.find((s) => s.id === sessionId);
+    if (sessionEntry) {
+      sessionEntry.title = doc.meta.title;
+      sessionEntry.totalCost = doc.meta.totalCost;
+      sessionEntry.totalTokens = doc.meta.totalTokens;
+      sessionEntry.updatedAt = doc.meta.updatedAt;
+    }
   })().finally(() => {
     hydratingSessionDocById.delete(sessionId);
   });
@@ -1839,6 +1903,37 @@ function removeSessionLocal(sessionId: string) {
   }
 }
 
+function openRenameDialog(sessionId: string) {
+  const session = sessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  renameDialog.open = true;
+  renameDialog.sessionId = sessionId;
+  renameDialog.value = session.title === 'New Session' ? '' : session.title;
+  renameDialog.busy = false;
+}
+
+function closeRenameDialog() {
+  renameDialog.open = false;
+  renameDialog.sessionId = '';
+  renameDialog.value = '';
+  renameDialog.busy = false;
+}
+
+async function confirmRename() {
+  const title = renameDialog.value.trim();
+  if (!title || renameDialog.busy) return;
+  const session = sessions.find((s) => s.id === renameDialog.sessionId);
+  if (!session) return;
+  renameDialog.busy = true;
+  try {
+    await apiPatch(`/sessions/${encodeURIComponent(renameDialog.sessionId)}`, { title });
+    session.title = title;
+    closeRenameDialog();
+  } catch {
+    renameDialog.busy = false;
+  }
+}
+
 async function confirmDeleteSession(sessionId: string) {
   const session = sessions.find((entry) => entry.id === sessionId);
   if (!session?.projectPath) return;
@@ -1901,9 +1996,9 @@ function toEpochMs(value?: string) {
 }
 
 function normalizeSessionTitle(session: Session) {
-  const trimmed = session.title.trim();
-  if (trimmed && trimmed.toLowerCase() !== 'new session') return trimmed;
-  return 'Session';
+  const trimmed = session.title?.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'new session') return 'New Session';
+  return trimmed;
 }
 
 function openExportDialog(sessionId: string) {
@@ -2349,18 +2444,29 @@ watch(
   }
 );
 
-function runComposerCommand(command: string) {
-  if (command === 'help') {
+function pushTimelineInfo(sessionId: string, text: string) {
+  const list = timelineBySessionId[sessionId] ?? (timelineBySessionId[sessionId] = []);
+  list.push({ id: `info_${Date.now()}`, kind: 'info', text, time: new Date().toLocaleTimeString() });
+}
+
+function runComposerCommand(command: string, args?: string) {  if (command === 'help') {
     openCommandPalette();
     return;
   }
 
-  if (command === 'models' || command === 'model') {
+  if (command === 'model' || command === 'models') {
+    if (args) {
+      const [provider, modelId] = args.split('/');
+      if (provider && modelId) {
+        void selectModel(provider, modelId);
+        return;
+      }
+    }
     state.modelPickerOpen = true;
     return;
   }
 
-  if (command === 'themes' || command === 'theme') {
+  if (command === 'theme' || command === 'themes') {
     state.themeDialogOpen = true;
     return;
   }
@@ -2386,6 +2492,76 @@ function runComposerCommand(command: string) {
     if (!currentProject.value) return;
     state.mode = 'session';
     if (!activeSession.value) createSession();
+    return;
+  }
+
+  if (command === 'rename') {
+    if (activeSession.value && args) {
+      void apiPatch(`/sessions/${activeSession.value.id}`, { title: args }).catch(() => {});
+    } else {
+      openCommandPalette();
+    }
+    return;
+  }
+
+  if (command === 'fork') {
+    if (activeSession.value) {
+      void apiPost(`/sessions/${activeSession.value.id}/fork`, {}).then(() => {
+        void reloadActiveSessions();
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (command === 'compact') {
+    if (activeSession.value) {
+      void apiPost(`/sessions/${activeSession.value.id}/compact`, {}).catch(() => {});
+    }
+    return;
+  }
+
+  if (command === 'archive') {
+    if (activeSession.value) {
+      confirmDeleteSession(activeSession.value.id);
+    }
+    return;
+  }
+
+  if (command === 'plan' || command === 'fast') {
+    openCommandPalette();
+    return;
+  }
+
+  if (command === 'cost') {
+    if (activeSession.value) {
+      const sid = activeSession.value.id;
+      void apiGet(`/sessions/${sid}/stats`).then((stats: any) => {
+        if (!stats) return;
+        const cost = stats.totalCost != null ? `$${stats.totalCost.toFixed(4)}` : '$0.00';
+        const t = stats.totalTokens ?? {};
+        const total = (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
+        const parts = [`Cost: ${cost}`, `Tokens: ${total.toLocaleString()}`];
+        if (t.input) parts.push(`Input: ${t.input.toLocaleString()}`);
+        if (t.output) parts.push(`Output: ${t.output.toLocaleString()}`);
+        if (t.cacheRead) parts.push(`Cache read: ${t.cacheRead.toLocaleString()}`);
+        if (t.cacheWrite) parts.push(`Cache write: ${t.cacheWrite.toLocaleString()}`);
+        pushTimelineInfo(sid, parts.join(' · '));
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (command === 'status') {
+    if (activeSession.value) {
+      const sid = activeSession.value.id;
+      void apiGet(`/sessions/${sid}/stats`).then((stats: any) => {
+        if (!stats) return;
+        const cost = stats.totalCost != null ? `$${stats.totalCost.toFixed(4)}` : '$0.00';
+        const t = stats.totalTokens ?? {};
+        const total = (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
+        pushTimelineInfo(sid, `Status · Cost: ${cost} · Tokens: ${total.toLocaleString()}`);
+      }).catch(() => {});
+    }
     return;
   }
 
@@ -2419,6 +2595,13 @@ const shortcuts = useGlobalShortcuts({
     () => {
       if (deleteDialog.open) {
         closeDeleteSessionDialog();
+        return true;
+      }
+      return false;
+    },
+    () => {
+      if (renameDialog.open) {
+        closeRenameDialog();
         return true;
       }
       return false;
@@ -2500,6 +2683,22 @@ onMounted(() => {
 });
 
 const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);
+
+const composerMetaLabel = computed(() => {
+  const parts = [selectedModelLabel.value];
+  const session = activeSession.value;
+  if (session) {
+    if (session.totalCost != null && session.totalCost > 0) {
+      parts.push(`$${session.totalCost.toFixed(4)}`);
+    }
+    if (session.totalTokens) {
+      const t = session.totalTokens;
+      const total = (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
+      if (total > 0) parts.push(`${total.toLocaleString()} tok`);
+    }
+  }
+  return parts.join(' · ');
+});
 
 watch(
   () => currentProject.value?.path,

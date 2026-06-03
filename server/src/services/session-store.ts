@@ -23,6 +23,8 @@ export type SessionMeta = {
   isGitBacked?: boolean;
   workspaceKind?: "worktree" | "clone" | "copy" | "remote";
   status: "idle" | "running" | "aborted" | "error" | "done";
+  totalCost: number;
+  totalTokens: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number };
   createdAt: string;
   updatedAt: string;
 };
@@ -182,6 +184,8 @@ export async function createSession(params: {
     isGitBacked: params.isGitBacked,
     workspaceKind: params.workspaceKind,
     status: "idle",
+    totalCost: 0,
+    totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
     createdAt: now,
     updatedAt: now
   };
@@ -239,7 +243,7 @@ export async function appendEvents(projectPath: string, sessionId: string, event
 export async function patchSessionMeta(
   projectPath: string,
   sessionId: string,
-  partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider">>
+  partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider" | "totalCost" | "totalTokens">>
 ) {
   projectPath = normalizeProjectPath(projectPath);
   return withSessionWriteLock(projectPath, sessionId, async () => {
@@ -270,6 +274,8 @@ export async function forkSession(projectPath: string, sourceSessionId: string) 
     id,
     title: `${source.meta.title} (fork)`,
     status: "idle",
+    totalCost: 0,
+    totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
     createdAt: now,
     updatedAt: now
   };

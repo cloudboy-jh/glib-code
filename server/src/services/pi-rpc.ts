@@ -6,6 +6,10 @@ export interface PiRpcClient {
   prompt(text: string, opts?: { context?: string }): Promise<void>;
   abort(): Promise<void>;
   getState(): Promise<PiEvent>;
+  getSessionStats(): Promise<PiEvent>;
+  setSessionName(name: string): Promise<void>;
+  compact(customInstructions?: string): Promise<PiEvent>;
+  getCommands(): Promise<PiEvent>;
   subscribe(handler: (event: PiEvent) => void | Promise<void>): () => void;
   getStderr(): string;
   dispose(): Promise<void>;
@@ -204,6 +208,23 @@ export function attachPiRpc(process: SandboxProcess, opts: PiRpcOpts = {}): PiRp
     },
     async getState() {
       const response = await send({ type: "get_state" }, 5000);
+      return (response.data as PiEvent | undefined) ?? response;
+    },
+    async getSessionStats() {
+      const response = await send({ type: "get_session_stats" }, 10000);
+      return (response.data as PiEvent | undefined) ?? response;
+    },
+    async setSessionName(name: string) {
+      await send({ type: "set_session_name", name }, 5000);
+    },
+    async compact(customInstructions?: string) {
+      const payload: PiEvent = { type: "compact" };
+      if (customInstructions) payload.customInstructions = customInstructions;
+      const response = await send(payload, 60000);
+      return (response.data as PiEvent | undefined) ?? response;
+    },
+    async getCommands() {
+      const response = await send({ type: "get_commands" }, 10000);
       return (response.data as PiEvent | undefined) ?? response;
     },
     subscribe(handler) {

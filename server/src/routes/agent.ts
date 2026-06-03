@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { AgentEvent } from "@glib-code/shared/events/agent";
-import { abortRunningTurn, broadcast, disposeRuntimeSession, getRunningTurn, runTurn, subscribe } from "../services/agent-runtime";
+import type { AgentEvent, TokenUsage } from "@glib-code/shared/events/agent";
+import { abortRunningTurn, broadcast, disposeRuntimeSession, getRunningTurn, onSessionInfoChanged, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/session-store";
 import { getProvidersState, getSettings } from "../services/settings-store";
 import { getCurrentProjectId, getProjectById, getProjectOverride } from "../services/project-store";
@@ -10,6 +10,18 @@ import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
 import { log, logError } from "../lib/log";
 import { routeError } from "../lib/route-error";
+
+onSessionInfoChanged(async (sessionId, name) => {
+  try {
+    const { getSessionById, patchSessionMeta: patch } = await import("../services/session-store");
+    const result = await getSessionById(sessionId);
+    if (!result) return;
+    await patch(result.projectPath, sessionId, { title: name });
+    broadcast(sessionId, { type: "session_start", sessionId, projectId: "", branch: "", model: "", createdAt: new Date().toISOString() });
+  } catch (error) {
+    logError("agent", "failed to update session name from pi", error, { sessionId });
+  }
+});
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -56,6 +68,18 @@ function missingCloudflareConfig() {
   if (!(process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID)) missing.push("CLOUDFLARE_ACCOUNT_ID");
   if (!(process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN)) missing.push("CLOUDFLARE_API_TOKEN");
   return missing;
+}
+
+function deriveSessionTitle(prompt: string): string {
+  let title = prompt.trim();
+  title = title.replace(/^##\s+My request for (?:Codex|glib-code|the agent):\s*/i, "");
+  title = title.replace(/\n.*$/s, "");
+  title = title.replace(/^["'`]+|["'`]+$/g, "");
+  if (title.length > 80) {
+    const cut = title.lastIndexOf(" ", 77);
+    title = title.slice(0, cut > 0 ? cut : 77) + "…";
+  }
+  return title.trim() || "New Session";
 }
 
 export const agentRoutes = new Hono()
@@ -153,6 +177,15 @@ export const agentRoutes = new Hono()
 
     await appendEvents(projectPath, id, [userEvent]);
     broadcast(id, userEvent);
+
+    const existingDoc = await getSession(projectPath, id);
+    if (existingDoc && (existingDoc.meta.title === "New Session" || !existingDoc.meta.title.trim())) {
+      const derivedTitle = deriveSessionTitle(prompt);
+      if (derivedTitle) {
+        await patchSessionMeta(projectPath, id, { title: derivedTitle });
+      }
+    }
+
     await patchSessionMeta(projectPath, id, { status: "running" });
 
     const agentCwd = resolveAgentCwd(projectPath, existing.meta.ephemeralPath, existing.meta.isGitBacked);
@@ -169,9 +202,25 @@ export const agentRoutes = new Hono()
       onEvent: async (event) => {
         await appendEvents(projectPath, id, [event]);
         if (event.type === "turn_end") {
-          await patchSessionMeta(projectPath, id, {
+          const patch: Record<string, unknown> = {
             status: event.reason === "error" ? "error" : event.reason === "aborted" ? "aborted" : "done"
-          });
+          };
+          if (event.cost != null && event.tokens) {
+            const doc = await getSession(projectPath, id);
+            const prev = doc?.meta;
+            if (prev) {
+              const addTokens = (a: TokenUsage, b: TokenUsage): TokenUsage => ({
+                input: a.input + b.input,
+                output: a.output + b.output,
+                reasoning: a.reasoning + b.reasoning,
+                cacheRead: a.cacheRead + b.cacheRead,
+                cacheWrite: a.cacheWrite + b.cacheWrite
+              });
+              patch.totalCost = (prev.totalCost ?? 0) + (event.cost ?? 0);
+              patch.totalTokens = addTokens(prev.totalTokens ?? { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, event.tokens);
+            }
+          }
+          await patchSessionMeta(projectPath, id, patch as any);
         }
       }
     }).catch((error) => logError("agent", "runTurn promise rejected", error, { sessionId: id, turnId }));

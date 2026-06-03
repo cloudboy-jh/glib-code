@@ -6,9 +6,10 @@
         :context="context"
         :model-value="prompt"
         :disabled="disabled"
+        :is-running="isRunning"
         @update:model-value="$emit('update:prompt', $event)"
         @send="$emit('send')"
-        @execute-command="$emit('executeCommand', $event)"
+        @execute-command="handleCommand"
       />
 
       <div v-if="contextChips.length" class="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
@@ -58,11 +59,16 @@ const props = withDefaults(
     contextChips?: Array<{ id: string; label: string }>;
     attachments?: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
     disabled?: boolean;
+    isRunning?: boolean;
   }>(),
-  { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], attachments: () => [], disabled: false }
+  { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], attachments: () => [], disabled: false, isRunning: false }
 );
 
-defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string]; removeContextChip: [id: string]; attach: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
+const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
+
+function handleCommand(value: string, args?: string) {
+  emit('executeCommand', value, args);
+}
 
 function emitSend() {
   if (!props.prompt.trim()) return;

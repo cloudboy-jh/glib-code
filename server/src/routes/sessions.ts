@@ -5,7 +5,7 @@ import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
-import { abortRunningTurn, disposeRuntimeSession } from "../services/agent-runtime";
+import { abortRunningTurn, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
 import { routeError } from "../lib/route-error";
 import { canonicalProjectPath } from "../lib/project-path";
@@ -233,4 +233,42 @@ export const sessionsRoutes = new Hono()
     });
     if (!patched) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
     return c.json(patched);
+  })
+  .get("/:id/stats", async (c) => {
+    const id = c.req.param("id");
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc } = await resolveSession(requestedProjectPath, id);
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    const piStats = await getSessionStatsFromPi(id);
+    return c.json({
+      sessionId: id,
+      totalCost: doc.meta.totalCost ?? 0,
+      totalTokens: doc.meta.totalTokens ?? { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+      piStats
+    });
+  })
+  .post("/:id/rename", async (c) => {
+    const id = c.req.param("id");
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { projectPath } = await resolveSession(requestedProjectPath, id);
+    if (!projectPath) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    const body = await c.req.json().catch(() => null) as { title?: string } | null;
+    const title = body?.title?.trim();
+    if (!title) return c.json(routeError("title required", "TITLE_REQUIRED"), 400);
+    const patched = await patchSessionMeta(projectPath, id, { title });
+    if (!patched) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    const { setSessionNameFromPi } = await import("../services/agent-runtime");
+    await setSessionNameFromPi(id, title);
+    return c.json(patched);
+  })
+  .post("/:id/compact", async (c) => {
+    const id = c.req.param("id");
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc } = await resolveSession(requestedProjectPath, id);
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    const body = await c.req.json().catch(() => null) as { customInstructions?: string } | null;
+    const { compactSessionInPi } = await import("../services/agent-runtime");
+    const result = await compactSessionInPi(id, body?.customInstructions);
+    if (!result) return c.json(routeError("compaction failed or no pi session", "COMPACT_FAILED", true), 503);
+    return c.json({ ok: true, result });
   });

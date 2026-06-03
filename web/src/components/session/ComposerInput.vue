@@ -32,7 +32,7 @@
 
     <ComposerCommandDialog
       v-if="commandDialogOpen"
-      :items="slashCommands"
+      :items="categorizedCommands"
       @close="commandDialogOpen = false"
       @select="selectCommandFromDialog"
     />
@@ -44,9 +44,10 @@ import { computed, ref } from 'vue';
 import { Maximize2, Minimize2 } from 'lucide-vue-next';
 import ComposerCommandDialog from './ComposerCommandDialog.vue';
 import ComposerCommandMenu from './ComposerCommandMenu.vue';
+import { getSlashCommands, parseCommandInput, type SlashCommand } from '../../composables/useSlashCommands';
 
-const props = defineProps<{ modelValue: string; context?: string; disabled?: boolean }>();
-const emit = defineEmits<{ 'update:modelValue': [value: string]; send: []; executeCommand: [value: string] }>();
+const props = defineProps<{ modelValue: string; context?: string; disabled?: boolean; isRunning?: boolean }>();
+const emit = defineEmits<{ 'update:modelValue': [value: string]; send: []; executeCommand: [value: string, args?: string] }>();
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const highlightedIndex = ref(0);
@@ -55,21 +56,9 @@ const expanded = ref(false);
 
 const placeholderText = computed(() => (props.context?.trim() ? 'Commit context preloaded · ready for changes' : 'Ask for follow-up changes or attach context'));
 
-const slashCommands = [
-  { id: 'cmd-help', value: 'help', label: 'Help', description: 'Show available composer and app commands.' },
-  { id: 'cmd-models', value: 'models', label: 'Models', description: 'Open the model picker.', aliases: ['model'] },
-  { id: 'cmd-themes', value: 'themes', label: 'Themes', description: 'Open the theme picker.', aliases: ['theme'] },
-  { id: 'cmd-new', value: 'new', label: 'New session', description: 'Start a fresh session.', aliases: ['clear'] },
-  { id: 'cmd-sessions', value: 'sessions', label: 'Sessions', description: 'Browse or switch sessions.', aliases: ['resume', 'continue'] },
-  { id: 'cmd-diff', value: 'diff', label: 'Switch to diffs', description: 'Jump to the diff review surface.' },
-  { id: 'cmd-session', value: 'session', label: 'Switch to session', description: 'Stay in the session workspace.' },
-  { id: 'cmd-attach', value: 'attach', label: 'Attach files', description: 'Open file picker and upload attachments.' },
-  { id: 'cmd-attachments', value: 'attachments', label: 'Attachments', description: 'Focus attachment list.' },
-  { id: 'cmd-undo', value: 'undo', label: 'Undo', description: 'Undo the previous step.' },
-  { id: 'cmd-redo', value: 'redo', label: 'Redo', description: 'Redo the last undone step.' },
-  { id: 'cmd-share', value: 'share', label: 'Share', description: 'Share the current session.' },
-  { id: 'cmd-init', value: 'init', label: 'Initialize', description: 'Initialize workspace guidance.' }
-];
+const allCommands = computed(() => getSlashCommands(props.isRunning));
+
+const categorizedCommands = computed(() => allCommands.value);
 
 const slashQuery = computed(() => {
   const trimmed = props.modelValue.trimStart();
@@ -80,23 +69,14 @@ const slashQuery = computed(() => {
 const filteredCommands = computed(() => {
   const q = slashQuery.value;
   if (q === null) return [];
-  if (!q) return slashCommands;
-  return slashCommands.filter((command) => {
-    const query = q.toLowerCase();
-    return command.value.includes(query) || command.label.toLowerCase().includes(query) || command.aliases?.some((alias) => alias.includes(query));
-  });
+  if (!q) return allCommands.value;
+  const query = q.toLowerCase().split(' ')[0];
+  return allCommands.value.filter((cmd) =>
+    cmd.value.includes(query) || cmd.label.toLowerCase().includes(query) || cmd.aliases?.some((alias) => alias.includes(query))
+  );
 });
 
 const commandMenuOpen = computed(() => slashQuery.value !== null && filteredCommands.value.length > 0);
-
-const commandLookup = computed(() => {
-  const entries = new Map<string, string>();
-  for (const command of slashCommands) {
-    entries.set(command.value, command.value);
-    command.aliases?.forEach((alias) => entries.set(alias, command.value));
-  }
-  return entries;
-});
 
 defineExpose({
   openCommandDialog() {
@@ -104,14 +84,17 @@ defineExpose({
   }
 });
 
-function selectCommand(value: string) {
-  emit('executeCommand', value);
+function selectCommand(cmd: SlashCommand) {
+  const parsed = parseCommandInput(props.modelValue);
+  const args = cmd.inlineArgs && parsed?.args ? parsed.args : undefined;
+  emit('executeCommand', cmd.value, args);
   highlightedIndex.value = 0;
   commandDialogOpen.value = false;
 }
 
 function selectCommandFromDialog(value: string) {
-  selectCommand(value);
+  const cmd = allCommands.value.find((c) => c.value === value);
+  if (cmd) selectCommand(cmd);
   textareaRef.value?.focus();
 }
 
@@ -131,7 +114,7 @@ function onKeydown(event: KeyboardEvent) {
     if (props.disabled) return;
     if (commandMenuOpen.value) {
       const item = filteredCommands.value[highlightedIndex.value];
-      if (item) selectCommand(item.value);
+      if (item) selectCommand(item);
       return;
     }
     if (props.modelValue.trim()) emit('send');

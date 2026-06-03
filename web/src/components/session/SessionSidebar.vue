@@ -143,11 +143,14 @@
                   <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
                 </button>
                 <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                  <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Export session" @click.stop="$emit('export', s.id)">
-                    Export
+                  <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Rename session" @click.stop="$emit('rename', s.id)">
+                    <Pencil class="h-3 w-3" />
                   </button>
-                  <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50" title="Delete session" @click.stop="$emit('delete', s.id)">
-                    Delete
+                  <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Export session" @click.stop="$emit('export', s.id)">
+                    <Download class="h-3 w-3" />
+                  </button>
+                  <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50" title="Delete session" @click.stop="$emit('delete', s.id)">
+                    <Trash2 class="h-3 w-3" />
                   </button>
                 </div>
               </div>
@@ -187,8 +190,15 @@
                       <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
                     </button>
                     <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Export session" @click.stop="$emit('export', s.id)">Export</button>
-                      <button type="button" :disabled="disabled" class="rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50" title="Delete session" @click.stop="$emit('delete', s.id)">Delete</button>
+                      <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Rename session" @click.stop="$emit('rename', s.id)">
+                        <Pencil class="h-3 w-3" />
+                      </button>
+                      <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Export session" @click.stop="$emit('export', s.id)">
+                        <Download class="h-3 w-3" />
+                      </button>
+                      <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50" title="Delete session" @click.stop="$emit('delete', s.id)">
+                        <Trash2 class="h-3 w-3" />
+                      </button>
                     </div>
                   </div>
                   <button
@@ -248,7 +258,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { House, Plus, Search, Settings2 } from 'lucide-vue-next';
+import { House, Plus, Search, Settings2, Pencil, Download, Trash2 } from 'lucide-vue-next';
 
 type SessionRow = {
   id: string;
@@ -276,7 +286,7 @@ const props = withDefaults(
   { collapsed: false, disabled: false, newDisabled: false }
 );
 
-const emit = defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string] }>();
+const emit = defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string]; rename: [id: string] }>();
 
 const collapsedOverflowOpen = ref(false);
 const collapsedRailRef = ref<HTMLElement | null>(null);
