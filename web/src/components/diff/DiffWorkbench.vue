@@ -295,7 +295,7 @@ import { ChevronDown, CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-nex
 import DiffView from '../shared/DiffView.vue';
 import OpenInEditor from '../shared/OpenInEditor.vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import diffsWordmark from '../../../../diffs-glibiconmain.png';
+import diffsWordmark from '../../../../assets/diffs-glibiconmain.png';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const MAX_PATCH_LINES = 12000;

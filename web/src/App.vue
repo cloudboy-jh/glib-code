@@ -417,8 +417,8 @@ import { applyTheme } from './lib/theme';
 import { THEME_PRESETS, THEME_PRESET_IDS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import { ChevronDown } from 'lucide-vue-next';
-import logoIcon from '../../glibcode-iconlogo.png';
-import logoWordmark from '../../glibcode-wordmark.png';
+import logoIcon from '../../assets/glibcode-iconlogo.png';
+import logoWordmark from '../../assets/glibcode-wordmark.png';
 
 const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
