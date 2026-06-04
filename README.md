@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./glibcode-wordmark.png" alt="glib-code" width="720" />
+  <img src="./assets/glibcode-wordmark.png" alt="glib-code" width="720" />
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="./glib-code-theme-cycle1.gif" alt="glib-code app screenshot" width="1100" />
+  <img src="./assets/glib-demo-gif.gif" alt="glib-code demo" width="1100" />
 </p>
 
 # glib-code
@@ -104,3 +104,14 @@ suitener-results/  Committed external validation run artifacts
 - `Docs/frontend-checklist.md`
 - `Docs/backend-checklist.md`
 - `Docs/T3_UI_PARITY_CHECKLIST.md`
+
+## Themes
+
+<details>
+<summary>Theme cycle preview</summary>
+
+<p align="center">
+  <img src="./assets/glib-code-theme-cycle1.gif" alt="glib-code theme cycle" width="1100" />
+</p>
+
+</details>
