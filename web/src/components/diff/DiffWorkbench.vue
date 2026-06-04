@@ -315,7 +315,7 @@ const props = withDefaults(
   defineProps<{
     currentProject: { id: string; name: string; branch: string; path: string };
     diffStyle?: 'split' | 'unified';
-    openRequest?: { token: number; mode: 'session' | 'history'; files?: string[] } | null;
+    openRequest?: { token: number; mode: 'session' | 'history' | 'commit' | 'uncommitted'; files?: string[]; commitRef?: string } | null;
     themeType?: 'dark' | 'light';
     themePreset?: ThemePreset;
     preferredEditor?: string | null;
@@ -687,10 +687,25 @@ async function openWorkingTree(preferredFiles: string[] = []) {
   await loadGitStatus();
 }
 
-async function applyOpenRequest(request?: { token: number; mode: 'session' | 'history'; files?: string[] } | null) {
+async function applyOpenRequest(request?: { token: number; mode: 'session' | 'history' | 'commit' | 'uncommitted'; files?: string[]; commitRef?: string } | null) {
   if (!request) return;
   if (request.mode === 'history') {
     state.phase = 'history';
+    return;
+  }
+  if (request.mode === 'commit' && request.commitRef) {
+    // Ensure history is loaded so items are populated
+    if (!state.items.length) await loadHistory();
+    const idx = state.items.findIndex((item) => item.ref === request.commitRef);
+    state.cursor = idx >= 0 ? idx : 0;
+    state.selectedCommitRef = request.commitRef;
+    state.openSource = 'commit';
+    state.phase = 'open';
+    await loadFilesAndPatch();
+    return;
+  }
+  if (request.mode === 'uncommitted') {
+    await openWorkingTree(request.files ?? []);
     return;
   }
   await openWorkingTree(request.files ?? []);

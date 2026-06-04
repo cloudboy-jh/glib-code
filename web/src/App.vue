@@ -57,15 +57,18 @@
             v-if="!currentProject"
             :recents="recents"
             :sessions-by-path="pickerSessionsByPath"
+            :commits-by-path="pickerCommitsByPath"
             :logo-src="logoWordmarkSrc"
             @open-project="state.openProjectDialogOpen = true"
             @open-clone="state.cloneDialogOpen = true"
             @open-palette="openCommandPalette"
             @open-settings="openSettings($event)"
             @open-recent="openRecentProject"
+            @open-recent-diff="openRecentDiff"
             @continue-recent-session="continueRecentSessionFromPicker"
             @start-new-recent-session="startNewRecentSessionFromPicker"
             @forget-recent="forgetRecentProject"
+            @fetch-commits="fetchPickerCommits"
           />
 
           <SessionView
@@ -608,7 +611,7 @@ const state = reactive({
   cloneDialogOpen: false,
   diffStyle: 'split' as 'split' | 'unified',
   contextViewerOpen: false,
-  diffOpenRequest: null as null | { token: number; mode: 'session' | 'history'; files?: string[] },
+  diffOpenRequest: null as null | { token: number; mode: 'session' | 'history' | 'commit' | 'uncommitted'; files?: string[]; commitRef?: string },
   promoteDialogOpen: false,
   conflictDialogOpen: false,
   sessionContinueOpen: false,
@@ -727,6 +730,9 @@ const sidebarSessions = computed(() => {
     }))
     .sort((a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt));
 });
+// Picker commit cache: keyed by canonicalized path
+const pickerCommitsByPath = reactive<Record<string, Array<{ ref: string; shortRef: string; title: string }>>>({});
+
 const { pickerSessionsByPath, hydratePickerSessions } = usePickerSessions({
   apiGet,
   mapApiSession: (meta) => {
@@ -1998,6 +2004,37 @@ const startNewRecentSessionFromPicker = sessionOrchestrator.startNewRecentSessio
 const removeRecentProject = sessionOrchestrator.removeRecentProject;
 const forgetRecentProject = sessionOrchestrator.forgetRecentProject;
 
+async function fetchPickerCommits(path: string) {
+  const key = path.replace(/\\/g, '/').trim().replace(/\/+$/, '').toLowerCase();
+  if (pickerCommitsByPath[key] !== undefined) return;
+  try {
+    const rows = await apiGet<Array<{ id: string; ref?: string; title?: string }>>(`/diff/items?source=commits&limit=20&projectPath=${encodeURIComponent(path)}`);
+    pickerCommitsByPath[key] = rows.map((row) => ({
+      ref: row.ref ?? row.id,
+      shortRef: (row.ref ?? row.id).slice(0, 7),
+      title: row.title ?? row.id
+    }));
+  } catch {
+    pickerCommitsByPath[key] = [];
+  }
+}
+
+async function openRecentDiff(payload: { name: string; path: string; source: 'uncommitted' | 'commit'; commitRef?: string }) {
+  const opened = await sessionOrchestrator.resolveProjectOpen(payload.path);
+  if (!opened.ok) { void hydrateRecents(); return; }
+  const recent = recents.find((r) => r.path === payload.path);
+  if (recent) recent.status = 'ok';
+  await queueProjectOpen(payload.name || recent?.name || opened.name, opened.path, 'diff');
+  void hydrateRecents();
+  if (payload.source === 'uncommitted') {
+    state.diffOpenRequest = { token: Date.now(), mode: 'uncommitted' };
+  } else if (payload.source === 'commit' && payload.commitRef) {
+    state.diffOpenRequest = { token: Date.now(), mode: 'commit', commitRef: payload.commitRef };
+  } else {
+    state.diffOpenRequest = { token: Date.now(), mode: 'history' };
+  }
+}
+
 function toEpochMs(value?: string) {
   if (!value) return 0;
   const parsed = Date.parse(value);
@@ -2468,47 +2505,56 @@ function mapGitStatusToTree(status: { staged?: string[]; modified?: string[]; de
   return out;
 }
 
+let treeArtifactInflight = false;
+
 async function pushTreeArtifact(scopedPaths?: string[], scopedGitStatus?: Record<string, string>) {
+  if (treeArtifactInflight) return;
   const sid = state.activeSessionId;
   if (!sid) return;
+
+  treeArtifactInflight = true;
   const list = timelineBySessionId[sid] ?? (timelineBySessionId[sid] = []);
 
   let paths = scopedPaths;
   let gitStatus = scopedGitStatus ?? {};
 
-  if (!paths) {
-    try {
-      const res = await apiGet<{ ok: boolean; paths: string[] }>('/fs/paths');
-      paths = res.paths ?? [];
-    } catch {
-      paths = [];
+  try {
+    if (!paths) {
+      try {
+        const res = await apiGet<{ ok: boolean; paths: string[] }>('/fs/paths');
+        paths = res.paths ?? [];
+      } catch {
+        paths = [];
+      }
     }
-  }
 
-  if (!scopedGitStatus) {
-    try {
-      const status = await apiGet<{ staged?: string[]; modified?: string[]; deleted?: string[]; not_added?: string[]; conflicted?: string[] }>('/git/status');
-      if (status) gitStatus = mapGitStatusToTree(status);
-    } catch {
-      // keep empty gitStatus
+    if (!scopedGitStatus) {
+      try {
+        const status = await apiGet<{ staged?: string[]; modified?: string[]; deleted?: string[]; not_added?: string[]; conflicted?: string[] }>('/git/status');
+        if (status) gitStatus = mapGitStatusToTree(status);
+      } catch {
+        // keep empty gitStatus
+      }
     }
-  }
 
-  list.push({
-    id: `tree_${Date.now()}`,
-    kind: 'System',
-    text: '',
-    time: new Date().toLocaleTimeString(),
-    toolCalls: [{
-      id: `tc_tree_${Date.now()}`,
-      title: 'File tree',
-      status: 'done',
-      renderKind: 'tree',
-      preview: `${paths.length} paths`,
-      treePaths: paths,
-      treeGitStatus: gitStatus
-    }]
-  });
+    list.push({
+      id: `tree_${Date.now()}`,
+      kind: 'System',
+      text: '',
+      time: new Date().toLocaleTimeString(),
+      toolCalls: [{
+        id: `tc_tree_${Date.now()}`,
+        title: 'File tree',
+        status: 'done',
+        renderKind: 'tree',
+        preview: `${paths.length} paths`,
+        treePaths: paths,
+        treeGitStatus: gitStatus
+      }]
+    });
+  } finally {
+    treeArtifactInflight = false;
+  }
 }
 
 function runComposerCommand(command: string, args?: string) {  if (command === 'help') {

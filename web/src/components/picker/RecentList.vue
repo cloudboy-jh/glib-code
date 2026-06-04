@@ -19,12 +19,13 @@
       </div>
 
       <div v-if="expandedPath === r.path">
+        <!-- Top-level mode choice: Diffs | Session -->
         <div v-if="modePhase === 'mode'" class="recent-mode-cards">
           <button
             :class="['recent-mode-button', hoveredMode === 'diff' ? 'recent-mode-button-active' : '']"
             type="button"
             @mouseenter="hoveredMode = 'diff'"
-            @click="$emit('open', { name: r.name, path: r.path, mode: 'diff' })"
+            @click="enterDiffList(r.path)"
           >
             <span class="recent-mode-icon recent-mode-icon-primary"><GitBranch class="h-4 w-4" /></span>
             <span>
@@ -47,6 +48,43 @@
           </button>
         </div>
 
+        <!-- Diff list: Working tree + recent commits -->
+        <div v-else-if="modePhase === 'diff-list'" class="recent-session-choice">
+          <button class="recent-back-button" type="button" @click="modePhase = 'mode'">
+            <ArrowLeft class="h-3.5 w-3.5" />
+            <span>Back</span>
+          </button>
+          <div class="recent-session-list">
+            <!-- Working tree always first -->
+            <button
+              type="button"
+              class="recent-session-row"
+              @click="$emit('openDiff', { name: r.name, path: r.path, source: 'uncommitted' })"
+            >
+              <span class="min-w-0 flex-1 truncate">Working tree</span>
+              <span class="shrink-0 text-[11px] text-muted-foreground/60">uncommitted</span>
+            </button>
+            <!-- Commits -->
+            <template v-if="commitsLoadingForPath === canonicalizePath(r.path)">
+              <div class="px-2 py-2 text-xs text-muted-foreground/60">Loading commits…</div>
+            </template>
+            <template v-else>
+              <button
+                v-for="commit in commitsForPath(r.path)"
+                :key="commit.ref"
+                type="button"
+                class="recent-session-row"
+                @click="$emit('openDiff', { name: r.name, path: r.path, source: 'commit', commitRef: commit.ref })"
+              >
+                <span class="shrink-0 font-mono text-[10px] text-primary/80 mr-2">{{ commit.shortRef }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ commit.title }}</span>
+              </button>
+              <div v-if="commitsForPath(r.path).length === 0 && commitsLoadingForPath !== canonicalizePath(r.path)" class="px-2 py-2 text-xs text-muted-foreground">No commits yet.</div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Session: Continue or New -->
         <div v-else-if="modePhase === 'session-choice'" class="recent-session-choice">
           <button class="recent-back-button" type="button" @click="modePhase = 'mode'">
             <ArrowLeft class="h-3.5 w-3.5" />
@@ -70,6 +108,7 @@
           </div>
         </div>
 
+        <!-- Session list -->
         <div v-else class="recent-session-choice">
           <button class="recent-back-button" type="button" @click="modePhase = 'session-choice'">
             <ArrowLeft class="h-3.5 w-3.5" />
@@ -107,13 +146,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { ArrowLeft, Folder, GitBranch, History, PlusSquare } from 'lucide-vue-next';
+
+type CommitRow = { ref: string; shortRef: string; title: string };
 
 const props = withDefaults(
   defineProps<{
     recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
     sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string }>>;
+    commitsByPath?: Record<string, CommitRow[]>;
     activeIndex?: number;
     activeOffset?: number;
   }>(),
@@ -122,23 +164,51 @@ const props = withDefaults(
     activeOffset: 0
   }
 );
-defineEmits<{
+const emit = defineEmits<{
   open: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
+  openDiff: [payload: { name: string; path: string; source: 'uncommitted' | 'commit'; commitRef?: string }];
   continueSession: [payload: { name: string; path: string; sessionId: string }];
   startNewSession: [payload: { name: string; path: string }];
   forget: [id: string];
+  fetchCommits: [path: string];
 }>();
 
 const expandedPath = ref<string | null>(null);
 const hoveredMode = ref<'diff' | 'session'>('diff');
-const modePhase = ref<'mode' | 'session-choice' | 'session-list'>('mode');
+const modePhase = ref<'mode' | 'diff-list' | 'session-choice' | 'session-list'>('mode');
 const showAllSessionPaths = ref(new Set<string>());
+const commitsLoadingForPath = ref<string | null>(null);
 
 function toggleModeCards(path: string) {
   expandedPath.value = expandedPath.value === path ? null : path;
   hoveredMode.value = 'diff';
   modePhase.value = 'mode';
 }
+
+function enterDiffList(path: string) {
+  const key = canonicalizePath(path);
+  modePhase.value = 'diff-list';
+  if (!props.commitsByPath?.[key]) {
+    commitsLoadingForPath.value = key;
+    emit('fetchCommits', path);
+  }
+}
+
+function commitsForPath(path: string): CommitRow[] {
+  return props.commitsByPath?.[canonicalizePath(path)] ?? [];
+}
+
+// Clear loading flag reactively when commitsByPath is populated
+watch(
+  () => props.commitsByPath,
+  (byPath) => {
+    if (!commitsLoadingForPath.value) return;
+    if (byPath?.[commitsLoadingForPath.value] !== undefined) {
+      commitsLoadingForPath.value = null;
+    }
+  },
+  { deep: true }
+);
 
 function sessionsForPath(path: string) {
   return props.sessionsByPath?.[canonicalizePath(path)] ?? [];

@@ -36,15 +36,11 @@
         </div>
         <div v-else-if="e.text" class="space-y-2">
           <template v-for="(block, blockIndex) in parseMessageBlocks(e.text)" :key="`${e.id}-block-${blockIndex}`">
-            <div v-if="block.kind === 'text'" class="space-y-1.5">
-              <template v-for="(line, lineIndex) in renderMarkdownLite(block.value)" :key="`${e.id}-line-${blockIndex}-${lineIndex}`">
-                <h3 v-if="line.kind === 'h3'" class="text-sm font-semibold text-foreground/95">{{ line.value }}</h3>
-                <h2 v-else-if="line.kind === 'h2'" class="text-base font-semibold text-foreground/95">{{ line.value }}</h2>
-                <h1 v-else-if="line.kind === 'h1'" class="text-lg font-semibold text-foreground/95">{{ line.value }}</h1>
-                <p v-else-if="line.kind === 'li'" class="break-words pl-4 text-sm leading-6 text-foreground/95">• {{ line.value }}</p>
-                <p v-else class="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">{{ line.value }}</p>
-              </template>
-            </div>
+            <div
+              v-if="block.kind === 'text'"
+              class="prose-agent text-sm leading-6 text-foreground/95"
+              v-html="renderMarkdown(block.value)"
+            />
             <div v-else-if="block.kind === 'diff'" class="space-y-1">
               <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
               <DiffView :patch="block.value" diff-style="unified" :theme-preset="themePreset" :theme-type="themeType" />
@@ -104,9 +100,14 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import DiffView from '../shared/DiffView.vue';
 import FileTreeView from '../shared/FileTreeView.vue';
+
+// Configure marked: no default wrapping, use GFM, no pedantic
+marked.setOptions({ gfm: true, breaks: true });
 
 const props = defineProps<{
   entries: Array<{
@@ -205,18 +206,9 @@ function parseMessageBlocks(text: string) {
   return blocks.length ? blocks : [{ kind: 'text' as const, value: text }];
 }
 
-function renderMarkdownLite(text: string) {
-  return text
-    .split('\n')
-    .map((raw) => raw.trimEnd())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      if (line.startsWith('### ')) return { kind: 'h3' as const, value: line.slice(4).trim() };
-      if (line.startsWith('## ')) return { kind: 'h2' as const, value: line.slice(3).trim() };
-      if (line.startsWith('# ')) return { kind: 'h1' as const, value: line.slice(2).trim() };
-      if (/^[-*]\s+/.test(line)) return { kind: 'li' as const, value: line.replace(/^[-*]\s+/, '').trim() };
-      return { kind: 'p' as const, value: line };
-    });
+function renderMarkdown(text: string): string {
+  const raw = marked.parse(text) as string;
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
 }
 
 function groupToolCalls(tools: NonNullable<(typeof props.entries)[number]['toolCalls']>) {

@@ -1,6 +1,6 @@
 # Frontend (Current Implementation)
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 For product-level topology and runtime/storage boundaries, see `Docs/Architecture.md`. This document covers the current frontend implementation.
 
@@ -85,6 +85,7 @@ Capabilities:
   - `missing_git`
 - Project mode pick when opening (`diff` or `session`)
 - Keyboard navigation (`j/k`, arrows, enter)
+- Inline diff source list when opening in diff mode: expands to show Working tree + last 20 commits, same pattern as the session list. Clicking an entry opens the project directly into that diff, bypassing the DiffWorkbench history screen. Commits are fetched lazily on first expand via `/diff/items?source=commits&limit=20&projectPath=...` and cached in `pickerCommitsByPath` for the session.
 
 ## Diff workbench
 
@@ -98,6 +99,7 @@ Current behavior:
 - File picker for changed files
 - Patch rendering via `DiffView.vue` and `@pierre/diffs`
 - Start session from selected diff payload (`source/ref/file`)
+- `openRequest` prop accepts `mode: 'commit' | 'uncommitted'` in addition to `'history'` and `'session'`. Passing `mode: 'commit'` with a `commitRef` jumps directly into that commit's diff, skipping the history list.
 - The active workbench starts sessions from the currently opened file or the whole diff. Hunk/multi-file payload handling exists above the component, but the current selector UI is not wired in.
 - Composer footer has icon buttons for file tree (FolderTree) and attach (Paperclip), plus a Send button. The tree button and `/tree` slash command push a full-repo file-tree artifact into the session timeline.
 - Session diff modal uses `DiffView.vue` / `@pierre/diffs` for promote review.
@@ -123,6 +125,7 @@ Current state:
 
 - Session shell/layout is in place.
 - Timeline renders user/assistant/error entries plus compact expandable tool-call cards.
+- Assistant text is rendered as full markdown via `marked` (GFM + line breaks) + `DOMPurify` sanitization into `v-html`. Handles bold, italic, inline code, links, headings, and lists. Styled via `.prose-agent` CSS class in `main.css`.
 - Tool-call cards classify diff/code/json/terminal/tree/error output, hide raw payloads under Inspect, and render unified diffs with `DiffView.vue` / `@pierre/diffs`.
 - Tool-call cards with `renderKind: 'tree'` render inline file-tree artifacts using `FileTreeView.vue` / `@pierre/trees`.
 - Composer sends real prompts and supports `/tree` and `/stop`/`/abort` command handling.
