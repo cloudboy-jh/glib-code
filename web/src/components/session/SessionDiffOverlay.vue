@@ -117,10 +117,19 @@ function splitPatchByFile(fullPatch: string): FilePatch[] {
   let currentFile = '';
 
   for (const line of lines) {
-    const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-    if (match) {
+    // git format: diff --git a/<file> b/<file>
+    const gitMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+    if (gitMatch) {
       if (current.length) entries.push({ file: currentFile, patch: current.join('\n') });
-      currentFile = (match[2] || match[1] || '').trim();
+      currentFile = (gitMatch[2] || gitMatch[1] || '').trim();
+      current = [line];
+      continue;
+    }
+    // unified diff format (from node `diff` library): Index: <file>
+    const indexMatch = line.match(/^Index: (.+)$/);
+    if (indexMatch) {
+      if (current.length) entries.push({ file: currentFile, patch: current.join('\n') });
+      currentFile = (indexMatch[1] || '').trim();
       current = [line];
       continue;
     }
