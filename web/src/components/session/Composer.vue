@@ -8,7 +8,7 @@
         :disabled="disabled"
         :is-running="isRunning"
         @update:model-value="$emit('update:prompt', $event)"
-        @send="$emit('send')"
+        @send="onSend"
         @execute-command="handleCommand"
       />
 
@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <ComposerFooter :meta="meta" :disabled="disabled" @send="$emit('send')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
+      <ComposerFooter :meta="meta" :disabled="disabled" :is-running="isRunning" @send="onSend" @stop="$emit('stop')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
     </div>
   </div>
 </template>
@@ -49,7 +49,7 @@ import { ref } from 'vue';
 import ComposerFooter from './ComposerFooter.vue';
 import ComposerInput from './ComposerInput.vue';
 
-const composerInputRef = ref<{ openCommandDialog: () => void } | null>(null);
+const composerInputRef = ref<{ openCommandDialog: () => void; reset: () => void } | null>(null);
 
 const props = withDefaults(
   defineProps<{
@@ -64,14 +64,15 @@ const props = withDefaults(
   { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], attachments: () => [], disabled: false, isRunning: false }
 );
 
-const emit = defineEmits<{ send: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; showTree: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
+const emit = defineEmits<{ send: []; stop: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; showTree: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
 
 function handleCommand(value: string, args?: string) {
   emit('executeCommand', value, args);
 }
 
-function emitSend() {
+function onSend() {
   if (!props.prompt.trim()) return;
+  composerInputRef.value?.reset();
   emit('send');
 }
 </script>

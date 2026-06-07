@@ -98,6 +98,7 @@
             @create-replacement-session="createReplacementSession"
             @update-prompt="setComposerPrompt"
             @send-prompt="sendPrompt"
+            @stop-agent="abortTurn"
             @run-composer-command="runComposerCommand"
             @remove-context-chip="removeContextChip"
             @open-attachment-picker="openAttachmentPicker"

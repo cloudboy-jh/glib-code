@@ -49,39 +49,62 @@
           </template>
         </div>
 
-        <div v-if="e.toolCalls?.length" class="mt-2 space-y-px">
-          <div
-            v-for="tool in groupToolCalls(e.toolCalls)"
-            :key="tool.groupId"
+        <div v-if="e.toolCalls?.length" class="mt-2">
+          <!-- Accordion summary row -->
+          <button
+            type="button"
+            :class="[
+              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
+              expandedTurns.has(e.id) ? 'bg-muted/30' : 'hover:bg-muted/20'
+            ]"
+            @click="toggleTurn(e.id)"
           >
-            <!-- Single compact row -->
-            <div :class="['flex items-center gap-2 rounded-md px-2 py-1.5 text-xs', tool.status === 'running' ? 'animate-pulse' : '']">
-              <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
-              <span class="min-w-0 flex-1 truncate text-muted-foreground/80">{{ tool.title }}</span>
-              <span v-if="tool.count > 1" class="shrink-0 text-[10px] text-muted-foreground/50">×{{ tool.count }}</span>
-              <!-- -N +N diff badge — click opens session diff for this file -->
-              <button
-                v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
-                class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/50"
-                @click="$emit('openFileDiff', tool.fileTarget)"
-              >
-                <span class="text-red-400/80">-{{ diffStats(tool.diff).del }}</span>
-                <span class="text-emerald-400/80">+{{ diffStats(tool.diff).add }}</span>
-              </button>
-            </div>
+            <!-- Spinner while running, chevron otherwise -->
+            <span v-if="e.id === activeAssistantId" class="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-sky-300/40 border-t-sky-200" />
+            <component :is="expandedTurns.has(e.id) ? ChevronDown : ChevronRight" v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+            <span class="min-w-0 flex-1 truncate text-left text-muted-foreground/70">
+              {{ toolCallSummary(e.toolCalls, e.id === activeAssistantId) }}
+            </span>
+            <span v-if="e.id !== activeAssistantId" class="shrink-0 text-[10px] text-muted-foreground/40">
+              {{ expandedTurns.has(e.id) ? 'collapse' : 'expand' }}
+            </span>
+          </button>
 
-            <!-- Error output only -->
-            <pre
-              v-if="tool.status === 'failed' && tool.preview"
-              class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
-            >{{ tool.preview }}</pre>
-
-            <!-- File tree artifact -->
+          <!-- Expanded rows -->
+          <div v-if="expandedTurns.has(e.id) || e.id === activeAssistantId" class="mt-0.5 space-y-px">
             <div
-              v-if="tool.renderKind === 'tree' && tool.treePaths?.length"
-              class="mx-2 mb-1"
+              v-for="tool in groupToolCalls(e.toolCalls)"
+              :key="tool.groupId"
             >
-              <FileTreeView :paths="tool.treePaths" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
+              <!-- Single compact row -->
+              <div :class="['flex items-center gap-2 rounded-md px-2 py-1.5 text-xs', tool.status === 'running' ? 'animate-pulse' : '']">
+                <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
+                <span class="min-w-0 flex-1 truncate text-muted-foreground/80">{{ tool.title }}</span>
+                <span v-if="tool.count > 1" class="shrink-0 text-[10px] text-muted-foreground/50">×{{ tool.count }}</span>
+                <!-- -N +N diff badge — click opens session diff for this file -->
+                <button
+                  v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
+                  class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/50"
+                  @click="$emit('openFileDiff', tool.fileTarget)"
+                >
+                  <span class="text-red-400/80">-{{ diffStats(tool.diff).del }}</span>
+                  <span class="text-emerald-400/80">+{{ diffStats(tool.diff).add }}</span>
+                </button>
+              </div>
+
+              <!-- Error output only -->
+              <pre
+                v-if="tool.status === 'failed' && tool.preview"
+                class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
+              >{{ tool.preview }}</pre>
+
+              <!-- File tree artifact -->
+              <div
+                v-if="tool.renderKind === 'tree' && tool.treePaths?.length"
+                class="mx-2 mb-1"
+              >
+                <FileTreeView :paths="tool.treePaths" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
+              </div>
             </div>
           </div>
         </div>
@@ -99,9 +122,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import DiffView from '../shared/DiffView.vue';
 import FileTreeView from '../shared/FileTreeView.vue';
@@ -162,6 +186,39 @@ const activeAssistantEntry = computed(() => {
 });
 
 const activeAssistantId = computed(() => activeAssistantEntry.value?.id ?? '');
+
+// Accordion state — tracks which completed turns are expanded
+const expandedTurns = reactive(new Set<string>());
+
+function toggleTurn(id: string) {
+  // Don't toggle while actively running — always expanded
+  if (id === activeAssistantId.value) return;
+  if (expandedTurns.has(id)) {
+    expandedTurns.delete(id);
+  } else {
+    expandedTurns.add(id);
+  }
+}
+
+function toolCallSummary(toolCalls: NonNullable<(typeof props.entries)[number]['toolCalls']>, isActive: boolean): string {
+  const total = toolCalls.length;
+  if (isActive) {
+    const running = toolCalls.filter((t) => t.status === 'running').length;
+    const current = toolCalls.filter((t) => t.status === 'running').at(-1)?.title ?? toolCalls.at(-1)?.title ?? 'Working…';
+    return running > 0 ? `${current}  ·  ${total} calls` : `${total} tool calls`;
+  }
+  // Summarise by tool type from title prefix (e.g. "bash · git status" → "bash")
+  const counts: Record<string, number> = {};
+  for (const t of toolCalls) {
+    const tool = t.title.split('·')[0].trim().split(' ')[0].toLowerCase();
+    counts[tool] = (counts[tool] ?? 0) + 1;
+  }
+  const parts = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, n]) => (n > 1 ? `${n}× ${name}` : name));
+  return `${total} tool call${total === 1 ? '' : 's'}  ·  ${parts.join(', ')}`;
+}
 
 const activeToolsSummary = computed(() => {
   const entry = activeAssistantEntry.value;

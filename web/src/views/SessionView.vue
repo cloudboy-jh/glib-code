@@ -17,6 +17,19 @@
         </div>
       </div>
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
+
+      <!-- Agent progress strip — shown while running -->
+      <div v-if="composerDisabled" class="mx-3 mb-1 sm:mx-4">
+        <div class="progress-strip mx-auto w-full max-w-4xl overflow-hidden rounded-lg border border-sky-500/20 bg-sky-500/7 px-3 py-1.5">
+          <!-- indeterminate sliding bar -->
+          <div class="progress-bar" />
+          <div class="relative flex items-center gap-2 text-xs text-sky-200/80">
+            <span class="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-300" />
+            <span class="min-w-0 flex-1 truncate">{{ agentProgressLabel }}</span>
+          </div>
+        </div>
+      </div>
+
       <Composer
         :context="contextLabel"
         :prompt="prompt"
@@ -27,6 +40,7 @@
         :is-running="composerDisabled"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
+        @stop="$emit('stopAgent')"
         @execute-command="(v, a) => $emit('runComposerCommand', v, a)"
         @remove-context-chip="$emit('removeContextChip', $event)"
         @attach="$emit('openAttachmentPicker')"
@@ -106,17 +120,43 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import { History, PlusSquare } from 'lucide-vue-next';
 import Composer from '../components/session/Composer.vue';
 import SessionContextCapsule from '../components/session/SessionContextCapsule.vue';
 import Timeline from '../components/session/Timeline.vue';
 
-defineProps<{
+type TimelineEntry = {
+  id: string;
+  kind: string;
+  text: string;
+  time: string;
+  at?: string;
+  level?: 'info' | 'error';
+  toolCalls?: Array<{
+    id: string;
+    title: string;
+    status: 'running' | 'done' | 'failed';
+    renderKind: 'diff' | 'code' | 'json' | 'terminal' | 'text' | 'tree' | 'error';
+    command?: string;
+    cwd?: string;
+    preview?: string;
+    rawInput?: string;
+    rawOutput?: string;
+    diff?: string;
+    fileTarget?: string;
+    isError?: boolean;
+    treePaths?: string[];
+    treeGitStatus?: Record<string, string>;
+  }>;
+};
+
+const props = defineProps<{
   activeSession: { id: string } | undefined;
   activeContextSummary: string;
   activeSessionNotice?: string;
-  activeTimeline: Array<unknown>;
+  activeTimeline: TimelineEntry[];
   themePreset: ThemePreset;
   themeType: 'dark' | 'light';
   contextLabel: string;
@@ -133,6 +173,20 @@ defineProps<{
   compatibleUsableModel: { providerId: string; modelId: string } | null;
 }>();
 
+const agentProgressLabel = computed(() => {
+  const timeline = props.activeTimeline as TimelineEntry[];
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const entry = timeline[i];
+    if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
+    const running = (entry.toolCalls ?? []).filter((t) => t.status === 'running');
+    if (running.length > 0) {
+      const tool = running[running.length - 1].title;
+      return tool;
+    }
+  }
+  return 'Working…';
+});
+
 defineEmits<{
   openContextViewer: [];
   removeActiveContext: [];
@@ -141,6 +195,7 @@ defineEmits<{
   createReplacementSession: [];
   updatePrompt: [value: string];
   sendPrompt: [];
+  stopAgent: [];
   runComposerCommand: [value: string, args?: string];
   removeContextChip: [id: string];
   openAttachmentPicker: [];
@@ -158,3 +213,30 @@ defineEmits<{
   openFileDiff: [fileTarget: string | undefined];
 }>(); 
 </script>
+
+<style scoped>
+.progress-strip {
+  position: relative;
+}
+
+.progress-bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(199 89% 60% / 0.18) 40%,
+    hsl(199 89% 60% / 0.30) 50%,
+    hsl(199 89% 60% / 0.18) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+</style>

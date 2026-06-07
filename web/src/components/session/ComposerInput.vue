@@ -81,6 +81,10 @@ const commandMenuOpen = computed(() => slashQuery.value !== null && filteredComm
 defineExpose({
   openCommandDialog() {
     commandDialogOpen.value = true;
+  },
+  reset() {
+    expanded.value = false;
+    if (textareaRef.value) textareaRef.value.scrollTop = 0;
   }
 });
 
