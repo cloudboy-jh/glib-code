@@ -85,6 +85,7 @@
             :active-context-chips="activeContextChips"
             :attachments="composerAttachments"
             :composer-disabled="composerDisabled"
+            :is-agent-running="activeSession?.status === 'running'"
             :session-continue-open="state.sessionContinueOpen"
             :recent-project-sessions="recentProjectSessions"
             :agent-setup-message="state.agentSetupMessage"

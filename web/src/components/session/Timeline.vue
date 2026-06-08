@@ -10,21 +10,6 @@
         :key="e.id"
         class="rounded-xl border border-border/70 bg-card/60 px-4 py-3"
       >
-        <div
-          v-if="e.id === activeAssistantId"
-          class="sticky top-2 z-10 mb-2 rounded-lg border border-sky-500/35 bg-sky-500/10 px-3 py-2 backdrop-blur-sm"
-        >
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-sky-100">
-            <span class="inline-flex items-center gap-2 font-medium">
-              <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-300/40 border-t-sky-200" />
-              {{ activeToolsSummary.phase }}
-            </span>
-            <span class="text-sky-100/70">{{ activeToolsSummary.total }} tool calls</span>
-            <span class="text-sky-100/70">{{ activeToolsSummary.running }} running</span>
-            <span class="text-sky-100/70">{{ activeToolsSummary.elapsed }}</span>
-          </div>
-          <div class="mt-1 truncate text-[11px] text-sky-100/85">Running: {{ activeToolsSummary.runningTool }}</div>
-        </div>
 
         <div class="mb-1.5 flex items-center justify-between gap-3">
           <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/90">{{ e.kind }}</span>
@@ -122,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
@@ -173,8 +158,6 @@ function diffStats(patch: string) {
 const scrollerRef = ref<HTMLDivElement | null>(null);
 const followLive = ref(true);
 const pendingCount = ref(0);
-const nowMs = ref(Date.now());
-let elapsedTimer: ReturnType<typeof setInterval> | null = null;
 
 const activeAssistantEntry = computed(() => {
   for (let index = props.entries.length - 1; index >= 0; index -= 1) {
@@ -220,25 +203,7 @@ function toolCallSummary(toolCalls: NonNullable<(typeof props.entries)[number]['
   return `${total} tool call${total === 1 ? '' : 's'}  ·  ${parts.join(', ')}`;
 }
 
-const activeToolsSummary = computed(() => {
-  const entry = activeAssistantEntry.value;
-  if (!entry) return { total: 0, running: 0, runningTool: '', phase: 'Running commands', elapsed: '00:00' };
-  const tools = entry.toolCalls ?? [];
-  const runningTools = tools.filter((tool) => tool.status === 'running');
-  const runningTool = runningTools[runningTools.length - 1]?.title ?? tools[tools.length - 1]?.title ?? 'Working';
-  const phase = inferPhase(runningTool);
-  const startedAtMs = entry.at ? Date.parse(entry.at) : Number.NaN;
-  const elapsed = Number.isFinite(startedAtMs)
-    ? formatElapsed(Math.max(0, nowMs.value - startedAtMs))
-    : '00:00';
-  return {
-    total: tools.length,
-    running: runningTools.length,
-    runningTool,
-    phase,
-    elapsed
-  };
-});
+
 
 function parseMessageBlocks(text: string) {
   const blocks: Array<{ kind: 'text' | 'diff' | 'code'; value: string }> = [];
@@ -284,19 +249,6 @@ function groupToolCalls(tools: NonNullable<(typeof props.entries)[number]['toolC
   return grouped;
 }
 
-function inferPhase(toolTitle: string) {
-  const value = toolTitle.toLowerCase();
-  if (/(read|grep|glob|search|list|fetch|get|open)/.test(value)) return 'Reading files';
-  if (/(write|patch|edit|apply|replace|delete|rename|create file|update file)/.test(value)) return 'Writing patch';
-  return 'Running commands';
-}
-
-function formatElapsed(ms: number) {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
 
 function isNearBottom(el: HTMLDivElement, threshold = 80) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;
@@ -335,16 +287,6 @@ watch(
 );
 
 onMounted(async () => {
-  elapsedTimer = setInterval(() => {
-    nowMs.value = Date.now();
-  }, 1000);
   await scrollToBottom(true);
-});
-
-onUnmounted(() => {
-  if (elapsedTimer) {
-    clearInterval(elapsedTimer);
-    elapsedTimer = null;
-  }
 });
 </script>

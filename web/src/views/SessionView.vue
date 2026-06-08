@@ -16,19 +16,32 @@
           <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="$emit('createReplacementSession')">New replacement</button>
         </div>
       </div>
+
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
 
-      <!-- Agent progress strip — shown while running -->
-      <div v-if="composerDisabled" class="mx-3 mb-1 sm:mx-4">
-        <div class="progress-strip mx-auto w-full max-w-4xl overflow-hidden rounded-lg border border-sky-500/20 bg-sky-500/7 px-3 py-1.5">
-          <!-- indeterminate sliding bar -->
-          <div class="progress-bar" />
-          <div class="relative flex items-center gap-2 text-xs text-sky-200/80">
-            <span class="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-sky-400/30 border-t-sky-300" />
-            <span class="min-w-0 flex-1 truncate">{{ agentProgressLabel }}</span>
+      <!-- Agent status bar — slim single line, only while running -->
+      <Transition name="status-bar">
+        <div v-if="isAgentRunning" class="status-bar mx-3 mb-1 sm:mx-4">
+          <div class="mx-auto flex w-full max-w-4xl items-center gap-3 px-1">
+            <!-- track -->
+            <div class="track">
+              <div class="track-fill" />
+            </div>
+            <!-- dot + label -->
+            <span class="agent-dot" />
+            <span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/80">
+              {{ agentStatusLabel }}
+            </span>
+            <!-- elapsed -->
+            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/50">{{ elapsed }}</span>
+            <!-- stop -->
+            <button class="stop-inline" @click="$emit('stopAgent')">
+              <StopCircle class="h-3.5 w-3.5" />
+              Stop
+            </button>
           </div>
         </div>
-      </div>
+      </Transition>
 
       <Composer
         :context="contextLabel"
@@ -37,7 +50,7 @@
         :context-chips="activeContextChips"
         :attachments="attachments"
         :disabled="composerDisabled"
-        :is-running="composerDisabled"
+        :is-running="isAgentRunning"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
         @stop="$emit('stopAgent')"
@@ -120,9 +133,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import { History, PlusSquare } from 'lucide-vue-next';
+import { History, PlusSquare, StopCircle } from 'lucide-vue-next';
 import Composer from '../components/session/Composer.vue';
 import SessionContextCapsule from '../components/session/SessionContextCapsule.vue';
 import Timeline from '../components/session/Timeline.vue';
@@ -165,6 +178,7 @@ const props = defineProps<{
   activeContextChips: Array<{ id: string; label: string }>;
   attachments: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
   composerDisabled: boolean;
+  isAgentRunning: boolean;
   sessionContinueOpen: boolean;
   recentProjectSessions: Array<{ id: string; title: string; time: string }>;
   agentSetupMessage: string;
@@ -172,20 +186,6 @@ const props = defineProps<{
   defaultProvider: string;
   compatibleUsableModel: { providerId: string; modelId: string } | null;
 }>();
-
-const agentProgressLabel = computed(() => {
-  const timeline = props.activeTimeline as TimelineEntry[];
-  for (let i = timeline.length - 1; i >= 0; i--) {
-    const entry = timeline[i];
-    if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
-    const running = (entry.toolCalls ?? []).filter((t) => t.status === 'running');
-    if (running.length > 0) {
-      const tool = running[running.length - 1].title;
-      return tool;
-    }
-  }
-  return 'Working…';
-});
 
 defineEmits<{
   openContextViewer: [];
@@ -211,32 +211,123 @@ defineEmits<{
   useCompatibleModel: [value: { providerId: string; modelId: string }];
   openModelPicker: [];
   openFileDiff: [fileTarget: string | undefined];
-}>(); 
+}>();
+
+// Current tool name derived from the live timeline
+const agentStatusLabel = computed(() => {
+  for (let i = props.activeTimeline.length - 1; i >= 0; i--) {
+    const entry = props.activeTimeline[i];
+    if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
+    const running = (entry.toolCalls ?? []).filter((t) => t.status === 'running');
+    if (running.length > 0) return running[running.length - 1].title;
+  }
+  return 'Working…';
+});
+
+// Elapsed timer — starts when isAgentRunning flips true
+const nowMs = ref(Date.now());
+const startMs = ref(Date.now());
+let timer: ReturnType<typeof setInterval> | null = null;
+
+watch(() => props.isAgentRunning, (running) => {
+  if (running) {
+    startMs.value = Date.now();
+    nowMs.value = Date.now();
+    timer = setInterval(() => { nowMs.value = Date.now(); }, 1000);
+  } else {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+}, { immediate: true });
+
+onUnmounted(() => { if (timer) clearInterval(timer); });
+
+const elapsed = computed(() => {
+  if (!props.isAgentRunning) return '0:00';
+  const s = Math.max(0, Math.floor((nowMs.value - startMs.value) / 1000));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+});
 </script>
 
 <style scoped>
-.progress-strip {
+/* Status bar container */
+.status-bar {
+  padding-bottom: 6px;
+}
+
+/* Indeterminate track */
+.track {
+  width: 80px;
+  flex-shrink: 0;
+  height: 2px;
+  border-radius: 99px;
+  background: hsl(var(--border) / 0.35);
+  overflow: hidden;
   position: relative;
 }
 
-.progress-bar {
+.track-fill {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    hsl(199 89% 60% / 0.18) 40%,
-    hsl(199 89% 60% / 0.30) 50%,
-    hsl(199 89% 60% / 0.18) 60%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: progress-sweep 1.8s ease-in-out infinite;
+  inset-block: 0;
+  width: 40%;
+  border-radius: 99px;
+  background: hsl(var(--primary) / 0.7);
+  animation: track-slide 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes progress-sweep {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes track-slide {
+  0%   { left: -40%; }
+  100% { left: 140%; }
+}
+
+/* Pulsing activity dot */
+.agent-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--primary) / 0.85);
+  box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  animation: dot-pulse 1.4s ease-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%   { box-shadow: 0 0 0 0   hsl(var(--primary) / 0.4); }
+  70%  { box-shadow: 0 0 0 5px hsl(var(--primary) / 0);   }
+  100% { box-shadow: 0 0 0 0   hsl(var(--primary) / 0);   }
+}
+
+/* Inline stop button */
+.stop-inline {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 99px;
+  border: 1px solid hsl(var(--destructive) / 0.45);
+  background: hsl(var(--destructive) / 0.08);
+  font-size: 11px;
+  font-weight: 500;
+  color: hsl(0 65% 65%);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.stop-inline:hover {
+  border-color: hsl(var(--destructive) / 0.7);
+  background: hsl(var(--destructive) / 0.18);
+  color: hsl(0 72% 72%);
+}
+
+/* Slide in/out transition */
+.status-bar-enter-active,
+.status-bar-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.status-bar-enter-from,
+.status-bar-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 </style>
