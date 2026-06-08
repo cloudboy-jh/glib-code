@@ -2653,7 +2653,7 @@ function runComposerCommand(command: string, args?: string) {  if (command === '
       const sid = activeSession.value.id;
       void apiGet(`/sessions/${sid}/stats`).then((stats: any) => {
         if (!stats) return;
-        const cost = stats.totalCost != null ? `$${stats.totalCost.toFixed(4)}` : '$0.00';
+        const cost = stats.totalCost != null ? formatCost(stats.totalCost) : '0¢';
         const t = stats.totalTokens ?? {};
         const total = (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
         const parts = [`Cost: ${cost}`, `Tokens: ${total.toLocaleString()}`];
@@ -2672,7 +2672,7 @@ function runComposerCommand(command: string, args?: string) {  if (command === '
       const sid = activeSession.value.id;
       void apiGet(`/sessions/${sid}/stats`).then((stats: any) => {
         if (!stats) return;
-        const cost = stats.totalCost != null ? `$${stats.totalCost.toFixed(4)}` : '$0.00';
+        const cost = stats.totalCost != null ? formatCost(stats.totalCost) : '0¢';
         const t = stats.totalTokens ?? {};
         const total = (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
         pushTimelineInfo(sid, `Status · Cost: ${cost} · Tokens: ${total.toLocaleString()}`);
@@ -2800,12 +2800,18 @@ onMounted(() => {
 
 const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);
 
+function formatCost(usd: number): string {
+  if (usd < 0.01) return `${(usd * 100).toFixed(1)}¢`;
+  if (usd < 1)    return `$${usd.toFixed(2)}`;
+  return `$${usd.toFixed(1)}`;
+}
+
 const composerMetaLabel = computed(() => {
   const parts = [selectedModelLabel.value];
   const session = activeSession.value;
   if (session) {
     if (session.totalCost != null && session.totalCost > 0) {
-      parts.push(`$${session.totalCost.toFixed(4)}`);
+      parts.push(formatCost(session.totalCost));
     }
     if (session.totalTokens) {
       const t = session.totalTokens;
