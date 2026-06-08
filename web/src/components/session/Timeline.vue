@@ -4,7 +4,7 @@
       <p class="text-sm text-muted-foreground/35">Send a message to start the conversation.</p>
     </div>
 
-    <div v-else class="mx-auto w-full max-w-3xl space-y-3">
+    <TransitionGroup v-else name="timeline-entry" tag="div" class="mx-auto w-full max-w-3xl space-y-3">
       <article
         v-for="e in entries"
         :key="e.id"
@@ -95,7 +95,7 @@
           </div>
         </div>
       </article>
-    </div>
+    </TransitionGroup>
 
     <button
       v-if="pendingCount > 0 || !followLive"
@@ -107,8 +107,42 @@
   </div>
 </template>
 
+<style scoped>
+.timeline-entry-enter-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.timeline-entry-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.timeline-entry-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.timeline-entry-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>
+
+<style scoped>
+.timeline-entry-enter-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.timeline-entry-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.timeline-entry-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.timeline-entry-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>
+
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch, TransitionGroup } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';

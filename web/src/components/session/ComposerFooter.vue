@@ -9,18 +9,21 @@
       <button class="command-chip" :disabled="disabled || isRunning" @click="$emit('tree')"><FolderTree class="h-3.5 w-3.5" /></button>
       <button class="command-chip" :disabled="disabled || isRunning" @click="$emit('attach')"><Paperclip class="h-3.5 w-3.5" /></button>
 
-      <!-- Stop button — shown only while agent is running -->
-      <button
-        v-if="isRunning"
-        class="stop-btn"
-        @click="$emit('stop')"
-      >
-        <Square class="h-3.5 w-3.5 fill-current" />
-        Stop
-      </button>
+      <div class="btn-slot">
+        <Transition name="btn-fade" mode="out-in">
+          <button
+            v-if="isRunning"
+            key="stop"
+            class="stop-btn"
+            @click="$emit('stop')"
+          >
+            <Square class="h-3.5 w-3.5 fill-current" />
+            Stop
+          </button>
 
-      <!-- Send button — shown when idle -->
-      <UiButton v-else class="h-9 rounded-full px-4" :disabled="disabled" @click="$emit('send')">Send</UiButton>
+          <UiButton v-else key="send" class="h-9 rounded-full px-4" :disabled="disabled" @click="$emit('send')">Send</UiButton>
+        </Transition>
+      </div>
     </div>
   </div>
 </template>
@@ -78,5 +81,20 @@ defineEmits<{ send: []; stop: []; openCommands: []; attach: []; tree: [] }>();
   border-color: hsl(var(--destructive) / 0.75);
   background: hsl(var(--destructive) / 0.22);
   color: hsl(0 80% 78%);
+}
+
+.btn-slot {
+  display: inline-block;
+  min-width: 72px;
+  text-align: center;
+}
+
+.btn-fade-enter-active,
+.btn-fade-leave-active {
+  transition: opacity 100ms ease;
+}
+.btn-fade-enter-from,
+.btn-fade-leave-to {
+  opacity: 0;
 }
 </style>
