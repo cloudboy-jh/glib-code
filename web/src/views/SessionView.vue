@@ -19,26 +19,12 @@
 
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
 
-      <!-- Agent status bar — slim single line, only while running -->
+      <!-- Agent status bar — text only, no animation chrome -->
       <Transition name="status-bar">
         <div v-if="isAgentRunning" class="status-bar mx-3 mb-1 sm:mx-4">
-          <div class="mx-auto flex w-full max-w-4xl items-center gap-3 px-1">
-            <!-- track -->
-            <div class="track">
-              <div class="track-fill" />
-            </div>
-            <!-- dot + label -->
-            <span class="agent-dot" />
-            <span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/80">
-              {{ agentStatusLabel }}
-            </span>
-            <!-- elapsed -->
-            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/50">{{ elapsed }}</span>
-            <!-- stop -->
-            <button class="stop-inline" @click="$emit('stopAgent')">
-              <StopCircle class="h-3.5 w-3.5" />
-              Stop
-            </button>
+          <div class="mx-auto flex w-full max-w-4xl items-center gap-2 px-1">
+            <span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/75">{{ agentStatusLabel }}</span>
+            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/40">{{ elapsed }}</span>
           </div>
         </div>
       </Transition>
@@ -135,7 +121,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import { History, PlusSquare, StopCircle } from 'lucide-vue-next';
+import { History, PlusSquare } from 'lucide-vue-next';
 import Composer from '../components/session/Composer.vue';
 import SessionContextCapsule from '../components/session/SessionContextCapsule.vue';
 import Timeline from '../components/session/Timeline.vue';
@@ -250,84 +236,23 @@ const elapsed = computed(() => {
 </script>
 
 <style scoped>
-/* Status bar container */
 .status-bar {
   padding-bottom: 6px;
+  border-left: 2px solid hsl(var(--primary) / 0.5);
+  margin-left: 12px;
+  padding-left: 10px;
 }
 
-/* Indeterminate track */
-.track {
-  width: 80px;
-  flex-shrink: 0;
-  height: 2px;
-  border-radius: 99px;
-  background: hsl(var(--border) / 0.35);
-  overflow: hidden;
-  position: relative;
+@media (min-width: 640px) {
+  .status-bar { margin-left: 16px; }
 }
 
-.track-fill {
-  position: absolute;
-  inset-block: 0;
-  width: 40%;
-  border-radius: 99px;
-  background: hsl(var(--primary) / 0.7);
-  animation: track-slide 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes track-slide {
-  0%   { left: -40%; }
-  100% { left: 140%; }
-}
-
-/* Pulsing activity dot */
-.agent-dot {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: hsl(var(--primary) / 0.85);
-  box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
-  animation: dot-pulse 1.4s ease-out infinite;
-}
-
-@keyframes dot-pulse {
-  0%   { box-shadow: 0 0 0 0   hsl(var(--primary) / 0.4); }
-  70%  { box-shadow: 0 0 0 5px hsl(var(--primary) / 0);   }
-  100% { box-shadow: 0 0 0 0   hsl(var(--primary) / 0);   }
-}
-
-/* Inline stop button */
-.stop-inline {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 99px;
-  border: 1px solid hsl(var(--destructive) / 0.45);
-  background: hsl(var(--destructive) / 0.08);
-  font-size: 11px;
-  font-weight: 500;
-  color: hsl(0 65% 65%);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.stop-inline:hover {
-  border-color: hsl(var(--destructive) / 0.7);
-  background: hsl(var(--destructive) / 0.18);
-  color: hsl(0 72% 72%);
-}
-
-/* Slide in/out transition */
 .status-bar-enter-active,
 .status-bar-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.15s ease;
 }
 .status-bar-enter-from,
 .status-bar-leave-to {
   opacity: 0;
-  transform: translateY(4px);
 }
 </style>

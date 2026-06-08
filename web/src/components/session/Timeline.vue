@@ -55,10 +55,10 @@
             </span>
           </button>
 
-          <!-- Expanded rows -->
+          <!-- Expanded rows (non-tree only) -->
           <div v-if="expandedTurns.has(e.id) || e.id === activeAssistantId" class="mt-0.5 space-y-px">
             <div
-              v-for="tool in groupToolCalls(e.toolCalls)"
+              v-for="tool in groupToolCalls(e.toolCalls).filter(t => t.renderKind !== 'tree')"
               :key="tool.groupId"
             >
               <!-- Single compact row -->
@@ -66,7 +66,7 @@
                 <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
                 <span class="min-w-0 flex-1 truncate text-muted-foreground/80">{{ tool.title }}</span>
                 <span v-if="tool.count > 1" class="shrink-0 text-[10px] text-muted-foreground/50">×{{ tool.count }}</span>
-                <!-- -N +N diff badge — click opens session diff for this file -->
+                <!-- -N +N diff badge -->
                 <button
                   v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
                   class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/50"
@@ -82,15 +82,16 @@
                 v-if="tool.status === 'failed' && tool.preview"
                 class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
               >{{ tool.preview }}</pre>
-
-              <!-- File tree artifact -->
-              <div
-                v-if="tool.renderKind === 'tree' && tool.treePaths?.length"
-                class="mx-2 mb-1"
-              >
-                <FileTreeView :paths="tool.treePaths" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
-              </div>
             </div>
+          </div>
+
+          <!-- Tree artifacts — always visible, never gated by accordion -->
+          <div
+            v-for="tool in groupToolCalls(e.toolCalls).filter(t => t.renderKind === 'tree' && t.treePaths?.length)"
+            :key="`tree-${tool.groupId}`"
+            class="mt-1.5"
+          >
+            <FileTreeView :paths="tool.treePaths!" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
           </div>
         </div>
       </article>

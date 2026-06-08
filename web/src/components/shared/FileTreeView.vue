@@ -23,6 +23,8 @@ const props = withDefaults(
 
 const containerRef = ref<HTMLElement | null>(null);
 let instance: FileTree | null = null;
+let lastPaths: string[] = [];
+let lastGitStatusJson = '';
 
 const ROW_HEIGHT = 22; // compact density item height
 const MIN_HEIGHT = 120;
@@ -107,14 +109,29 @@ function createInstance(): FileTree {
 async function mountOrRender() {
   if (!containerRef.value || !props.paths.length) return;
 
+  const newGitStatusJson = JSON.stringify(props.gitStatus);
+
   if (!instance) {
+    lastPaths = [...props.paths];
+    lastGitStatusJson = newGitStatusJson;
     instance = createInstance();
     instance.render({ containerWrapper: containerRef.value });
     return;
   }
 
-  instance.resetPaths(props.paths);
-  instance.setGitStatus(gitStatusEntries());
+  const pathsChanged = props.paths.length !== lastPaths.length || props.paths.some((p, i) => p !== lastPaths[i]);
+  const statusChanged = newGitStatusJson !== lastGitStatusJson;
+
+  if (!pathsChanged && !statusChanged) return;
+
+  if (pathsChanged) {
+    lastPaths = [...props.paths];
+    instance.resetPaths(props.paths);
+  }
+  if (statusChanged) {
+    lastGitStatusJson = newGitStatusJson;
+    instance.setGitStatus(gitStatusEntries());
+  }
 }
 
 watch(
