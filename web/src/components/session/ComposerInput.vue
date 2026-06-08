@@ -12,6 +12,7 @@
       ]"
       @input="onInput"
       @keydown="onKeydown"
+      @paste="onPaste"
     />
 
     <button
@@ -47,7 +48,7 @@ import ComposerCommandMenu from './ComposerCommandMenu.vue';
 import { getSlashCommands, parseCommandInput, type SlashCommand } from '../../composables/useSlashCommands';
 
 const props = defineProps<{ modelValue: string; context?: string; disabled?: boolean; isRunning?: boolean }>();
-const emit = defineEmits<{ 'update:modelValue': [value: string]; send: []; executeCommand: [value: string, args?: string] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: string]; send: []; executeCommand: [value: string, args?: string]; addTextAttachment: [content: string] }>();
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const highlightedIndex = ref(0);
@@ -104,6 +105,15 @@ function selectCommandFromDialog(value: string) {
 
 function onInput(event: Event) {
   emit('update:modelValue', (event.target as HTMLTextAreaElement).value);
+}
+
+function onPaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text/plain') ?? '';
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount > 50) {
+    event.preventDefault();
+    emit('addTextAttachment', text);
+  }
 }
 
 function onKeydown(event: KeyboardEvent) {

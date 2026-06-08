@@ -1,7 +1,16 @@
 <template>
   <div class="shrink-0 px-3 pb-2 pt-1 sm:px-4 sm:pt-1.5">
     <div class="mx-auto w-full max-w-4xl rounded-2xl border border-border/80 bg-card/90 p-2 shadow-sm shadow-black/10 sm:p-2.5">
-      <!-- Input area — hidden while agent is running -->
+
+      <!-- Running state: status line in the card body -->
+      <Transition name="composer-status">
+        <div v-if="isRunning" class="composer-status-line">
+          <span class="min-w-0 flex-1 truncate text-[13px] text-muted-foreground/85">{{ statusLabel || 'Working…' }}</span>
+          <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/50">{{ elapsed }}</span>
+        </div>
+      </Transition>
+
+      <!-- Idle state: full input area -->
       <Transition name="composer-body">
         <div v-if="!isRunning" class="composer-body">
           <ComposerInput
@@ -13,6 +22,7 @@
             @update:model-value="$emit('update:prompt', $event)"
             @send="onSend"
             @execute-command="handleCommand"
+            @add-text-attachment="$emit('addTextAttachment', $event)"
           />
 
           <div v-if="contextChips.length" class="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
@@ -26,6 +36,26 @@
             >
               <span class="truncate">{{ chip.label }}</span>
               <span aria-hidden="true">×</span>
+            </button>
+          </div>
+
+          <!-- Text attachment chips -->
+          <div v-if="textAttachments.length" class="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+            <button
+              v-for="ta in textAttachments"
+              :key="ta.id"
+              type="button"
+              class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-300 hover:bg-amber-500/20"
+              :title="ta.label"
+              @click="$emit('viewTextAttachment', ta.id)"
+            >
+              <FileText class="h-3 w-3 shrink-0" />
+              <span class="truncate">{{ ta.label }}</span>
+              <span
+                aria-hidden="true"
+                class="text-amber-300/60 hover:text-amber-300"
+                @click.stop="$emit('removeTextAttachment', ta.id)"
+              >×</span>
             </button>
           </div>
 
@@ -51,6 +81,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { FileText } from 'lucide-vue-next';
 import ComposerFooter from './ComposerFooter.vue';
 import ComposerInput from './ComposerInput.vue';
 
@@ -61,15 +92,40 @@ const props = withDefaults(
     context: string;
     prompt: string;
     meta?: string;
+    statusLabel?: string;
+    elapsed?: string;
     contextChips?: Array<{ id: string; label: string }>;
+    textAttachments?: Array<{ id: string; label: string; content: string }>;
     attachments?: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
     disabled?: boolean;
     isRunning?: boolean;
   }>(),
-  { meta: 'GPT-5.3 Codex · High · Full access', contextChips: () => [], attachments: () => [], disabled: false, isRunning: false }
+  {
+    meta: 'GPT-5.3 Codex · High · Full access',
+    statusLabel: '',
+    elapsed: '0:00',
+    contextChips: () => [],
+    textAttachments: () => [],
+    attachments: () => [],
+    disabled: false,
+    isRunning: false,
+  }
 );
 
-const emit = defineEmits<{ send: []; stop: []; 'update:prompt': [value: string]; executeCommand: [value: string, args?: string]; removeContextChip: [id: string]; attach: []; showTree: []; removeAttachment: [id: string]; retryAttachment: [id: string] }>();
+const emit = defineEmits<{
+  send: [];
+  stop: [];
+  'update:prompt': [value: string];
+  executeCommand: [value: string, args?: string];
+  removeContextChip: [id: string];
+  attach: [];
+  showTree: [];
+  removeAttachment: [id: string];
+  retryAttachment: [id: string];
+  addTextAttachment: [content: string];
+  removeTextAttachment: [id: string];
+  viewTextAttachment: [id: string];
+}>();
 
 function handleCommand(value: string, args?: string) {
   emit('executeCommand', value, args);
@@ -83,6 +139,24 @@ function onSend() {
 </script>
 
 <style scoped>
+/* Running status line */
+.composer-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 6px;
+}
+
+.composer-status-enter-active,
+.composer-status-leave-active {
+  transition: opacity 150ms ease;
+}
+.composer-status-enter-from,
+.composer-status-leave-to {
+  opacity: 0;
+}
+
+/* Input body */
 .composer-body {
   transition: opacity 200ms ease, transform 200ms ease;
 }

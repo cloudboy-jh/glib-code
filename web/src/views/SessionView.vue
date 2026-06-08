@@ -19,12 +19,13 @@
 
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
 
-      <!-- Agent status bar — text only, no animation chrome -->
+      <!-- Agent status bar — visible panel with primary tint -->
       <Transition name="status-bar">
-        <div v-if="isAgentRunning" class="status-bar mx-3 mb-1 sm:mx-4">
-          <div class="mx-auto flex w-full max-w-4xl items-center gap-2 px-1">
-            <span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/75">{{ agentStatusLabel }}</span>
-            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/40">{{ elapsed }}</span>
+        <div v-if="isAgentRunning" class="status-bar">
+          <div class="status-bar-inner mx-auto w-full max-w-4xl">
+            <span class="status-dot" />
+            <span class="min-w-0 flex-1 truncate text-[12px] text-foreground/80">{{ agentStatusLabel }}</span>
+            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60">{{ elapsed }}</span>
           </div>
         </div>
       </Transition>
@@ -33,7 +34,10 @@
         :context="contextLabel"
         :prompt="prompt"
         :meta="selectedModelLabel"
+        :status-label="agentStatusLabel"
+        :elapsed="elapsed"
         :context-chips="activeContextChips"
+        :text-attachments="textAttachments"
         :attachments="attachments"
         :disabled="composerDisabled"
         :is-running="isAgentRunning"
@@ -46,6 +50,9 @@
         @show-tree="$emit('showTree')"
         @remove-attachment="$emit('removeAttachment', $event)"
         @retry-attachment="$emit('retryAttachment', $event)"
+        @add-text-attachment="$emit('addTextAttachment', $event)"
+        @remove-text-attachment="$emit('removeTextAttachment', $event)"
+        @view-text-attachment="$emit('viewTextAttachment', $event)"
       />
     </div>
   </template>
@@ -163,6 +170,7 @@ const props = defineProps<{
   selectedModelLabel: string;
   activeContextChips: Array<{ id: string; label: string }>;
   attachments: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
+  textAttachments: Array<{ id: string; label: string; content: string }>;
   composerDisabled: boolean;
   isAgentRunning: boolean;
   sessionContinueOpen: boolean;
@@ -188,6 +196,9 @@ defineEmits<{
   showTree: [];
   removeAttachment: [id: string];
   retryAttachment: [id: string];
+  addTextAttachment: [content: string];
+  removeTextAttachment: [id: string];
+  viewTextAttachment: [id: string];
   toggleContinue: [];
   createSession: [];
   selectSession: [id: string];
@@ -237,22 +248,40 @@ const elapsed = computed(() => {
 
 <style scoped>
 .status-bar {
-  padding-bottom: 6px;
-  border-left: 2px solid hsl(var(--primary) / 0.5);
-  margin-left: 12px;
-  padding-left: 10px;
+  margin-bottom: 4px;
+  padding: 0 12px;
 }
 
 @media (min-width: 640px) {
-  .status-bar { margin-left: 16px; }
+  .status-bar { padding: 0 16px; }
+}
+
+.status-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  padding: 6px 12px;
+}
+
+.status-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.9;
 }
 
 .status-bar-enter-active,
 .status-bar-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 .status-bar-enter-from,
 .status-bar-leave-to {
   opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

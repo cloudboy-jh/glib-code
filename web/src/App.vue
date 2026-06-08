@@ -84,6 +84,7 @@
              :selected-model-label="composerMetaLabel"
             :active-context-chips="activeContextChips"
             :attachments="composerAttachments"
+            :text-attachments="textAttachments"
             :composer-disabled="composerDisabled"
             :is-agent-running="activeSession?.status === 'running'"
             :session-continue-open="state.sessionContinueOpen"
@@ -106,6 +107,9 @@
             @show-tree="pushTreeArtifact"
             @remove-attachment="removeAttachment"
             @retry-attachment="retryAttachment"
+            @add-text-attachment="addTextAttachment"
+            @remove-text-attachment="removeTextAttachment"
+            @view-text-attachment="viewTextAttachment"
             @toggle-continue="state.sessionContinueOpen = !state.sessionContinueOpen"
             @create-session="createSession"
             @select-session="selectSessionFromSidebar"
@@ -282,6 +286,13 @@
       @clone="cloneRepository"
     />
 
+    <TextAttachmentModal
+      :open="textAttachmentModal.open"
+      :content="textAttachments.find(t => t.id === textAttachmentModal.id)?.content ?? ''"
+      @close="textAttachmentModal.open = false"
+      @remove="() => { if (textAttachmentModal.id) removeTextAttachment(textAttachmentModal.id); textAttachmentModal.open = false; }"
+    />
+
     <div
       v-if="state.contextViewerOpen && activeContextBundle"
       class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6"
@@ -410,6 +421,7 @@ import SessionDiffOverlay from './components/session/SessionDiffOverlay.vue';
 import DiffView from './views/DiffView.vue';
 import PickerView from './views/PickerView.vue';
 import SessionView from './views/SessionView.vue';
+import TextAttachmentModal from './components/session/TextAttachmentModal.vue';
 import { ApiRequestError, useApiClient } from './composables/useApiClient';
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts';
 import { canonicalizeProjectPath, usePickerSessions } from './composables/usePickerSessions';
@@ -698,6 +710,28 @@ type ComposerAttachment = {
 
 const composerAttachments = reactive<ComposerAttachment[]>([]);
 const attachmentInputRef = ref<HTMLInputElement | null>(null);
+
+// Text attachments — pasted long text blobs
+interface TextAttachment { id: string; label: string; content: string }
+const textAttachments = reactive<TextAttachment[]>([]);
+const textAttachmentModal = reactive<{ open: boolean; id: string | null }>({ open: false, id: null });
+
+function addTextAttachment(content: string) {
+  const id = crypto.randomUUID();
+  const preview = content.replace(/\s+/g, ' ').trim().slice(0, 50);
+  const label = preview + (content.length > 50 ? '…' : '');
+  textAttachments.push({ id, label, content });
+}
+
+function removeTextAttachment(id: string) {
+  const idx = textAttachments.findIndex((t) => t.id === id);
+  if (idx !== -1) textAttachments.splice(idx, 1);
+}
+
+function viewTextAttachment(id: string) {
+  textAttachmentModal.id = id;
+  textAttachmentModal.open = true;
+}
 
 const terminal = reactive({
   status: 'closed' as 'connecting' | 'open' | 'reconnecting' | 'closed' | 'error' | 'unavailable',
@@ -2088,9 +2122,17 @@ async function sendPrompt() {
   if (!session?.projectPath) return;
   const bundle = contextBundleBySessionId[sessionId];
   sendingSessionIds.add(sessionId);
+
+  // Prepend any text attachments as context before the prompt
+  let finalPrompt = sentPrompt;
+  if (textAttachments.length > 0) {
+    const blocks = textAttachments.map((t, i) => `[Attached text ${i + 1}]\n${t.content}`).join('\n\n---\n\n');
+    finalPrompt = `${blocks}\n\n---\n\n${sentPrompt}`;
+  }
+
   try {
     await apiPost(`/agent/sessions/${encodeURIComponent(sessionId)}/send`, {
-      prompt: sentPrompt,
+      prompt: finalPrompt,
       context: bundle?.payload,
       attachments: composerAttachments.filter((item) => item.status === 'uploaded' && item.id).map((item) => item.id),
       projectPath: session.projectPath
@@ -2099,6 +2141,7 @@ async function sendPrompt() {
       forms.prompt = '';
       draftBySessionId[sessionId] = '';
       composerAttachments.splice(0, composerAttachments.length);
+      textAttachments.splice(0, textAttachments.length);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send prompt';
