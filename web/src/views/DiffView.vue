@@ -21,7 +21,7 @@ import DiffWorkbench from '../components/diff/DiffWorkbench.vue';
 defineProps<{
   currentProject: { id: string; name: string; path: string; branch: string } | null;
   diffStyle: 'split' | 'unified';
-  openRequest?: { token: number; mode: 'session' | 'history'; files?: string[] } | null;
+  openRequest?: { token: number; mode: 'session' | 'history' | 'commit' | 'uncommitted'; files?: string[]; commitRef?: string } | null;
   themeType: 'dark' | 'light';
   themePreset: ThemePreset;
   preferredEditor: string | null;
@@ -31,7 +31,7 @@ defineProps<{
 defineEmits<{
   'update:diffStyle': [value: 'split' | 'unified'];
   openProjects: [];
-  startSessionFromDiff: [payload: { source: 'uncommitted' | 'commits'; ref?: string; file?: string; paths?: string[]; context?: string }];
+  startSessionFromDiff: [payload: { source: 'uncommitted' | 'commit'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }>; context?: string }];
   openSettings: [];
 }>();
 </script>

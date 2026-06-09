@@ -8,6 +8,7 @@ import { sessionsRoutes } from "./sessions";
 import { appendEvents, createSession } from "../services/session-store";
 import { registerProject, resetProjectStoreForTests, setCurrentProject } from "../services/project-store";
 import { __setRunningTurnForTests } from "../services/agent-runtime";
+import { normalizeProjectPath } from "../services/session-resolver";
 
 let root = "";
 let repoA = "";
@@ -163,7 +164,7 @@ describe("session routes projectPath resolution", () => {
     const res = await app.request(`/api/sessions/${session.id}/export?projectPath=${encodeURIComponent(repoA)}&format=pi-jsonl`);
     expect(res.status).toBe(200);
     const lines = (await res.text()).trim().split("\n").map((line) => JSON.parse(line));
-    expect(lines[0]).toMatchObject({ type: "session", version: 3, id: session.id, cwd: repoA.replace(/\\/g, "/").toLowerCase() });
+    expect(lines[0]).toMatchObject({ type: "session", version: 3, id: session.id, cwd: normalizeProjectPath(repoA) });
     expect(lines[1]).toMatchObject({ type: "message", message: { role: "user", content: "hello" } });
     expect(lines[2]).toMatchObject({ type: "message", message: { role: "assistant", content: "hi there" } });
   });

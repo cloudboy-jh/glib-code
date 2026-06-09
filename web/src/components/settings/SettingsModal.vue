@@ -140,6 +140,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch } from 'vue';
+import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import { Check } from 'lucide-vue-next';
 import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
@@ -168,7 +169,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  'update:theme': [value: string];
+  'update:theme': [value: ThemePreset];
   'update:provider': [value: string];
   'update:model': [value: string];
   'update:keybinding': [command: string, key: string];
