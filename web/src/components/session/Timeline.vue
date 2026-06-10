@@ -34,6 +34,21 @@
           </template>
         </div>
 
+        <!-- Attachment chips — shown for User entries that had file attachments -->
+        <div v-if="e.attachments?.length" class="mt-2 flex flex-wrap gap-1.5">
+          <a
+            v-for="attach in e.attachments"
+            :key="attach.id"
+            :href="`${API_BASE}/attachments/${encodeURIComponent(attach.id)}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[11px] text-muted-foreground/80 hover:border-border hover:text-foreground/90 transition-colors"
+          >
+            <Paperclip class="h-3 w-3 shrink-0 opacity-60" />
+            <span class="truncate">{{ attach.name }}</span>
+          </a>
+        </div>
+
         <div v-if="e.toolCalls?.length" class="mt-2">
           <!-- Accordion summary row -->
           <button
@@ -50,13 +65,13 @@
             <span class="min-w-0 flex-1 truncate text-left text-muted-foreground/70">
               {{ toolCallSummary(e.toolCalls, e.id === activeAssistantId) }}
             </span>
-            <span v-if="e.id !== activeAssistantId" class="shrink-0 text-[10px] text-muted-foreground/40">
+            <span class="shrink-0 text-[10px] text-muted-foreground/40">
               {{ expandedTurns.has(e.id) ? 'collapse' : 'expand' }}
             </span>
           </button>
 
           <!-- Expanded rows (non-tree only) -->
-          <div v-if="expandedTurns.has(e.id) || e.id === activeAssistantId" class="mt-0.5 space-y-px">
+          <div v-if="expandedTurns.has(e.id)" class="mt-0.5 space-y-px">
             <div
               v-for="tool in groupToolCalls(e.toolCalls).filter(t => t.renderKind !== 'tree')"
               :key="tool.groupId"
@@ -145,7 +160,9 @@
 import { computed, nextTick, onMounted, reactive, ref, watch, TransitionGroup } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { ChevronDown, ChevronRight } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, Paperclip } from 'lucide-vue-next';
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import DiffView from '../shared/DiffView.vue';
 import FileTreeView from '../shared/FileTreeView.vue';
@@ -161,6 +178,7 @@ const props = defineProps<{
     time: string;
     at?: string;
     level?: 'info' | 'error';
+    attachments?: Array<{ id: string; name: string }>;
     toolCalls?: Array<{
       id: string;
       title: string;
@@ -205,12 +223,16 @@ const activeAssistantEntry = computed(() => {
 
 const activeAssistantId = computed(() => activeAssistantEntry.value?.id ?? '');
 
-// Accordion state — tracks which completed turns are expanded
+// Accordion state — tracks which turns are expanded
 const expandedTurns = reactive(new Set<string>());
 
+// Auto-expand when a turn becomes active, collapse it back when it finishes
+// so the user's manual open/close on completed turns is respected
+watch(activeAssistantId, (newId) => {
+  if (newId) expandedTurns.add(newId);
+}, { immediate: true });
+
 function toggleTurn(id: string) {
-  // Don't toggle while actively running — always expanded
-  if (id === activeAssistantId.value) return;
   if (expandedTurns.has(id)) {
     expandedTurns.delete(id);
   } else {

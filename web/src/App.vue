@@ -87,6 +87,7 @@
             :text-attachments="textAttachments"
             :composer-disabled="composerDisabled"
             :is-agent-running="activeSession?.status === 'running'"
+            :is-agent-stopping="Boolean(state.activeSessionId && stoppingSessionIds.has(state.activeSessionId))"
             :session-continue-open="state.sessionContinueOpen"
             :recent-project-sessions="recentProjectSessions"
             :agent-setup-message="state.agentSetupMessage"
@@ -307,9 +308,11 @@
       </div>
     </div>
 
-    <div v-if="state.promoteDialogOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="state.promoteDialogOpen = false">
+    <div v-if="state.promoteDialogOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="(!promote.result || promote.alreadyPromoted) && (state.promoteDialogOpen = false)">
       <div class="flex h-full max-h-[calc(100vh-2rem)] w-full max-w-[min(1500px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40 sm:max-h-[calc(100vh-3rem)]">
-        <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
+
+        <!-- Header — hidden on success or already promoted -->
+        <div v-if="!promote.result && !promote.alreadyPromoted" class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
           <div>
             <div class="text-sm font-medium">Session diff and commit</div>
             <div class="mt-0.5 text-[11px] text-muted-foreground">{{ promoteSelectionLabel }} · {{ promoteFlowLabel }}</div>
@@ -338,38 +341,90 @@
             <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Close</button>
           </div>
         </div>
-        <div class="min-h-0 flex-1 overflow-hidden p-3">
-            <div v-if="promote.loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
-            <div v-else-if="promote.error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">
-              <div class="max-w-xl">
-                <div>{{ promote.error }}</div>
-                <div v-if="promote.dirtyFiles.length" class="mt-3 max-h-40 overflow-auto rounded border border-red-200/20 bg-black/15 p-2 text-left font-mono text-[11px] text-red-50/85">
-                  <div v-for="file in promote.dirtyFiles" :key="file" class="truncate">{{ file }}</div>
-                </div>
-                <button v-if="promote.dirtyFiles.length" class="mt-4 rounded-md border border-red-200/30 bg-red-100/10 px-3 py-1.5 text-xs font-semibold text-red-50 hover:bg-red-100/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="promote.stashing" @click="stashAndRetryPromote">
-                  {{ promote.stashing ? 'Stashing…' : 'Stash and continue' }}
-                </button>
+
+        <!-- Content area -->
+        <div class="min-h-0 flex-1 overflow-hidden">
+
+          <!-- Already promoted state — show existing commit -->
+          <div v-if="promote.alreadyPromoted" class="promote-success grid h-full place-items-center">
+            <div class="flex flex-col items-center gap-5 text-center">
+              <div class="promote-check-wrap">
+                <svg class="promote-check-svg" viewBox="0 0 52 52" fill="none">
+                  <circle class="promote-check-circle" cx="26" cy="26" r="24" stroke-width="2" />
+                  <polyline class="promote-check-tick" points="14,27 22,35 38,18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
               </div>
-            </div>
-            <div v-else-if="promote.result" class="grid h-full place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-sm text-emerald-100">
               <div>
-                <div class="font-medium">{{ promoteResultTitle }}</div>
-                <div class="mt-1 text-xs text-emerald-100/75">{{ promote.result.branch }} @ {{ promote.result.sha.slice(0, 7) }}</div>
-                <div v-if="promote.pushResult" class="mt-1 text-xs text-emerald-100/75">Pushed {{ promote.pushResult.upstream }} @ {{ promote.pushResult.sha.slice(0, 7) }}</div>
+                <div class="text-base font-semibold text-foreground/95">Already committed</div>
+                <div class="mt-1.5 text-[12px] text-muted-foreground/70">This session was already promoted.</div>
+                <div v-if="promote.promotedSha" class="mt-1 font-mono text-[11px] text-muted-foreground/50">{{ promote.promotedSha.slice(0, 7) }}</div>
+              </div>
+              <button class="rounded-md border border-border/70 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Close</button>
+            </div>
+          </div>
+
+          <!-- Success state — full bleed, animated checkmark -->
+          <div v-else-if="promote.result" class="promote-success grid h-full place-items-center">
+            <div class="flex flex-col items-center gap-5 text-center">
+              <div class="promote-check-wrap">
+                <svg class="promote-check-svg" viewBox="0 0 52 52" fill="none">
+                  <circle class="promote-check-circle" cx="26" cy="26" r="24" stroke-width="2" />
+                  <polyline class="promote-check-tick" points="14,27 22,35 38,18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <svg class="promote-countdown-ring" viewBox="0 0 52 52">
+                  <circle class="promote-countdown-track" cx="26" cy="26" r="24" />
+                  <circle class="promote-countdown-arc" cx="26" cy="26" r="24" />
+                </svg>
+              </div>
+              <div>
+                <div class="text-base font-semibold text-foreground/95">{{ promoteResultTitle }}</div>
+                <div class="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground/70">
+                  <span>{{ promote.result.branch }} <span class="font-mono text-[11px]">{{ promote.result.sha.slice(0, 7) }}</span></span>
+                  <span v-if="promote.pushResult">· pushed {{ promote.pushResult.upstream }} <span class="font-mono text-[11px]">{{ promote.pushResult.sha.slice(0, 7) }}</span></span>
+                </div>
               </div>
             </div>
-            <div v-else-if="!promote.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
-            <SharedDiffView v-else :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
+          </div>
+
+          <!-- Error -->
+          <div v-else-if="promote.error" class="grid h-full place-items-center p-6">
+            <div class="max-w-xl text-center">
+              <div class="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" /></svg>
+              </div>
+              <div class="text-sm text-foreground/90">{{ promote.error }}</div>
+              <div v-if="promote.dirtyFiles.length" class="mt-3 max-h-40 overflow-auto rounded border border-red-200/20 bg-black/15 p-2 text-left font-mono text-[11px] text-red-50/85">
+                <div v-for="file in promote.dirtyFiles" :key="file" class="truncate">{{ file }}</div>
+              </div>
+              <button v-if="promote.dirtyFiles.length" class="mt-4 rounded-md border border-red-200/30 bg-red-100/10 px-3 py-1.5 text-xs font-semibold text-red-50 hover:bg-red-100/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="promote.stashing" @click="stashAndRetryPromote">
+                {{ promote.stashing ? 'Stashing…' : 'Stash and continue' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading -->
+          <div v-else-if="promote.loading" class="grid h-full place-items-center p-3 text-sm text-muted-foreground">Loading diff…</div>
+
+          <!-- No changes -->
+          <div v-else-if="!promote.diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 p-3 text-sm text-muted-foreground">No session changes.</div>
+
+          <!-- Diff -->
+          <div v-else class="h-full p-3">
+            <MultiDiffView :patch="promote.diff" :diff-style="state.diffStyle" :theme-type="diffThemeType" :theme-preset="settings.themePreset" />
+          </div>
         </div>
-        <div class="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card/98 px-4 py-3">
+
+        <!-- Footer — hidden on success or already promoted -->
+        <div v-if="!promote.result && !promote.alreadyPromoted" class="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card/98 px-4 py-3">
           <div class="text-xs text-muted-foreground">
-            {{ promoteStatusLabel }}
+            <template v-if="!promote.error">{{ promoteStatusLabel }}</template>
           </div>
           <div class="flex items-center gap-2">
-          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.promoteDialogOpen = false">Cancel</button>
-            <button class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promoteCommitDisabled" @click="confirmPromote">{{ promoteCommitLabel }}</button>
+            <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.promoteDialogOpen = false">{{ promote.error ? 'Close' : 'Cancel' }}</button>
+            <button v-if="!promote.error" class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promoteCommitDisabled" @click="confirmPromote">{{ promoteCommitLabel }}</button>
           </div>
         </div>
+
       </div>
     </div>
 
@@ -437,6 +492,7 @@ import logoWordmark from '../../assets/glibcode-wordmark.png';
 const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
 const SharedDiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
+const MultiDiffView = defineAsyncComponent(() => import('./components/shared/MultiDiffView.vue'));
 const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
 const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
@@ -502,6 +558,7 @@ type TimelineEntry = {
   time: string;
   at?: string;
   level?: 'info' | 'error';
+  attachments?: Array<{ id: string; name: string }>;
   toolCalls?: Array<{
     id: string;
     title: string;
@@ -674,7 +731,9 @@ const promote = reactive({
   pushResult: null as null | { remote: string; branch: string; upstream: string; sha: string },
   files: [] as string[],
   selectedFiles: [] as string[],
-  fileMenuOpen: false
+  fileMenuOpen: false,
+  alreadyPromoted: false,
+  promotedSha: null as string | null,
 });
 
 const conflict = reactive({
@@ -709,6 +768,8 @@ type ComposerAttachment = {
 };
 
 const composerAttachments = reactive<ComposerAttachment[]>([]);
+// Persist attachment names across send so we can label them in the timeline on replay
+const attachmentNameById = new Map<string, string>();
 const attachmentInputRef = ref<HTMLInputElement | null>(null);
 
 // Text attachments — pasted long text blobs
@@ -864,6 +925,7 @@ const staleSessionIds = reactive(new Set<string>());
 const sessionNoticeById = reactive<Record<string, string | undefined>>({});
 const streamErrorCountBySessionId = new Map<string, number>();
 const sendingSessionIds = reactive(new Set<string>());
+const stoppingSessionIds = reactive(new Set<string>());
 const hydratedVersionBySessionId = new Map<string, string>();
 const hydratingSessionDocById = new Map<string, Promise<void>>();
 
@@ -1224,7 +1286,8 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   if (event.type === 'user_turn') {
     const id = `${event.turnId}-user`;
     if (!findTimelineEntry(sessionId, id)) {
-      appendTimelineEvent(sessionId, { id, kind: 'User', text: event.prompt, time: timeLabel(event.at), at: event.at, level: 'info' });
+      const attachments = event.attachments?.map((aid) => ({ id: aid, name: attachmentNameById.get(aid) ?? aid }));
+      appendTimelineEvent(sessionId, { id, kind: 'User', text: event.prompt, time: timeLabel(event.at), at: event.at, level: 'info', attachments });
     }
     return;
   }
@@ -1274,6 +1337,7 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
     if (event.reason === 'aborted' && !findTimelineEntry(sessionId, `${event.turnId}-aborted`)) {
       appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), at: event.at, level: 'info' });
     }
+    stoppingSessionIds.delete(sessionId);
     setSessionStatus(sessionId, event.reason === 'error' || event.reason === 'aborted' ? 'disconnected' : 'connected');
     if (event.cost != null && event.tokens) {
       const session = sessions.find((s) => s.id === sessionId);
@@ -2131,10 +2195,15 @@ async function sendPrompt() {
   }
 
   try {
+    const uploadedAttachments = composerAttachments.filter((item) => item.status === 'uploaded' && item.id);
+    // Stash names so the timeline can label them even after the composer is cleared
+    for (const item of uploadedAttachments) {
+      if (item.id) attachmentNameById.set(item.id, item.name);
+    }
     await apiPost(`/agent/sessions/${encodeURIComponent(sessionId)}/send`, {
       prompt: finalPrompt,
       context: bundle?.payload,
-      attachments: composerAttachments.filter((item) => item.status === 'uploaded' && item.id).map((item) => item.id),
+      attachments: uploadedAttachments.map((item) => item.id),
       projectPath: session.projectPath
     });
     if (state.activeSessionId === sessionId && forms.prompt === sentPrompt) {
@@ -2180,8 +2249,17 @@ async function runPromote() {
   promote.files = [];
   promote.selectedFiles = [];
   promote.fileMenuOpen = false;
+  promote.alreadyPromoted = false;
+  promote.promotedSha = null;
+  promote.result = null;
+  promote.pushResult = null;
   try {
-    const payload = await apiGet<{ diff: string; files?: string[] }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
+    const payload = await apiGet<{ diff: string; files?: string[]; alreadyPromoted?: boolean; promotedSha?: string | null }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
+    if (payload.alreadyPromoted) {
+      promote.alreadyPromoted = true;
+      promote.promotedSha = payload.promotedSha ?? null;
+      return;
+    }
     promote.diff = payload.diff ?? '';
     promote.files = payload.files?.length ? payload.files : filesFromPatch(promote.diff);
     promote.selectedFiles = [...promote.files];
@@ -2224,6 +2302,7 @@ async function confirmPromote() {
       promote.pushing = true;
       promote.pushResult = await apiPost<{ remote: string; branch: string; upstream: string; sha: string }>('/git/push', {});
     }
+    setTimeout(() => { state.promoteDialogOpen = false; }, 3000);
     appendTimelineEvent(state.activeSessionId, {
       id: `${state.activeSessionId}-${Date.now()}-promote`,
       kind: 'Promote',
@@ -2285,7 +2364,14 @@ async function abortTurn() {
   if (!state.activeSessionId) return;
   const session = activeSession.value;
   if (!session?.projectPath) return;
-  await apiDelete(`/agent/sessions/${encodeURIComponent(state.activeSessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
+  const sessionId = state.activeSessionId;
+  stoppingSessionIds.add(sessionId);
+  try {
+    await apiDelete(`/agent/sessions/${encodeURIComponent(sessionId)}/turn?projectPath=${encodeURIComponent(session.projectPath)}`);
+  } catch {
+    // 404 = no active turn (already stopped), or network hiccup — either way, clear stopping state
+    stoppingSessionIds.delete(sessionId);
+  }
 }
 
 function terminalWsUrl() {

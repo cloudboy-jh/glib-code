@@ -1,4 +1,20 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+
+async function rmRetry(path: string, maxAttempts = 5, delayMs = 300): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await rm(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if ((code === "EBUSY" || code === "EPERM" || code === "EACCES") && attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
 import { dirname, join, relative, resolve } from "node:path";
 import { parseLocalRefUri } from "gittrix/packages/core/src/ref.js";
 import type { AdapterCapabilities, DurableAdapter, EphemeralAdapter, ListEntry } from "gittrix/packages/core/src/types.js";
@@ -92,7 +108,7 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
     const durablePath = resolve(durable.path);
     const workspacePath = this.sessionPath(sessionId);
     await mkdir(this.sessionDir(sessionId), { recursive: true });
-    await rm(workspacePath, { recursive: true, force: true });
+    await rmRetry(workspacePath);
 
     await ensureShaAvailable(durablePath, baseline.sha);
 
@@ -101,7 +117,7 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
       await runGit(["worktree", "add", "--detach", workspacePath, baseline.sha], durablePath);
     } catch {
       workspaceKind = "clone";
-      await rm(workspacePath, { recursive: true, force: true });
+      await rmRetry(workspacePath);
       await runGit(["clone", "--no-checkout", durablePath, workspacePath], durablePath);
       await runGit(["checkout", "--detach", baseline.sha], workspacePath);
     }
@@ -152,7 +168,7 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
       try {
         await runGit(["worktree", "remove", "--force", workspacePath], info.durablePath);
       } catch {
-        await rm(workspacePath, { recursive: true, force: true });
+        await rmRetry(workspacePath);
       }
       try {
         await runGit(["worktree", "prune"], info.durablePath);
@@ -160,7 +176,7 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
         // Best-effort cleanup: stale worktree metadata should not block eviction.
       }
     } else {
-      await rm(workspacePath, { recursive: true, force: true });
+      await rmRetry(workspacePath);
     }
   }
 

@@ -26,7 +26,8 @@ export function useSessionStreaming(options: {
     for (const name of names) {
       stream.addEventListener(name, (evt) => {
         options.streamErrorCountBySessionId.set(sessionId, 0);
-        options.setSessionStatus(sessionId, 'connected');
+        const session = options.sessions.find((s) => s.id === sessionId);
+        if (session?.status !== 'running') options.setSessionStatus(sessionId, 'connected');
         if (!options.staleSessionIds.has(sessionId)) options.sessionNoticeById[sessionId] = undefined;
         const message = evt as MessageEvent<string>;
         try {

@@ -2,15 +2,7 @@
   <div class="shrink-0 px-3 pb-2 pt-1 sm:px-4 sm:pt-1.5">
     <div class="mx-auto w-full max-w-4xl rounded-2xl border border-border/80 bg-card/90 p-2 shadow-sm shadow-black/10 sm:p-2.5">
 
-      <!-- Running state: status line in the card body -->
-      <Transition name="composer-status">
-        <div v-if="isRunning" class="composer-status-line">
-          <span class="min-w-0 flex-1 truncate text-[13px] text-muted-foreground/85">{{ statusLabel || 'Working…' }}</span>
-          <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/50">{{ elapsed }}</span>
-        </div>
-      </Transition>
-
-      <!-- Idle state: full input area -->
+      <!-- Input area — hidden while running, shown when idle -->
       <Transition name="composer-body">
         <div v-if="!isRunning" class="composer-body">
           <ComposerInput
@@ -74,9 +66,10 @@
         </div>
       </Transition>
 
-      <ComposerFooter :meta="meta" :disabled="disabled" :is-running="isRunning" @send="onSend" @stop="$emit('stop')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
+      <ComposerFooter :meta="meta" :disabled="disabled" :is-running="isRunning" :is-stopping="isStopping" @send="onSend" @stop="$emit('stop')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
     </div>
   </div>
+
 </template>
 
 <script setup lang="ts">
@@ -92,23 +85,21 @@ const props = withDefaults(
     context: string;
     prompt: string;
     meta?: string;
-    statusLabel?: string;
-    elapsed?: string;
     contextChips?: Array<{ id: string; label: string }>;
     textAttachments?: Array<{ id: string; label: string; content: string }>;
     attachments?: Array<{ localId: string; name: string; status: 'queued' | 'uploading' | 'uploaded' | 'failed' | 'removing' }>;
     disabled?: boolean;
     isRunning?: boolean;
+    isStopping?: boolean;
   }>(),
   {
     meta: 'GPT-5.3 Codex · High · Full access',
-    statusLabel: '',
-    elapsed: '0:00',
     contextChips: () => [],
     textAttachments: () => [],
     attachments: () => [],
     disabled: false,
     isRunning: false,
+    isStopping: false,
   }
 );
 
@@ -139,23 +130,6 @@ function onSend() {
 </script>
 
 <style scoped>
-/* Running status line */
-.composer-status-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px 6px;
-}
-
-.composer-status-enter-active,
-.composer-status-leave-active {
-  transition: opacity 150ms ease;
-}
-.composer-status-enter-from,
-.composer-status-leave-to {
-  opacity: 0;
-}
-
 /* Input body */
 .composer-body {
   transition: opacity 200ms ease, transform 200ms ease;

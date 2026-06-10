@@ -19,28 +19,16 @@
 
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
 
-      <!-- Agent status bar — visible panel with primary tint -->
-      <Transition name="status-bar">
-        <div v-if="isAgentRunning" class="status-bar">
-          <div class="status-bar-inner mx-auto w-full max-w-4xl">
-            <span class="status-dot" />
-            <span class="min-w-0 flex-1 truncate text-[12px] text-foreground/80">{{ agentStatusLabel }}</span>
-            <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60">{{ elapsed }}</span>
-          </div>
-        </div>
-      </Transition>
-
       <Composer
         :context="contextLabel"
         :prompt="prompt"
         :meta="selectedModelLabel"
-        :status-label="agentStatusLabel"
-        :elapsed="elapsed"
         :context-chips="activeContextChips"
         :text-attachments="textAttachments"
         :attachments="attachments"
         :disabled="composerDisabled"
         :is-running="isAgentRunning"
+        :is-stopping="isAgentStopping"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
         @stop="$emit('stopAgent')"
@@ -126,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted } from 'vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import { History, PlusSquare } from 'lucide-vue-next';
 import Composer from '../components/session/Composer.vue';
@@ -140,6 +128,7 @@ type TimelineEntry = {
   time: string;
   at?: string;
   level?: 'info' | 'error';
+  attachments?: Array<{ id: string; name: string }>;
   toolCalls?: Array<{
     id: string;
     title: string;
@@ -173,6 +162,7 @@ const props = defineProps<{
   textAttachments: Array<{ id: string; label: string; content: string }>;
   composerDisabled: boolean;
   isAgentRunning: boolean;
+  isAgentStopping: boolean;
   sessionContinueOpen: boolean;
   recentProjectSessions: Array<{ id: string; title: string; time: string }>;
   agentSetupMessage: string;
@@ -210,78 +200,7 @@ defineEmits<{
   openFileDiff: [fileTarget: string | undefined];
 }>();
 
-// Current tool name derived from the live timeline
-const agentStatusLabel = computed(() => {
-  for (let i = props.activeTimeline.length - 1; i >= 0; i--) {
-    const entry = props.activeTimeline[i];
-    if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
-    const running = (entry.toolCalls ?? []).filter((t) => t.status === 'running');
-    if (running.length > 0) return running[running.length - 1].title;
-  }
-  return 'Working…';
-});
 
-// Elapsed timer — starts when isAgentRunning flips true
-const nowMs = ref(Date.now());
-const startMs = ref(Date.now());
-let timer: ReturnType<typeof setInterval> | null = null;
-
-watch(() => props.isAgentRunning, (running) => {
-  if (running) {
-    startMs.value = Date.now();
-    nowMs.value = Date.now();
-    timer = setInterval(() => { nowMs.value = Date.now(); }, 1000);
-  } else {
-    if (timer) { clearInterval(timer); timer = null; }
-  }
-}, { immediate: true });
-
-onUnmounted(() => { if (timer) clearInterval(timer); });
-
-const elapsed = computed(() => {
-  if (!props.isAgentRunning) return '0:00';
-  const s = Math.max(0, Math.floor((nowMs.value - startMs.value) / 1000));
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, '0')}`;
-});
 </script>
 
-<style scoped>
-.status-bar {
-  margin-bottom: 4px;
-  padding: 0 12px;
-}
 
-@media (min-width: 640px) {
-  .status-bar { padding: 0 16px; }
-}
-
-.status-bar-inner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  padding: 6px 12px;
-}
-
-.status-dot {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--primary);
-  opacity: 0.9;
-}
-
-.status-bar-enter-active,
-.status-bar-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.status-bar-enter-from,
-.status-bar-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-</style>

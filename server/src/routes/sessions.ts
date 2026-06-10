@@ -133,6 +133,10 @@ export const sessionsRoutes = new Hono()
       const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
       return c.json({ diff: patch, files: filesFromPatch(patch) });
     } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === "SESSION_EXPIRED") {
+        return c.json({ diff: "", files: [], alreadyPromoted: true, promotedSha: doc.meta.baselineSha ?? null });
+      }
       logError("server", "session diff failed", error, {
         sessionId: doc.meta.id,
         gittrixSessionId: doc.meta.gittrixSessionId,
