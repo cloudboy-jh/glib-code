@@ -529,14 +529,17 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
     if (errorMessage) return rememberError(turnId, errorMessage);
     const usage = extractUsage((event as any).message);
     if (usage) {
-      return {
-        type: "turn_end",
-        turnId,
-        reason: "stop",
-        cost: usage.cost,
-        tokens: usage.tokens,
-        at: nowIso()
-      };
+      // Accumulate into turnUsageAccumulator; the real turn_end is emitted by
+      // runTurn after promptRuntime resolves so the running indicator stays live
+      // for the full agentic loop (multiple LLM calls / tool rounds).
+      const acc = turnUsageAccumulator.get(turnId) ?? { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } };
+      acc.cost += usage.cost;
+      acc.tokens.input += usage.tokens.input;
+      acc.tokens.output += usage.tokens.output;
+      acc.tokens.reasoning += usage.tokens.reasoning;
+      acc.tokens.cacheRead += usage.tokens.cacheRead;
+      acc.tokens.cacheWrite += usage.tokens.cacheWrite;
+      turnUsageAccumulator.set(turnId, acc);
     }
     return null;
   }
@@ -797,7 +800,14 @@ export async function runTurn(params: {
       }
     }
     if (runningTurns.get(params.sessionId)?.turnId !== params.turnId) return { turnId: params.turnId, ok: true };
-    const end: AgentEvent = { type: "turn_end", turnId: params.turnId, reason: "stop", at: nowIso() };
+    const accumulated = turnUsageAccumulator.get(params.turnId);
+    const end: AgentEvent = {
+      type: "turn_end",
+      turnId: params.turnId,
+      reason: "stop",
+      at: nowIso(),
+      ...(accumulated ? { cost: accumulated.cost, tokens: accumulated.tokens } : {})
+    };
     await params.onEvent(end);
     broadcast(params.sessionId, end);
     log("agent", "turn stopped", { sessionId: params.sessionId, turnId: params.turnId });

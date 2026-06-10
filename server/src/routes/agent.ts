@@ -292,8 +292,13 @@ export const agentRoutes = new Hono()
     if (!existing) return c.json(routeError("session not found", "SESSION_NOT_FOUND"), 404);
     const turnId = abortRunningTurn(id);
     if (!turnId) return c.json(routeError("no active turn", "NO_ACTIVE_TURN"), 404);
-    const evt: AgentEvent = { type: "aborted", turnId, at: new Date().toISOString() };
-    await appendEvents(projectPath, id, [evt, { type: "turn_end", turnId, reason: "aborted", at: new Date().toISOString() }]);
+    const abortedEvt: AgentEvent = { type: "aborted", turnId, at: new Date().toISOString() };
+    const turnEndEvt: AgentEvent = { type: "turn_end", turnId, reason: "aborted", at: new Date().toISOString() };
+    await appendEvents(projectPath, id, [abortedEvt, turnEndEvt]);
+    // Broadcast so SSE clients immediately exit the stopping state; runTurn's
+    // own turn_end may never fire if pi resolves cleanly after abort.
+    broadcast(id, abortedEvt);
+    broadcast(id, turnEndEvt);
     await patchSessionMeta(projectPath, id, { status: "aborted" });
     return c.json({ ok: true, sessionId: id, turnId });
   })

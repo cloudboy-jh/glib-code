@@ -12,8 +12,13 @@
       >
 
         <div class="mb-1.5 flex items-center justify-between gap-3">
-          <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/90">{{ e.kind }}</span>
-          <span class="shrink-0 text-[11px] text-muted-foreground/65">{{ e.time }}</span>
+          <span :class="['text-[10px] font-semibold uppercase tracking-[0.12em]', e.id === activeAssistantId ? 'timeline-shimmer' : 'text-muted-foreground/90']">
+            {{ e.kind }}
+          </span>
+          <span class="shrink-0 text-[11px] tabular-nums text-muted-foreground/65">
+            <template v-if="e.id === activeAssistantId && elapsedLabel">{{ elapsedLabel }}</template>
+            <template v-else>{{ e.time }}</template>
+          </span>
         </div>
 
         <div v-if="e.level === 'error'" class="rounded-md border border-red-500/35 bg-red-950/20 px-3 py-2 text-sm text-red-300/95">
@@ -32,6 +37,7 @@
             </div>
             <pre v-else class="max-h-64 overflow-auto rounded-md bg-black/20 p-2 text-[11px] leading-5 text-muted-foreground">{{ block.value }}</pre>
           </template>
+          <span v-if="e.id === activeAssistantId" class="timeline-cursor" aria-hidden="true" />
         </div>
 
         <!-- Attachment chips — shown for User entries that had file attachments -->
@@ -59,10 +65,8 @@
             ]"
             @click="toggleTurn(e.id)"
           >
-            <!-- Spinner while running, chevron otherwise -->
-            <span v-if="e.id === activeAssistantId" class="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-sky-300/40 border-t-sky-200" />
-            <component :is="expandedTurns.has(e.id) ? ChevronDown : ChevronRight" v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
-            <span class="min-w-0 flex-1 truncate text-left text-muted-foreground/70">
+            <component :is="expandedTurns.has(e.id) ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+            <span :class="['min-w-0 flex-1 truncate text-left', e.id === activeAssistantId ? 'timeline-shimmer' : 'text-muted-foreground/70']">
               {{ toolCallSummary(e.toolCalls, e.id === activeAssistantId) }}
             </span>
             <div
@@ -144,30 +148,50 @@
   opacity: 0;
   transform: translateY(-4px);
 }
-</style>
 
-<style scoped>
-.timeline-entry-enter-active {
-  transition: opacity 200ms ease, transform 200ms ease;
+.timeline-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--foreground) / 0.35) 0%,
+    hsl(var(--foreground) / 0.35) 40%,
+    hsl(var(--foreground) / 0.95) 50%,
+    hsl(var(--foreground) / 0.35) 60%,
+    hsl(var(--foreground) / 0.35) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: timeline-shimmer-sweep 2.2s linear infinite;
 }
-.timeline-entry-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
+
+@keyframes timeline-shimmer-sweep {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
-.timeline-entry-leave-active {
-  transition: opacity 150ms ease, transform 150ms ease;
+
+.timeline-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  background: hsl(var(--foreground) / 0.85);
+  animation: timeline-cursor-blink 1s steps(2, start) infinite;
 }
-.timeline-entry-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
+
+@keyframes timeline-cursor-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 </style>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch, TransitionGroup } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, toRef, watch, TransitionGroup } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChevronDown, ChevronRight, Paperclip } from 'lucide-vue-next';
+import { useElapsed } from '../../composables/useElapsed';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
@@ -205,6 +229,8 @@ const props = defineProps<{
   }>;
   themePreset?: ThemePreset;
   themeType?: 'dark' | 'light';
+  isAgentRunning?: boolean;
+  turnStartedAt?: string | null;
 }>();
 
 defineEmits<{ openFileDiff: [fileTarget: string | undefined] }>();
@@ -233,6 +259,14 @@ const followLive = ref(true);
 const pendingCount = ref(0);
 
 const activeAssistantEntry = computed(() => {
+  // While the agent is running, the last Assistant entry is the active one
+  // (covers the case where no tools have started yet — pure thinking/streaming)
+  if (props.isAgentRunning) {
+    for (let index = props.entries.length - 1; index >= 0; index -= 1) {
+      const entry = props.entries[index];
+      if (entry.kind === 'Assistant') return entry;
+    }
+  }
   for (let index = props.entries.length - 1; index >= 0; index -= 1) {
     const entry = props.entries[index];
     if (entry.kind !== 'Assistant' && entry.kind !== 'Error') continue;
@@ -242,6 +276,8 @@ const activeAssistantEntry = computed(() => {
 });
 
 const activeAssistantId = computed(() => activeAssistantEntry.value?.id ?? '');
+
+const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 
 // Accordion state — tracks which turns are expanded
 const expandedTurns = reactive(new Set<string>());

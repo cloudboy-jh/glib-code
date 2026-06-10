@@ -88,6 +88,8 @@
             :composer-disabled="composerDisabled"
             :is-agent-running="activeSession?.status === 'running'"
             :is-agent-stopping="Boolean(state.activeSessionId && stoppingSessionIds.has(state.activeSessionId))"
+            :current-tool-label="state.activeSessionId ? (currentToolBySessionId[state.activeSessionId] ?? '') : ''"
+            :turn-started-at="state.activeSessionId ? (turnStartedAtBySessionId[state.activeSessionId] ?? null) : null"
             :session-continue-open="state.sessionContinueOpen"
             :recent-project-sessions="recentProjectSessions"
             :agent-setup-message="state.agentSetupMessage"
@@ -926,6 +928,8 @@ const sessionNoticeById = reactive<Record<string, string | undefined>>({});
 const streamErrorCountBySessionId = new Map<string, number>();
 const sendingSessionIds = reactive(new Set<string>());
 const stoppingSessionIds = reactive(new Set<string>());
+const turnStartedAtBySessionId = reactive<Record<string, string | undefined>>({});
+const currentToolBySessionId = reactive<Record<string, string | undefined>>({});
 const hydratedVersionBySessionId = new Map<string, string>();
 const hydratingSessionDocById = new Map<string, Promise<void>>();
 
@@ -1294,6 +1298,8 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   if (event.type === 'turn_start') {
     ensureAssistantTurn(sessionId, event.turnId, event.at);
     setSessionStatus(sessionId, 'running');
+    turnStartedAtBySessionId[sessionId] = event.at;
+    currentToolBySessionId[sessionId] = undefined;
     return;
   }
   if (event.type === 'text_part') {
@@ -1318,6 +1324,12 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
         isError: view.status === 'failed'
       });
     }
+    // Track the current running tool for the composer label
+    if (view.status === 'running') {
+      currentToolBySessionId[sessionId] = view.title;
+    } else if (currentToolBySessionId[sessionId] === view.title) {
+      currentToolBySessionId[sessionId] = undefined;
+    }
     return;
   }
   if (event.type === 'error') {
@@ -1338,6 +1350,8 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
       appendTimelineEvent(sessionId, { id: `${event.turnId}-aborted`, kind: 'System', text: 'Turn aborted.', time: timeLabel(event.at), at: event.at, level: 'info' });
     }
     stoppingSessionIds.delete(sessionId);
+    turnStartedAtBySessionId[sessionId] = undefined;
+    currentToolBySessionId[sessionId] = undefined;
     setSessionStatus(sessionId, event.reason === 'error' || event.reason === 'aborted' ? 'disconnected' : 'connected');
     if (event.cost != null && event.tokens) {
       const session = sessions.find((s) => s.id === sessionId);

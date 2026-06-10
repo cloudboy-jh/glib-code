@@ -1,10 +1,16 @@
 <template>
-  <div class="mt-2.5 flex items-center gap-3">
+  <div :class="['flex items-center gap-3', isRunning || isStopping ? 'mt-1' : 'mt-2.5']">
 
     <!-- Running: sweep bar + stop button -->
     <template v-if="isRunning || isStopping">
       <div class="run-track min-w-0 flex-1">
-        <div :class="['run-bar', isStopping ? 'run-bar--stopping' : '']" />
+        <div class="run-pong-wrap">
+          <div :class="['run-pong', isStopping ? 'run-pong--stopping' : '']" />
+        </div>
+        <span :class="['run-shimmer', isStopping ? 'run-shimmer--stopping' : '']">
+          {{ isStopping ? 'Stopping…' : (currentToolLabel || 'Working…') }}
+        </span>
+        <span v-if="elapsedLabel" class="run-elapsed">{{ elapsedLabel }}</span>
       </div>
 
       <div class="btn-slot">
@@ -41,46 +47,138 @@
 </template>
 
 <script setup lang="ts">
+import { toRef } from 'vue';
 import { FolderTree, Paperclip, Square } from 'lucide-vue-next';
 import UiButton from '../ui/button.vue';
+import { useElapsed } from '../../composables/useElapsed';
 
-defineProps<{ meta: string; disabled?: boolean; isRunning?: boolean; isStopping?: boolean }>();
-defineEmits<{ send: []; stop: []; openCommands: []; attach: []; tree: [] }>(); 
+const props = withDefaults(
+  defineProps<{
+    meta: string;
+    disabled?: boolean;
+    isRunning?: boolean;
+    isStopping?: boolean;
+    currentToolLabel?: string;
+    turnStartedAt?: string | null;
+  }>(),
+  {
+    disabled: false,
+    isRunning: false,
+    isStopping: false,
+    currentToolLabel: '',
+    turnStartedAt: null
+  }
+);
+
+defineEmits<{ send: []; stop: []; openCommands: []; attach: []; tree: [] }>();
+
+const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 </script>
 
 <style scoped>
 /* Running indicator track */
 .run-track {
-  height: 3px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  height: 32px;
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.18);
   overflow: hidden;
   position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 12px;
 }
 
-.run-bar {
+/* Ping-pong bar lives at the bottom edge of the track */
+.run-pong-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  background: hsl(var(--primary) / 0.08);
+}
+
+.run-pong {
   position: absolute;
   top: 0;
   height: 100%;
-  width: 40%;
+  width: 28%;
   border-radius: 999px;
+  background: hsl(var(--primary));
+  animation: run-pong 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+.run-pong--stopping {
+  background: hsl(0 72% 70%);
+  animation-duration: 2.6s;
+  opacity: 0.55;
+}
+
+@keyframes run-pong {
+  0%   { left: 0%; }
+  100% { left: 72%; }
+}
+
+/* Text with shimmering gradient sweeping through it */
+.run-shimmer {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--primary) 90%, transparent) 50%,
-    transparent 100%
+    hsl(var(--foreground) / 0.35) 0%,
+    hsl(var(--foreground) / 0.35) 40%,
+    hsl(var(--foreground) / 0.95) 50%,
+    hsl(var(--foreground) / 0.35) 60%,
+    hsl(var(--foreground) / 0.35) 100%
   );
-  animation: run-sweep 1.4s ease-in-out infinite alternate;
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: run-text-shimmer 2.2s linear infinite;
 }
 
-.run-bar--stopping {
-  animation-duration: 2.4s;
-  opacity: 0.4;
+.run-shimmer--stopping {
+  background: linear-gradient(
+    90deg,
+    hsl(0 72% 70% / 0.45) 0%,
+    hsl(0 72% 70% / 0.45) 40%,
+    hsl(0 72% 70% / 1) 50%,
+    hsl(0 72% 70% / 0.45) 60%,
+    hsl(0 72% 70% / 0.45) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation-duration: 3s;
 }
 
-@keyframes run-sweep {
-  0%   { left: -40%; }
-  100% { left: 100%; }
+@keyframes run-text-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.run-elapsed {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground) / 0.7);
+  pointer-events: none;
+  flex-shrink: 0;
 }
 
 /* Chips */

@@ -66,7 +66,7 @@
         </div>
       </Transition>
 
-      <ComposerFooter :meta="meta" :disabled="disabled" :is-running="isRunning" :is-stopping="isStopping" @send="onSend" @stop="$emit('stop')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
+      <ComposerFooter :meta="meta" :disabled="disabled" :is-running="isRunning" :is-stopping="isStopping" :current-tool-label="currentToolLabel" :turn-started-at="turnStartedAt" @send="onSend" @stop="$emit('stop')" @open-commands="composerInputRef?.openCommandDialog()" @attach="$emit('attach')" @tree="$emit('showTree')" />
     </div>
   </div>
 
@@ -91,6 +91,8 @@ const props = withDefaults(
     disabled?: boolean;
     isRunning?: boolean;
     isStopping?: boolean;
+    currentToolLabel?: string;
+    turnStartedAt?: string | null;
   }>(),
   {
     meta: 'GPT-5.3 Codex · High · Full access',
@@ -100,6 +102,8 @@ const props = withDefaults(
     disabled: false,
     isRunning: false,
     isStopping: false,
+    currentToolLabel: '',
+    turnStartedAt: null,
   }
 );
 

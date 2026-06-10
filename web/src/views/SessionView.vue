@@ -17,7 +17,7 @@
         </div>
       </div>
 
-      <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" @open-file-diff="$emit('openFileDiff', $event)" />
+      <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" :turn-started-at="turnStartedAt" :is-agent-running="isAgentRunning" @open-file-diff="$emit('openFileDiff', $event)" />
 
       <Composer
         :context="contextLabel"
@@ -29,6 +29,8 @@
         :disabled="composerDisabled"
         :is-running="isAgentRunning"
         :is-stopping="isAgentStopping"
+        :current-tool-label="currentToolLabel"
+        :turn-started-at="turnStartedAt"
         @update:prompt="$emit('updatePrompt', $event)"
         @send="$emit('sendPrompt')"
         @stop="$emit('stopAgent')"
@@ -163,6 +165,8 @@ const props = defineProps<{
   composerDisabled: boolean;
   isAgentRunning: boolean;
   isAgentStopping: boolean;
+  currentToolLabel: string;
+  turnStartedAt: string | null;
   sessionContinueOpen: boolean;
   recentProjectSessions: Array<{ id: string; title: string; time: string }>;
   agentSetupMessage: string;
