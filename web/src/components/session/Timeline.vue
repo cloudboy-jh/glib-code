@@ -65,6 +65,13 @@
             <span class="min-w-0 flex-1 truncate text-left text-muted-foreground/70">
               {{ toolCallSummary(e.toolCalls, e.id === activeAssistantId) }}
             </span>
+            <div
+              v-if="!expandedTurns.has(e.id) && totalDiffStats(e.toolCalls).total > 0"
+              class="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 font-mono text-[11px] font-medium"
+            >
+              <span class="text-red-400">-{{ totalDiffStats(e.toolCalls).del }}</span>
+              <span class="text-emerald-400">+{{ totalDiffStats(e.toolCalls).add }}</span>
+            </div>
             <span class="shrink-0 text-[10px] text-muted-foreground/40">
               {{ expandedTurns.has(e.id) ? 'collapse' : 'expand' }}
             </span>
@@ -84,11 +91,11 @@
                 <!-- -N +N diff badge -->
                 <button
                   v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
-                  class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/50"
+                  class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium hover:bg-muted/50"
                   @click="$emit('openFileDiff', tool.fileTarget)"
                 >
-                  <span class="text-red-400/80">-{{ diffStats(tool.diff).del }}</span>
-                  <span class="text-emerald-400/80">+{{ diffStats(tool.diff).add }}</span>
+                  <span class="text-red-400">-{{ diffStats(tool.diff).del }}</span>
+                  <span class="text-emerald-400">+{{ diffStats(tool.diff).add }}</span>
                 </button>
               </div>
 
@@ -205,6 +212,19 @@ defineEmits<{ openFileDiff: [fileTarget: string | undefined] }>();
 function diffStats(patch: string) {
   const add = (patch.match(/^\+(?!\+\+)/gm) ?? []).length;
   const del = (patch.match(/^-(?!--)/gm) ?? []).length;
+  return { add, del, total: add + del };
+}
+
+function totalDiffStats(toolCalls: NonNullable<(typeof props.entries)[number]['toolCalls']>) {
+  let add = 0;
+  let del = 0;
+  for (const tool of toolCalls) {
+    if (tool.renderKind === 'diff' && tool.diff) {
+      const stats = diffStats(tool.diff);
+      add += stats.add;
+      del += stats.del;
+    }
+  }
   return { add, del, total: add + del };
 }
 
