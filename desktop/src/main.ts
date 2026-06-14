@@ -3,6 +3,13 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+// Production layout (inside .app bundle):
+// Resources/
+//   app/          ← app.getAppPath(), compiled main.js + preload.js
+//   server/       ← extraResources: Bun server source
+//   web/dist/     ← extraResources: built Vue app
+// process.resourcesPath points to Resources/
+
 let serverProc: ReturnType<typeof spawn> | null = null;
 const isDev = process.env.GLIB_DESKTOP_DEV === "1";
 const apiPort = 4273;
@@ -10,7 +17,10 @@ const devWebUrl = "http://127.0.0.1:5173";
 const healthUrl = `http://127.0.0.1:${apiPort}/api/health`;
 
 function getRepoRoot() {
-  return resolve(app.getAppPath(), "..");
+  if (isDev) {
+    return resolve(app.getAppPath(), "..");
+  }
+  return process.resourcesPath;
 }
 
 function getPreloadPath() {
