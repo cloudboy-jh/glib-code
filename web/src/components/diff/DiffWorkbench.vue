@@ -690,6 +690,7 @@ async function openWorkingTree(preferredFiles: string[] = []) {
 async function applyOpenRequest(request?: { token: number; mode: 'session' | 'history' | 'commit' | 'uncommitted'; files?: string[]; commitRef?: string } | null) {
   if (!request) return;
   if (request.mode === 'history') {
+    await loadHistory();
     state.phase = 'history';
     return;
   }

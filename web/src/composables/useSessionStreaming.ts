@@ -1,6 +1,6 @@
 import type { AgentEvent } from '@glib-code/shared/events/agent';
 
-type SessionLike = { id: string; projectPath: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' };
+type SessionLike = { id: string; projectPath: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done' };
 
 export function useSessionStreaming(options: {
   apiBase: string;
@@ -20,6 +20,11 @@ export function useSessionStreaming(options: {
     const session = options.sessions.find((entry) => entry.id === sessionId);
     if (!session?.projectPath) return;
     if (options.staleSessionIds.has(sessionId)) return;
+    // Don't connect SSE for sessions that are already done (promoted/committed)
+    if (session.status === 'done') {
+      markSessionStale(sessionId, 'Session promoted — workspace committed.');
+      return;
+    }
     options.setSessionStatus(sessionId, 'connecting');
     const stream = new EventSource(`${options.apiBase}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}&replay=150`);
     const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];

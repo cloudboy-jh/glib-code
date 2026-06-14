@@ -265,7 +265,7 @@ type SessionRow = {
   title: string;
   time: string;
   updatedAt?: string;
-  status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
+  status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
   repo: string;
   project: string;
   projectPath: string;
@@ -471,6 +471,7 @@ function statusDotClass(status: SessionRow['status']) {
   if (status === 'stale') return 'bg-amber-400';
   if (status === 'running') return 'bg-sky-400';
   if (status === 'connecting') return 'bg-violet-400';
+  if (status === 'done') return 'bg-zinc-500';
   if (status === 'disconnected') return 'bg-zinc-500';
   return '';
 }

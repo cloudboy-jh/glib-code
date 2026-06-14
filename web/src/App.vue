@@ -510,7 +510,7 @@ const isThemeCycleDemo = demoMode === 'theme-cycle';
    title: string;
    time: string;
    updatedAt?: string;
-   status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
+   status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
    repo: string;
    project: string;
    projectPath: string;
@@ -1379,7 +1379,7 @@ function mapApiSession(meta: SessionMetaApi): Session {
     title: meta.title,
     time: timeLabel(meta.updatedAt),
     updatedAt: meta.updatedAt,
-    status: meta.status === 'running' ? 'running' : meta.status === 'error' || meta.status === 'aborted' ? 'disconnected' : 'connected',
+    status: meta.status === 'running' ? 'running' : meta.status === 'done' ? 'done' : meta.status === 'error' || meta.status === 'aborted' ? 'disconnected' : 'connected',
     repo: repoName,
     project: repoName,
     projectPath: normalizedPath,
@@ -1842,9 +1842,15 @@ async function openCurrentSessionDiff(fileTarget?: string) {
   sessionDiff.error = '';
 
   try {
-    const payload = await apiGet<{ diff: string; files?: string[] }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
-    sessionDiff.diff = payload.diff ?? '';
-    sessionDiff.files = payload.files?.length ? payload.files : filesFromPatch(sessionDiff.diff);
+    const payload = await apiGet<{ diff: string; files?: string[]; alreadyPromoted?: boolean; promotedSha?: string | null }>(`/sessions/${encodeURIComponent(state.activeSessionId)}/diff?projectPath=${encodeURIComponent(session.projectPath)}`);
+    if (payload.alreadyPromoted) {
+      sessionDiff.error = `Session already promoted — no workspace diff available.`;
+      sessionDiff.diff = '';
+      sessionDiff.files = [];
+    } else {
+      sessionDiff.diff = payload.diff ?? '';
+      sessionDiff.files = payload.files?.length ? payload.files : filesFromPatch(sessionDiff.diff);
+    }
   } catch (error) {
     sessionDiff.error = error instanceof Error ? error.message : 'Failed to load session diff';
   } finally {
@@ -2327,6 +2333,10 @@ async function confirmPromote() {
       level: 'info'
     });
     void hydrateGitStatus().catch(() => undefined);
+    // Session workspace is gone after promote — disconnect stream and mark stale
+    if (state.activeSessionId) {
+      markSessionStale(state.activeSessionId, 'Session promoted — workspace committed.');
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Promote failed';
     const payload = error instanceof ApiRequestError ? error.payload as { code?: string; conflictingFiles?: string[]; durableSha?: string; baselineSha?: string; files?: string[] } | undefined : undefined;

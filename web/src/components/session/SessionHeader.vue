@@ -61,7 +61,7 @@ function onClickOutside(event: MouseEvent) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside));
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside));
 
-const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
+const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
   preferredEditor: null,
   gitActionLabel: 'Commit'
 });
@@ -71,7 +71,7 @@ const statusDotClass = computed(() => {
   if (props.status === 'stale') return 'bg-amber-400';
   if (props.status === 'running') return 'bg-sky-400';
   if (props.status === 'connecting') return 'bg-violet-400';
-  if (props.status === 'disconnected') return 'bg-zinc-500';
+  if (props.status === 'done' || props.status === 'disconnected') return 'bg-zinc-500';
   return 'bg-emerald-400';
 });
 
@@ -79,6 +79,7 @@ const statusLabel = computed(() => {
   if (props.status === 'running') return 'Agent is live';
   if (props.status === 'connecting') return 'Connecting';
   if (props.status === 'stale') return 'Stream stale';
+  if (props.status === 'done') return 'Promoted';
   if (props.status === 'disconnected') return 'Disconnected';
   return 'Connected';
 });
@@ -87,6 +88,7 @@ const statusBadgeClass = computed(() => {
   if (props.status === 'running') return 'border-sky-500/45 bg-sky-500/15 text-sky-100';
   if (props.status === 'stale') return 'border-amber-500/40 bg-amber-500/12 text-amber-100';
   if (props.status === 'connecting') return 'border-violet-500/35 bg-violet-500/12 text-violet-100';
+  if (props.status === 'done') return 'border-zinc-500/40 bg-zinc-500/15 text-zinc-300';
   if (props.status === 'disconnected') return 'border-border/70 bg-background/45 text-muted-foreground';
   return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-100';
 });

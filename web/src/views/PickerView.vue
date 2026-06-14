@@ -24,7 +24,7 @@ import PickerScreen from '../components/picker/PickerScreen.vue';
 
 defineProps<{
   recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
-  sessionsByPath: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' }>>;
+  sessionsByPath: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done' }>>;
   commitsByPath?: Record<string, Array<{ ref: string; shortRef: string; title: string }>>;
   logoSrc?: string;
 }>();

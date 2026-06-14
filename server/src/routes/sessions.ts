@@ -189,6 +189,8 @@ export const sessionsRoutes = new Hono()
         { selector: body.selector, strategy: body.strategy, message: body.message },
         project?.branch ?? "main"
       );
+      // Mark session as done so the client knows the workspace is gone
+      await patchSessionMeta(projectPath!, doc.meta.id, { status: "done" }).catch(() => undefined);
       return c.json(result);
     } catch (error) {
       const conflict = error as Partial<{ code: string; conflictingFiles: string[]; durableSha: string; baselineSha: string }>;

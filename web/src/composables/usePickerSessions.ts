@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue';
 
-type SessionStatus = 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running';
+type SessionStatus = 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
 
 type SessionLike = {
   id: string;
