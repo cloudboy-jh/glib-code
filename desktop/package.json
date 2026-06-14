@@ -7,6 +7,7 @@
     "dev": "bun run build && electron .",
     "build": "tsc -p tsconfig.json",
     "build:local": "tsc -p tsconfig.json && electron-builder --dir --mac",
+    "build:local:win": "tsc -p tsconfig.json && electron-builder --dir --win",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -27,6 +28,10 @@
     "mac": {
       "identity": null,
       "icon": "assets/icon.iconset/icon_1024x1024.png",
+      "target": [{ "target": "dir" }]
+    },
+    "win": {
+      "icon": "assets/icon.iconset/icon_256x256.png",
       "target": [{ "target": "dir" }]
     }
   }
