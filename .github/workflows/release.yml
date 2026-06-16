@@ -27,7 +27,7 @@ jobs:
 
       - name: Package & publish
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run --cwd desktop build:win
 
   release-mac:
@@ -48,7 +48,7 @@ jobs:
 
       - name: Package & publish
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Uncomment + add secrets to enable notarization:
           # CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
           # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
@@ -78,5 +78,5 @@ jobs:
 
       - name: Package & publish
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run --cwd desktop build:linux
