@@ -459,13 +459,33 @@
         </div>
       </div>
     </div>
+
+    <!-- ── First-launch overlay (z-100, full-screen, only on first run) ── -->
+    <FirstLaunchOverlay
+      :show="showFirstLaunch"
+      :step="firstLaunchStep"
+      :app-version="firstLaunchAppVersion"
+      :needs-fs-permission-rationale="needsFsPermissionRationale"
+      :logo-icon-src="logoIconSrc"
+      @advance="advanceFirstLaunchStep"
+    />
+
+    <!-- ── Update toast (z-90, bottom-right corner) ── -->
+    <UpdatePrompt
+      :update-state="updateState"
+      @download="downloadUpdate"
+      @install="installUpdate"
+      @dismiss="dismissUpdate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch, onBeforeUnmount } from 'vue';
 import type { AgentEvent } from '@glib-code/shared/events/agent';
 import CommandPalette from './components/app/CommandPalette.vue';
+import FirstLaunchOverlay from './components/app/FirstLaunchOverlay.vue';
+import UpdatePrompt from './components/app/UpdatePrompt.vue';
 import TerminalDrawer from './components/app/TerminalDrawer.vue';
 import CloneRepoDialog from './components/picker/CloneRepoDialog.vue';
 import OpenProjectDialog from './components/picker/OpenProjectDialog.vue';
@@ -480,6 +500,7 @@ import PickerView from './views/PickerView.vue';
 import SessionView from './views/SessionView.vue';
 import TextAttachmentModal from './components/session/TextAttachmentModal.vue';
 import { ApiRequestError, useApiClient } from './composables/useApiClient';
+import { useFirstLaunch } from './composables/useFirstLaunch';
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts';
 import { canonicalizeProjectPath, usePickerSessions } from './composables/usePickerSessions';
 import { useSessionOrchestrator } from './composables/useSessionOrchestrator';
@@ -949,6 +970,20 @@ const { connectSessionStream, syncActiveSessionStream, disconnectSessionStream, 
   reduceAgentEventToTimeline,
   hydrateSessionDoc
 });
+
+const {
+  showFirstLaunch,
+  step: firstLaunchStep,
+  appVersion: firstLaunchAppVersion,
+  needsFsPermissionRationale,
+  updateState,
+  init: initFirstLaunch,
+  cleanup: cleanupFirstLaunch,
+  advanceStep: advanceFirstLaunchStep,
+  downloadUpdate,
+  installUpdate,
+  dismissUpdate,
+} = useFirstLaunch();
 
 const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
 const composerDisabled = computed(() => Boolean(
@@ -2949,6 +2984,7 @@ onMounted(() => {
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
   shortcuts.bind();
+  void initFirstLaunch().catch(() => undefined);
 });
 
 const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);
@@ -3008,5 +3044,6 @@ onUnmounted(() => {
   closeTerminalSocket();
   for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   shortcuts.unbind();
+  cleanupFirstLaunch();
 });
 </script>

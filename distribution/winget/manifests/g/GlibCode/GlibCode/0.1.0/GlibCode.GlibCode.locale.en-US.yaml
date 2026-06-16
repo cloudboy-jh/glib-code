@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: GlibCode.GlibCode
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: Glib Code, Inc.
+PublisherUrl: https://glibcode.com
+PublisherSupportUrl: https://github.com/glibcode/glib-code/issues
+PackageName: glib-code
+PackageUrl: https://glibcode.com
+License: MIT
+LicenseUrl: https://github.com/glibcode/glib-code/blob/main/LICENSE
+ShortDescription: AI coding agent — review diffs, run sessions, ship faster.
+Description: |-
+  glib-code is a desktop AI coding agent. Open a local git repository,
+  attach context from any diff or commit, and run AI-powered sessions
+  that read and write your files directly. Review changes in a split diff
+  view, commit with one click, and stay in flow.
+Tags:
+  - ai
+  - coding
+  - developer-tools
+  - git
+  - code-review
+  - agent
+ReleaseNotesUrl: https://github.com/glibcode/glib-code/releases/tag/v0.1.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Package.appxmanifest — glib-code MSIX manifest
+  ─────────────────────────────────────────────────────────────────────────────
+  This manifest is used as a TEMPLATE by electron-builder's appx target.
+  electron-builder substitutes ${version} and ${publisher} from package.json /
+  the appx config block. Hand-edited values here (capabilities, assets) are
+  preserved verbatim.
+
+  Required appx asset sizes (place in assets/appx/):
+    Square44x44Logo.png       — 44×44  (taskbar / Start tiles small)
+    Square44x44Logo.scale-200.png — 88×88
+    Square150x150Logo.png     — 150×150 (medium Start tile)
+    Square150x150Logo.scale-200.png — 300×300
+    StoreLogo.png             — 50×50  (Store listing)
+    Wide310x150Logo.png       — 310×150 (wide Start tile)
+    Square310x310Logo.png     — 310×310 (large Start tile)
+    SplashScreen.png          — 620×300 (splash on slow machines)
+
+  All generated from icon_1024x1024.png via scripts/make-appx-assets.ts.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="GlibCode.GlibCode"
+    Publisher="CN=Glib Code, Inc."
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>glib-code</DisplayName>
+    <PublisherDisplayName>Glib Code, Inc.</PublisherDisplayName>
+    <Logo>assets\appx\StoreLogo.png</Logo>
+    <Description>AI-powered code review and agent sessions for your local repositories.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="glib-code.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="glib-code"
+        Description="AI coding agent — review diffs, run sessions, ship faster."
+        BackgroundColor="#0b0f14"
+        Square150x150Logo="assets\appx\Square150x150Logo.png"
+        Square44x44Logo="assets\appx\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="assets\appx\Wide310x150Logo.png"
+          Square310x310Logo="assets\appx\Square310x310Logo.png"
+          Square71x71Logo="assets\appx\Square71x71Logo.png"
+          ShortName="glib" />
+        <uap:SplashScreen Image="assets\appx\SplashScreen.png" BackgroundColor="#0b0f14" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <!--
+    Capabilities declared here are exactly what App Installer shows the user.
+    Only declare what glib actually uses:
+
+    - runFullTrust              required for Electron apps (they run outside the UWP sandbox)
+    - broadFileSystemAccess     glib reads/writes arbitrary repo paths — user-granted at install
+    - internetClient            update checks + AI API calls
+    - privateNetworkClientServer local API server on 127.0.0.1:4273
+
+    DO NOT add webcam, microphone, location, contacts, calendar, etc.
+    Minimal capability list = shorter, less scary App Installer dialog.
+  -->
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <uap:Capability Name="internetClient" />
+    <rescap:Capability Name="broadFileSystemAccess" />
+    <Capability Name="privateNetworkClientServer" />
+  </Capabilities>
+
+</Package>
