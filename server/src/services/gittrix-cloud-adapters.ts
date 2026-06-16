@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { AuthError } from "gittrix/packages/core/src/errors.js";
-import type { AdapterCapabilities, DurableAdapter, ListEntry, EphemeralAdapter } from "gittrix/packages/core/src/types.js";
+import { AuthError } from "gittrix";
+import type { AdapterCapabilities, DurableAdapter, ListEntry, EphemeralAdapter } from "gittrix";
 
 type GitResult = { stdout: string; stdoutBytes: Uint8Array };
 

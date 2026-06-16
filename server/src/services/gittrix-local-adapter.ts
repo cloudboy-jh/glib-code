@@ -16,8 +16,8 @@ async function rmRetry(path: string, maxAttempts = 5, delayMs = 300): Promise<vo
   }
 }
 import { dirname, join, relative, resolve } from "node:path";
-import { parseLocalRefUri } from "gittrix/packages/core/src/ref.js";
-import type { AdapterCapabilities, DurableAdapter, EphemeralAdapter, ListEntry } from "gittrix/packages/core/src/types.js";
+import { parseLocalRefUri } from "gittrix";
+import type { AdapterCapabilities, DurableAdapter, EphemeralAdapter, ListEntry } from "gittrix";
 
 type GitResult = { stdout: string; stdoutBytes: Uint8Array };
 

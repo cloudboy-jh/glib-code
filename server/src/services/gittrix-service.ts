@@ -1,8 +1,7 @@
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { GitTrix } from "gittrix/packages/core/src/gittrix.js";
-import { BaselineConflictError } from "gittrix/packages/core/src/errors.js";
-import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, UserSession } from "gittrix/packages/core/src/types.js";
+import { GitTrix, BaselineConflictError } from "gittrix";
+import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, UserSession } from "gittrix";
 import { GitHubDurableAdapter, CloudflareArtifactsEphemeralAdapter } from "./gittrix-cloud-adapters";
 import { LocalDurableAdapter, LocalEphemeralAdapter } from "./gittrix-local-adapter";
 import { getConfigDir } from "../lib/paths";
