@@ -16,6 +16,14 @@ glib-code is an AI coding workspace where agents make changes in a safe sandbox,
 
 Open a repo, start a session, let the agent work, review the diff, then accept only the files you want.
 
+## Download
+
+| Platform | Link |
+|----------|------|
+| Windows | [glib-code-setup.exe](https://github.com/cloudboy-jh/glib-code/releases/latest) |
+| Mac | [glib-code.dmg](https://github.com/cloudboy-jh/glib-code/releases/latest) |
+| Linux | [glib-code.AppImage](https://github.com/cloudboy-jh/glib-code/releases/latest) |
+
 ## What it does
 
 - Opens or clones local Git repositories.
@@ -34,76 +42,71 @@ open repo -> start session -> agent edits in sandbox -> review diff -> apply acc
 
 Agent writes go to a temporary workspace first. Your real checkout only changes when you apply approved files.
 
-Deeper system details live in `Docs/Architecture.md`.
-
-## Quick start
+## Running locally (dev)
 
 Requirements:
 
 - Bun 1.x
 - Git
-- pi CLI/runtime for agent sessions
-- Provider API key for the model you want to use
-
-Install:
+- A provider API key (OpenAI, Anthropic, or any compatible provider)
 
 ```bash
 bun install
-```
-
-Run local web app:
-
-```bash
-bun run dev
-```
-
-Run desktop dev app:
-
-```bash
 bun run dev:desktop
 ```
 
-Default dev URLs:
+This starts the API server, Vite dev server, and Electron window together. DevTools open automatically.
 
-- API server: `http://127.0.0.1:4273`
-- Web app: `http://127.0.0.1:5173`
+Default ports:
+- API: `http://127.0.0.1:4273`
+- Web: `http://127.0.0.1:5173`
 
-Add a provider key in `Settings -> Models` before starting an agent session. Project picker and diff review still work without a provider key.
+Add a provider key in **Settings → Models** before starting an agent session. Project picker and diff review work without one.
+
+## Building the desktop app
+
+```bash
+# Build all workspaces first
+bun run build
+
+# Then package for your platform
+bun run --cwd desktop build:win    # Windows — outputs NSIS .exe
+bun run --cwd desktop build:dmg    # Mac — outputs .dmg (arm64 + x64)
+bun run --cwd desktop build:linux  # Linux — outputs .AppImage + .deb
+```
+
+Output goes to `desktop/dist-app/`.
+
+## Releasing
+
+Push a `v*` tag — GitHub Actions builds all three platforms and uploads the artifacts to a GitHub Release automatically.
+
+```bash
+git tag v0.x.y
+git push origin v0.x.y
+```
 
 ## Scripts
 
 ```bash
-bun run dev         # run server + web with prefixed logs
-bun run dev:desktop # run server + web + Electron desktop shell
-bun run dev:server  # backend only (:4273)
-bun run dev:web     # frontend only (Vite)
-bun run build       # build shared + server + web + desktop
-bun run check       # typecheck all workspaces
+bun run dev            # server + web with prefixed logs
+bun run dev:desktop    # server + web + Electron window
+bun run dev:server     # API server only (:4273)
+bun run dev:web        # Vite only (:5173)
+bun run build          # build all workspaces
+bun run check          # typecheck all workspaces
 ```
 
 ## Repository layout
 
 ```txt
-server/            Bun + Hono API, sandbox/session orchestration, pi runtime bridge
-web/               Vue frontend, diff workbench, session timeline, settings
-desktop/           Electron shell for packaged local app
-shared/            Shared types, schemas, theme presets, event contracts
-Docs/              Product, architecture, backend, frontend, agent, planning docs
-suitener-results/  Committed external validation run artifacts
+server/        Bun + Hono API, session orchestration, pi runtime bridge
+web/           Vue frontend, diff workbench, session timeline, settings
+desktop/       Electron shell — packaging, first-launch flow, auto-update
+shared/        Types, schemas, theme presets, event contracts
+.github/       Release workflow (builds NSIS/DMG/AppImage on tag push)
+Docs/          Architecture, spec, frontend, backend, agent docs
 ```
-
-## Docs
-
-- `Docs/Architecture.md`
-- `Docs/SPEC.md`
-- `Docs/Frontend.md`
-- `Docs/Backend.md`
-- `Docs/Agent.md`
-- `Docs/Onboarding.md`
-- `Docs/next-steps.md`
-- `Docs/frontend-checklist.md`
-- `Docs/backend-checklist.md`
-- `Docs/T3_UI_PARITY_CHECKLIST.md`
 
 ## Themes
 
