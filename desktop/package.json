@@ -2,7 +2,11 @@
   "name": "@glib-code/desktop",
   "version": "0.1.0",
   "description": "AI coding agent — review diffs, run sessions, ship faster.",
-  "author": "Glib Code, Inc.",
+  "homepage": "https://github.com/cloudboy-jh/glib-code",
+  "author": {
+    "name": "Glib Code, Inc.",
+    "email": "support@glibcode.com"
+  },
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
@@ -68,7 +72,6 @@
     "dmg": {
       "title": "${productName} ${version}",
       "icon": "assets/icon.iconset/icon_1024x1024.png",
-      "background": "assets/dmg-background.png",
       "iconSize": 128,
       "window": {
         "width": 660,
@@ -103,6 +106,7 @@
     },
     "linux": {
       "icon": "assets/icon.iconset/icon_512x512.png",
+      "maintainer": "Glib Code, Inc. <support@glibcode.com>",
       "target": [
         {
           "target": "AppImage"
