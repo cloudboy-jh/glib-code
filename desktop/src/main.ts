@@ -254,8 +254,9 @@ app.whenReady().then(async () => {
   registerIpcHandlers();
 
   if (!isDev) {
-    serverProc = spawn(getBunCommand(), ["run", join(getRepoRoot(), "server.js"), `--port=${apiPort}`], {
-      cwd: getRepoRoot(),
+    const serverDir = join(getRepoRoot(), "server");
+    serverProc = spawn(getBunCommand(), ["run", join(serverDir, "server.js"), `--port=${apiPort}`], {
+      cwd: serverDir,
       stdio: "inherit",
     });
 

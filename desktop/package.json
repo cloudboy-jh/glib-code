@@ -43,8 +43,9 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../server/dist/server.js",
-        "to": "server.js"
+        "from": "../server/dist",
+        "to": "server",
+        "filter": ["**/*", "!node_modules/.cache"]
       }
     ],
     "publish": [
