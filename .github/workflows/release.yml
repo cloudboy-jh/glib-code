@@ -52,7 +52,7 @@ jobs:
         with:
           name: bundles
           path: |
-            server/dist/server.js
+            server/dist/**
             web/dist/**
             shared/dist/**
           retention-days: 1

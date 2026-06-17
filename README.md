@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
-    <img src="https://img.shields.io/badge/version-0.1.2-1e293b?style=flat-square" alt="Latest release" />
+    <img src="https://img.shields.io/badge/version-0.1.3-1e293b?style=flat-square" alt="Latest release" />
   </a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-1e293b?style=flat-square" alt="Platforms" />
 </p>
@@ -25,9 +25,9 @@ glib-code is an AI coding agent that lives next to your local repos. Open a proj
 
 | Platform | File |
 |----------|------|
-| Windows | `glib-code-Setup-0.1.2.exe` |
-| Mac | `glib-code-0.1.2-arm64.dmg` |
-| Linux | `glib-code-0.1.2.AppImage` |
+| Windows | `glib-code-Setup-0.1.3.exe` |
+| Mac | `glib-code-0.1.3-arm64.dmg` |
+| Linux | `glib-code-0.1.3.AppImage` |
 
 ## What it does
 
