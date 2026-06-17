@@ -4,3 +4,4 @@ dist/
 *.log
 .env
 suitener-results/
+dist-app
