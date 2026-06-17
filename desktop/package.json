@@ -1,13 +1,12 @@
 {
   "name": "@glib-code/desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "AI coding agent — review diffs, run sessions, ship faster.",
   "homepage": "https://github.com/cloudboy-jh/glib-code",
   "author": {
     "name": "Glib Code, Inc.",
     "email": "support@glibcode.com"
   },
-  "type": "module",
   "main": "dist/main.js",
   "scripts": {
     "dev": "bun run build && electron .",
