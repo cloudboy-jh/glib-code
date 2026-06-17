@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { autoUpdater, type UpdateInfo, type ProgressInfo, type UpdateDownloadedEvent } from "electron-updater";
+import electronUpdater, { type UpdateInfo, type ProgressInfo, type UpdateDownloadedEvent } from "electron-updater";
+const { autoUpdater } = electronUpdater;
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -212,7 +213,8 @@ async function createWindow() {
     win.show();
   });
 
-  if (isDev) {
+  // Open devtools in dev OR when GLIB_DEVTOOLS is set (for debugging packaged builds)
+  if (isDev || process.env.GLIB_DEVTOOLS === "1") {
     win.webContents.openDevTools({ mode: "detach" });
   }
 
@@ -252,7 +254,7 @@ app.whenReady().then(async () => {
   registerIpcHandlers();
 
   if (!isDev) {
-    serverProc = spawn(getBunCommand(), ["server/src/index.ts", `--port=${apiPort}`], {
+    serverProc = spawn(getBunCommand(), ["run", join(getRepoRoot(), "server.js"), `--port=${apiPort}`], {
       cwd: getRepoRoot(),
       stdio: "inherit",
     });

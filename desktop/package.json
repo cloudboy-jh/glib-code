@@ -1,6 +1,8 @@
 {
   "name": "@glib-code/desktop",
   "version": "0.1.0",
+  "description": "AI coding agent — review diffs, run sessions, ship faster.",
+  "author": "Glib Code, Inc.",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
@@ -36,9 +38,8 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../server",
-        "to": "server",
-        "filter": ["**/*", "!node_modules"]
+        "from": "../server/dist/server.js",
+        "to": "server.js"
       }
     ],
     "publish": [
