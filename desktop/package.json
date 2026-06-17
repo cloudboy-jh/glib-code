@@ -10,9 +10,9 @@
     "build": "tsc -p tsconfig.json",
     "build:local": "tsc -p tsconfig.json && electron-builder --dir --mac",
     "build:local:win": "tsc -p tsconfig.json && electron-builder --dir --win",
-    "build:win": "tsc -p tsconfig.json && electron-builder --win nsis --publish always",
-    "build:dmg": "tsc -p tsconfig.json && electron-builder --mac dmg --publish always",
-    "build:linux": "tsc -p tsconfig.json && electron-builder --linux AppImage deb --publish always",
+    "build:win": "electron-builder --win nsis --publish always",
+    "build:dmg": "electron-builder --mac dmg --publish always",
+    "build:linux": "electron-builder --linux AppImage deb --publish always",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -41,11 +41,6 @@
       {
         "from": "../server/dist/server.js",
         "to": "server.js"
-      },
-      {
-        "from": "../node_modules",
-        "to": "node_modules",
-        "filter": ["**/*", "!**/.cache/**"]
       }
     ],
     "publish": [

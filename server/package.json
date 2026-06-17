@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun src/index.ts --port=4273",
     "build": "tsc -p tsconfig.json",
-    "bundle": "bun build src/index.ts --outfile dist/server.js --target bun --packages external",
+    "bundle": "bun build src/index.ts --outfile dist/server.js --target bun --external '@opentelemetry/*' --external 'electron' --external 'fsevents'",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

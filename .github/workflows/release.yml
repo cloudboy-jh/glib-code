@@ -8,9 +8,58 @@ on:
 permissions:
   contents: write
 
+# ── Architecture ──────────────────────────────────────────────────────────
+# Two-stage pipeline modelled on how Cursor / Linear / Notion ship:
+#
+#   Stage 1: build-bundles (bun)
+#     - Builds the server (single inlined JS bundle) and web (Vite output).
+#     - Uploads as an artifact.
+#     - Bun is fast and monorepo-native — perfect for this stage.
+#
+#   Stage 2: package-{win,mac,linux} (node + npm only)
+#     - Downloads the artifact from stage 1.
+#     - Runs `npm ci` inside desktop/ using a committed package-lock.json,
+#       so electron-builder sees a clean flat node_modules.
+#     - electron-builder is NOT bun-compatible: it spawns child Node procs
+#       that resolve `node` from PATH, and bun's binary gets picked up
+#       first if both are on PATH. Keeping bun out of these jobs entirely
+#       avoids that whole class of bug.
+# ──────────────────────────────────────────────────────────────────────────
+
 jobs:
-  release-win:
+  build-bundles:
+    name: Build server + web bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install workspace deps
+        run: bun install
+
+      - name: Build shared + server + server bundle + web
+        run: |
+          bun run --cwd shared build
+          bun run --cwd server build
+          bun run --cwd server bundle
+          bun run --cwd web build
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles
+          path: |
+            server/dist/server.js
+            web/dist/**
+            shared/dist/**
+          retention-days: 1
+
+  package-win:
     name: Windows (NSIS)
+    needs: build-bundles
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,24 +67,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Download bundles
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
+          name: bundles
+          path: .
 
-      - name: Install dependencies
-        run: bun install
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
 
-      - name: Build
-        run: bun run build
+      - name: Compile main process TypeScript
+        working-directory: desktop
+        run: npm run build
 
       - name: Package & publish
+        working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bun run --cwd desktop build:win
+        run: npx electron-builder --win nsis --publish always
 
-  release-mac:
+  package-mac:
     name: Mac (DMG)
+    needs: build-bundles
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,29 +100,38 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Download bundles
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
+          name: bundles
+          path: .
 
-      - name: Install dependencies
-        run: bun install
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
 
-      - name: Build
-        run: bun run build
+      - name: Compile main process TypeScript
+        working-directory: desktop
+        run: npm run build
 
       - name: Package & publish
+        working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Uncomment + add secrets to enable code signing + notarization:
           # CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
           # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bun run --cwd desktop build:dmg
+        run: npx electron-builder --mac dmg --publish always
 
-  release-linux:
+  package-linux:
     name: Linux (AppImage + deb)
+    needs: build-bundles
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,21 +139,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Download bundles
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install
+          name: bundles
+          path: .
 
       - name: Install Linux packaging deps
         run: sudo apt-get install -y rpm fakeroot
 
-      - name: Build
-        run: bun run build
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Compile main process TypeScript
+        working-directory: desktop
+        run: npm run build
 
       - name: Package & publish
+        working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bun run --cwd desktop build:linux
+        run: npx electron-builder --linux AppImage deb --publish always
