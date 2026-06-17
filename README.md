@@ -10,16 +10,6 @@
   <img src="./assets/glib-demo-gif.gif" alt="glib-code demo" width="1100" />
 </p>
 
-<p align="center">
-  <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
-    <img src="https://img.shields.io/github/v/release/cloudboy-jh/glib-code?style=flat-square&color=0f172a&labelColor=1e293b&label=latest" alt="Latest release" />
-  </a>
-  <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
-    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-1e293b?style=flat-square" alt="Platforms" />
-  </a>
-</p>
-
----
 
 glib-code is an AI coding agent that lives next to your local repos. Open a project, start a session, let the agent work in an isolated sandbox, review exactly what changed, then apply only the files you want.
 
