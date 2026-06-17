@@ -27,6 +27,7 @@
   "build": {
     "appId": "dev.glibcode.app",
     "productName": "glib-code",
+    "electronVersion": "35.1.4",
     "directories": {
       "output": "dist-app"
     },
