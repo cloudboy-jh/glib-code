@@ -1,6 +1,6 @@
 {
   "name": "@glib-code/desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "AI coding agent — review diffs, run sessions, ship faster.",
   "homepage": "https://github.com/cloudboy-jh/glib-code",
   "author": {
