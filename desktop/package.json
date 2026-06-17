@@ -40,6 +40,11 @@
       {
         "from": "../server/dist/server.js",
         "to": "server.js"
+      },
+      {
+        "from": "../node_modules",
+        "to": "node_modules",
+        "filter": ["**/*", "!**/.cache/**"]
       }
     ],
     "publish": [

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun src/index.ts --port=4273",
     "build": "tsc -p tsconfig.json",
-    "bundle": "bun build src/index.ts --outfile dist/server.js --target bun --external electron",
+    "bundle": "bun build src/index.ts --outfile dist/server.js --target bun --packages external",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
