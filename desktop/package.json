@@ -1,6 +1,6 @@
 {
   "name": "@glib-code/desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "AI coding agent — review diffs, run sessions, ship faster.",
   "homepage": "https://github.com/cloudboy-jh/glib-code",
   "author": {
@@ -51,7 +51,8 @@
       {
         "provider": "github",
         "owner": "cloudboy-jh",
-        "repo": "glib-code"
+        "repo": "glib-code",
+        "releaseType": "release"
       }
     ],
     "mac": {
