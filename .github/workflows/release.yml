@@ -76,13 +76,13 @@ jobs:
           name: bundles
           path: .
 
-      - name: Install desktop deps
+      - name: Install desktop deps (isolated from workspace root)
         working-directory: desktop
-        run: npm ci
+        run: npm ci --prefix .
 
       - name: Compile main process TypeScript
         working-directory: desktop
-        run: npm run build
+        run: npm run build --prefix .
 
       - name: Package & publish
         working-directory: desktop
@@ -109,13 +109,13 @@ jobs:
           name: bundles
           path: .
 
-      - name: Install desktop deps
+      - name: Install desktop deps (isolated from workspace root)
         working-directory: desktop
-        run: npm ci
+        run: npm ci --prefix .
 
       - name: Compile main process TypeScript
         working-directory: desktop
-        run: npm run build
+        run: npm run build --prefix .
 
       - name: Package & publish
         working-directory: desktop
@@ -151,13 +151,13 @@ jobs:
       - name: Install Linux packaging deps
         run: sudo apt-get install -y rpm fakeroot
 
-      - name: Install desktop deps
+      - name: Install desktop deps (isolated from workspace root)
         working-directory: desktop
-        run: npm ci
+        run: npm ci --prefix .
 
       - name: Compile main process TypeScript
         working-directory: desktop
-        run: npm run build
+        run: npm run build --prefix .
 
       - name: Package & publish
         working-directory: desktop
