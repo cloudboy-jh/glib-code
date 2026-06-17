@@ -10,108 +10,97 @@
   <img src="./assets/glib-demo-gif.gif" alt="glib-code demo" width="1100" />
 </p>
 
-# glib-code
+<p align="center">
+  <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
+    <img src="https://img.shields.io/github/v/release/cloudboy-jh/glib-code?style=flat-square&color=0f172a&labelColor=1e293b&label=latest" alt="Latest release" />
+  </a>
+  <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-1e293b?style=flat-square" alt="Platforms" />
+  </a>
+</p>
 
-glib-code is an AI coding workspace where agents make changes in a safe sandbox, so your real code stays untouched until you approve.
+---
 
-Open a repo, start a session, let the agent work, review the diff, then accept only the files you want.
+glib-code is an AI coding agent that lives next to your local repos. Open a project, start a session, let the agent work in an isolated sandbox, review exactly what changed, then apply only the files you want.
 
 ## Download
 
-Go to **[Releases](https://github.com/cloudboy-jh/glib-code/releases/latest)** and grab the file for your platform:
+**[→ Latest release](https://github.com/cloudboy-jh/glib-code/releases/latest)**
 
-- **Windows** — `glib-code-Setup-*.exe`
-- **Mac** — `glib-code-*.dmg`
-- **Linux** — `glib-code-*.AppImage`
+| Platform | File |
+|----------|------|
+| Windows | `glib-code-Setup-0.1.0.exe` |
+| Mac | `glib-code-0.1.0-arm64.dmg` |
+| Linux | `glib-code-0.1.0.AppImage` |
 
 ## What it does
 
-- Opens or clones local Git repositories.
-- Lets you review commit history and current working changes before you prompt the agent.
-- Runs each agent session in an isolated workspace (powered by GitTrix under the hood).
-- Streams assistant output, errors, and tool activity into a live timeline.
-- Shows a session diff so you can inspect exactly what changed.
-- Applies only selected files back to your real repo when you approve.
-- Supports provider key management, model selection, GitHub push flows, and local push/stash flows.
+- Opens or clones any local Git repository
+- Review commit history and working tree diffs before prompting the agent
+- Runs sessions in an isolated workspace — your real checkout stays untouched
+- Streams assistant output, tool calls, and errors in a live timeline
+- Shows a full session diff so you see exactly what the agent changed
+- Apply only the files you accept back to your real repo
+- Provider key management, model selection, GitHub push, local commit flows
 
-## How it works
+## Dev setup
 
-```txt
-open repo -> start session -> agent edits in sandbox -> review diff -> apply accepted files
-```
-
-Agent writes go to a temporary workspace first. Your real checkout only changes when you apply approved files.
-
-## Running locally (dev)
-
-Requirements:
-
-- Bun 1.x
-- Git
-- A provider API key (OpenAI, Anthropic, or any compatible provider)
+Requirements: Bun 1.x, Git, a provider API key (OpenAI, Anthropic, or any compatible provider).
 
 ```bash
 bun install
 bun run dev:desktop
 ```
 
-This starts the API server, Vite dev server, and Electron window together. DevTools open automatically.
+Starts the API server, Vite, and Electron together. DevTools open automatically in dev mode.
 
-Default ports:
 - API: `http://127.0.0.1:4273`
 - Web: `http://127.0.0.1:5173`
 
-Add a provider key in **Settings → Models** before starting an agent session. Project picker and diff review work without one.
+Add a provider key in **Settings → Models** before starting an agent session.
 
-## Building the desktop app
+## Scripts
 
 ```bash
-# Build all workspaces first
-bun run build
-
-# Then package for your platform
-bun run --cwd desktop build:win    # Windows — outputs NSIS .exe
-bun run --cwd desktop build:dmg    # Mac — outputs .dmg (arm64 + x64)
-bun run --cwd desktop build:linux  # Linux — outputs .AppImage + .deb
+bun run dev:desktop    # server + web + Electron (full dev)
+bun run dev:server     # API server only
+bun run dev:web        # Vite only
+bun run build          # build all workspaces
+bun run check          # typecheck all workspaces
 ```
-
-Output goes to `desktop/dist-app/`.
 
 ## Releasing
 
-Push a `v*` tag — GitHub Actions builds all three platforms and uploads the artifacts to a GitHub Release automatically.
+Push a version tag — GitHub Actions builds all three platforms and publishes to a GitHub Release automatically.
 
 ```bash
 git tag v0.x.y
 git push origin v0.x.y
 ```
 
-## Scripts
+Build output is in `desktop/dist-app/`. To build locally without publishing:
 
 ```bash
-bun run dev            # server + web with prefixed logs
-bun run dev:desktop    # server + web + Electron window
-bun run dev:server     # API server only (:4273)
-bun run dev:web        # Vite only (:5173)
-bun run build          # build all workspaces
-bun run check          # typecheck all workspaces
+bun run build
+bun run --cwd desktop build:local:win   # Windows unpacked dir
+bun run --cwd desktop build:local       # Mac unpacked dir
 ```
 
-## Repository layout
+## Repo layout
 
-```txt
-server/        Bun + Hono API, session orchestration, pi runtime bridge
-web/           Vue frontend, diff workbench, session timeline, settings
-desktop/       Electron shell — packaging, first-launch flow, auto-update
-shared/        Types, schemas, theme presets, event contracts
-.github/       Release workflow (builds NSIS/DMG/AppImage on tag push)
-Docs/          Architecture, spec, frontend, backend, agent docs
+```
+server/      Bun + Hono API, session orchestration, agent runtime bridge
+web/         Vue 3 frontend — diff workbench, session timeline, settings
+desktop/     Electron shell — packaging, first-launch, auto-update
+shared/      Types, schemas, theme presets, event contracts
+.github/     CI — two-stage release workflow (bun build → node package)
+Docs/        Architecture, spec, frontend, backend, agent docs
 ```
 
 ## Themes
 
 <details>
-<summary>Theme cycle preview</summary>
+<summary>Theme preview</summary>
 
 <p align="center">
   <img src="./assets/glib-code-theme-cycle1.gif" alt="glib-code theme cycle" width="1100" />
