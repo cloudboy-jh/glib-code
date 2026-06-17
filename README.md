@@ -18,7 +18,11 @@ Open a repo, start a session, let the agent work, review the diff, then accept o
 
 ## Download
 
-**[glibcode.com](https://glibcode.com)** — Windows, Mac, Linux
+Go to **[Releases](https://github.com/cloudboy-jh/glib-code/releases/latest)** and grab the file for your platform:
+
+- **Windows** — `glib-code-Setup-*.exe`
+- **Mac** — `glib-code-*.dmg`
+- **Linux** — `glib-code-*.AppImage`
 
 ## What it does
 
