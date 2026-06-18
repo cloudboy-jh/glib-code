@@ -121,6 +121,15 @@ export async function setSessionNameFromPi(sessionId: string, name: string) {
   }
 }
 
+export function getSessionPlanSnapshot(sessionId: string) {
+  const running = runningTurns.get(sessionId);
+  return {
+    isRunning: running != null,
+    currentTurnId: running?.turnId ?? null,
+    turnStartedAt: running?.startedAt ?? null,
+  };
+}
+
 export async function compactSessionInPi(sessionId: string, customInstructions?: string) {
   const sandboxed = sandboxSessions.get(sessionId);
   if (!sandboxed) return null;

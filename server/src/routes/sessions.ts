@@ -5,10 +5,35 @@ import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
-import { abortRunningTurn, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
+import { abortRunningTurn, disposeRuntimeSession, getSessionPlanSnapshot, getSessionStatsFromPi } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
 import { routeError } from "../lib/route-error";
 import { canonicalProjectPath } from "../lib/project-path";
+
+// ── Boundary diff cache ────────────────────────────────────────────────────
+// Keyed by gittrixSessionId. TTL 10s — cheap polling from the right rail
+// without hammering git on every render tick.
+type BoundaryCacheEntry = {
+  touchedFiles: string[];
+  hasPendingChanges: boolean;
+  cachedAt: number;
+};
+const BOUNDARY_CACHE_TTL_MS = 10_000;
+const boundaryCache = new Map<string, BoundaryCacheEntry>();
+
+function boundaryFromCache(gittrixSessionId: string): BoundaryCacheEntry | null {
+  const entry = boundaryCache.get(gittrixSessionId);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > BOUNDARY_CACHE_TTL_MS) {
+    boundaryCache.delete(gittrixSessionId);
+    return null;
+  }
+  return entry;
+}
+
+function putBoundaryCache(gittrixSessionId: string, entry: Omit<BoundaryCacheEntry, "cachedAt">) {
+  boundaryCache.set(gittrixSessionId, { ...entry, cachedAt: Date.now() });
+}
 
 function mustProject() {
   const projectId = getCurrentProjectId();
@@ -277,4 +302,140 @@ export const sessionsRoutes = new Hono()
     const result = await compactSessionInPi(id, body?.customInstructions);
     if (!result) return c.json(routeError("compaction failed or no pi session", "COMPACT_FAILED", true), 503);
     return c.json({ ok: true, result });
+  })
+  // ── Boundary state ────────────────────────────────────────────────────────
+  // Lightweight poll endpoint for the right-rail boundary zone. Returns the
+  // ephemeral/durable state + touched file list without transmitting the full
+  // diff patch. Results are cached for 10s per gittrix session.
+  .get("/:id/boundary", async (c) => {
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+
+    if (!doc.meta.gittrixSessionId) {
+      return c.json({
+        state: "no_workspace" as const,
+        touchedFiles: [],
+        touchedFileCount: 0,
+        baselineSha: doc.meta.baselineSha ?? null,
+        lastPromotedAt: null,
+      });
+    }
+
+    // Return from cache if fresh
+    const cached = boundaryFromCache(doc.meta.gittrixSessionId);
+    if (cached) {
+      return c.json({
+        state: cached.hasPendingChanges ? ("pending" as const) : ("clean" as const),
+        touchedFiles: cached.touchedFiles,
+        touchedFileCount: cached.touchedFiles.length,
+        baselineSha: doc.meta.baselineSha ?? null,
+        lastPromotedAt: null,
+      });
+    }
+
+    const project = getProjectById(doc.meta.projectId);
+    try {
+      const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
+      const touchedFiles = filesFromPatch(patch);
+      const hasPendingChanges = touchedFiles.length > 0;
+      putBoundaryCache(doc.meta.gittrixSessionId, { touchedFiles, hasPendingChanges });
+      return c.json({
+        state: hasPendingChanges ? ("pending" as const) : ("clean" as const),
+        touchedFiles,
+        touchedFileCount: touchedFiles.length,
+        baselineSha: doc.meta.baselineSha ?? null,
+        lastPromotedAt: null,
+      });
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === "SESSION_EXPIRED") {
+        return c.json({
+          state: "clean" as const,
+          touchedFiles: [],
+          touchedFileCount: 0,
+          baselineSha: doc.meta.baselineSha ?? null,
+          lastPromotedAt: null,
+          alreadyPromoted: true,
+        });
+      }
+      logError("server", "boundary check failed", error, {
+        sessionId: doc.meta.id,
+        gittrixSessionId: doc.meta.gittrixSessionId,
+        projectPath,
+      });
+      return c.json(routeError(error instanceof Error ? error.message : "boundary check failed", "BOUNDARY_CHECK_FAILED", true), 500);
+    }
+  })
+  // ── Task plan snapshot ────────────────────────────────────────────────────
+  // Glanceable snapshot of agent progress for the right-rail task-state panel.
+  // Derives from in-memory runtime state + the session event log; no new storage.
+  .get("/:id/plan", async (c) => {
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc } = await resolveSession(requestedProjectPath, c.req.param("id"));
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+
+    const runtimeSnapshot = getSessionPlanSnapshot(c.req.param("id"));
+
+    // Derive turn count, tool call count, and recent tools from event log
+    let turnCount = 0;
+    let toolCallCount = 0;
+    const recentTools: string[] = [];
+
+    for (const event of doc.events) {
+      if (event.type === "turn_end") turnCount += 1;
+      if (event.type === "tool_call" && event.output !== "") {
+        // Only count completed tool calls (output present means end event)
+        toolCallCount += 1;
+        recentTools.push(event.tool);
+      }
+    }
+
+    // Keep last 8 unique-ish tool names for glanceability
+    const recentToolsSlice = recentTools.slice(-8);
+
+    return c.json({
+      status: doc.meta.status,
+      isRunning: runtimeSnapshot.isRunning,
+      currentTurnId: runtimeSnapshot.currentTurnId,
+      turnStartedAt: runtimeSnapshot.turnStartedAt,
+      turnCount,
+      toolCallCount,
+      recentTools: recentToolsSlice,
+    });
+  })
+  // ── Discard ephemeral ─────────────────────────────────────────────────────
+  // Evicts the ephemeral GitTrix workspace without deleting the glib session.
+  // The session resets to idle; the next send will spin up a fresh workspace.
+  // This is the "discard costs nothing" path from the spec — ephemeral empties,
+  // durable is untouched.
+  .post("/:id/discard", async (c) => {
+    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
+    const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
+    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    if (!doc.meta.gittrixSessionId) return c.json(routeError("session has no gittrix workspace to discard", "SESSION_NO_GITTRIX_MAPPING"), 400);
+
+    // Abort any running turn first — can't discard mid-run
+    abortRunningTurn(c.req.param("id"));
+
+    const project = getProjectById(doc.meta.projectId);
+    try {
+      await gittrixService.evict(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
+    } catch (error) {
+      logError("server", "discard evict failed", error, {
+        sessionId: doc.meta.id,
+        gittrixSessionId: doc.meta.gittrixSessionId,
+        projectPath,
+      });
+      return c.json(routeError(error instanceof Error ? error.message : "discard failed", "DISCARD_FAILED", true), 500);
+    }
+
+    // Clear the gittrix session from the stored meta so the boundary shows clean
+    // and the next send will re-initialize a fresh ephemeral workspace.
+    await patchSessionMeta(projectPath!, doc.meta.id, { status: "idle" } as any);
+
+    // Bust the boundary cache so the next poll reflects the now-clean state immediately
+    boundaryCache.delete(doc.meta.gittrixSessionId);
+
+    return c.json({ ok: true, sessionId: doc.meta.id });
   });

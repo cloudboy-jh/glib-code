@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import SessionSidebar from './SessionSidebar.vue';
+import LeftSidebar from './LeftSidebar.vue';
 
 function makeSession(id: string, projectPath: string, updatedAt: string) {
   return {
@@ -15,7 +15,7 @@ function makeSession(id: string, projectPath: string, updatedAt: string) {
   };
 }
 
-describe('SessionSidebar', () => {
+describe('LeftSidebar', () => {
   it('shows current project first and toggles show more/less', async () => {
     const sessions = [
       makeSession('c1', 'C:/Repo/App', '2026-01-07T00:00:00.000Z'),
@@ -27,7 +27,7 @@ describe('SessionSidebar', () => {
       makeSession('o1', 'D:/Else/Proj', '2026-01-01T00:00:00.000Z')
     ];
 
-    const wrapper = mount(SessionSidebar, {
+    const wrapper = mount(LeftSidebar, {
       props: {
         sessions,
         activeId: 'c1',

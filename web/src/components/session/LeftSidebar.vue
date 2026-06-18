@@ -1,8 +1,9 @@
 <template>
   <aside class="flex h-full min-h-0 flex-col bg-card/95 text-foreground">
     <div :class="['flex h-full min-h-0 flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
-      <div class="relative flex h-9 items-center justify-center">
-        <div v-if="!collapsed" class="min-w-0">
+      <!-- Expanded header: wordmark left, collapse toggle right -->
+      <div v-if="!collapsed" class="relative flex h-9 items-center justify-center">
+        <div class="min-w-0 flex-1">
           <div class="flex min-w-0 items-center justify-center rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
             <div
               v-if="logoWordmarkSrc"
@@ -14,18 +15,25 @@
             <div v-else class="truncate text-sm font-medium tracking-tight text-foreground">glib-code</div>
           </div>
         </div>
-
-        <div v-else class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-foreground" aria-label="glib-code">
-          <div v-if="logoIconSrc" class="logo-icon h-5 w-5" :style="{ '--logo-url': `url(${logoIconSrc})` }" role="img" aria-label="glib-code icon" />
-          <span v-else class="text-base font-semibold leading-none">g</span>
-        </div>
-
         <button
           type="button"
-          :class="['inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground', 'absolute right-0 h-8 w-8']"
+          class="absolute right-0 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Collapse sidebar"
           @click="$emit('toggleCollapse')"
         >
-          {{ collapsed ? '›' : '‹' }}
+          <PanelLeftClose class="sidebar-icon" />
+        </button>
+      </div>
+
+      <!-- Collapsed header: toggle only, centered — no overlapping logo -->
+      <div v-else class="flex h-9 items-center justify-center">
+        <button
+          type="button"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Expand sidebar"
+          @click="$emit('toggleCollapse')"
+        >
+          <PanelLeftOpen class="sidebar-icon" />
         </button>
       </div>
 
@@ -50,7 +58,7 @@
         </button>
       </div>
 
-      <div class="min-h-0 flex-1 overflow-auto">
+      <div :class="['min-h-0 flex-1', collapsed ? 'overflow-visible' : 'overflow-auto']">
         <template v-if="collapsed">
           <div ref="collapsedRailRef" class="relative space-y-1">
             <button
@@ -258,7 +266,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { House, Plus, Search, Settings2, Pencil, Download, Trash2 } from 'lucide-vue-next';
+import { House, Plus, Search, Settings2, Pencil, Download, Trash2, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next';
 
 type SessionRow = {
   id: string;

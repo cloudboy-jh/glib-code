@@ -1,12 +1,11 @@
 <template>
   <div class="h-[100dvh] w-[100dvw] overflow-hidden bg-background text-foreground">
-    <div :class="['grid h-full', currentProject ? 'grid-cols-[auto_1fr]' : 'grid-cols-1']">
+    <div class="grid h-full overflow-hidden" :style="{ gridTemplateColumns: gridTemplateColumns }">
       <div
         v-if="currentProject"
-        class="relative h-full border-r border-border/60 bg-card"
-        :style="{ width: `${sidebarWidth}px` }"
+        :class="['relative h-full min-w-0 border-r border-border/60 bg-card', sidebarUiCollapsed ? 'overflow-visible' : 'overflow-hidden']"
       >
-        <SessionSidebar
+        <LeftSidebar
           :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
           :current-project-path="currentProject?.path ?? ''"
@@ -141,6 +140,18 @@
           />
         </main>
       </section>
+
+      <!-- ── Workspace panel ── always mounted in session mode, collapse drives width via grid -->
+      <RightSidebar
+        v-if="showRightRail"
+        :collapsed="!rightRailOpen"
+        :boundary="boundary"
+        :plan="boundaryPlan"
+        :discarding="rightRailDiscarding"
+        @toggle-collapse="toggleRightRail"
+        @promote="runPromote"
+        @discard="discardEphemeral"
+      />
     </div>
 
     <CommandPalette
@@ -494,8 +505,11 @@ import ThemeDialog from './components/picker/ThemeDialog.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
 import ModelPicker from './components/settings/ModelPicker.vue';
 import SessionHeader from './components/session/SessionHeader.vue';
-import SessionSidebar from './components/session/SessionSidebar.vue';
+import LeftSidebar from './components/session/LeftSidebar.vue';
 import SessionDiffOverlay from './components/session/SessionDiffOverlay.vue';
+import RightSidebar from './components/session/RightSidebar.vue';
+import { useRailVisibility } from './composables/useRailVisibility';
+import { useBoundary } from './composables/useBoundary';
 import DiffView from './views/DiffView.vue';
 import PickerView from './views/PickerView.vue';
 import SessionView from './views/SessionView.vue';
@@ -518,8 +532,13 @@ const logoWordmarkSrc = logoWordmark;
 const SharedDiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
 const MultiDiffView = defineAsyncComponent(() => import('./components/shared/MultiDiffView.vue'));
 const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
+
+// ── Rail visibility — reads localStorage synchronously before first paint ──
+const { leftRailOpen, rightRailOpen, toggleLeft: toggleLeftRail, toggleRight: toggleRightRail } = useRailVisibility();
 const SIDEBAR_EXPANDED_WIDTH = 288;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
+const RIGHT_RAIL_EXPANDED_WIDTH = 288;
+const RIGHT_RAIL_COLLAPSED_WIDTH = 64;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
@@ -842,6 +861,16 @@ const paletteCommands = [
 ];
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
+
+// ── Boundary composable — drives the right rail ────────────────────────────
+// Must live after `state` and `activeSession` are declared.
+const rightRailDiscarding = ref(false);
+const { boundary, plan: boundaryPlan, refresh: refreshBoundary, onPromoteComplete: onBoundaryPromoteComplete } = useBoundary({
+  sessionId: () => state.activeSessionId || null,
+  projectPath: () => activeSession.value?.projectPath ?? currentProject.value?.path ?? null,
+  isSessionActive: () => Boolean(state.activeSessionId && currentProject.value && state.mode === 'session'),
+});
+
 const sidebarSessions = computed(() => {
   return sessions
     .map((session) => ({
@@ -871,7 +900,7 @@ const recentProjectSessions = computed(() => {
   const activeProjectPath = canonicalizeProjectPath(currentProject.value.path);
   return sidebarSessions.value.filter((session) => canonicalizeProjectPath(session.projectPath) === activeProjectPath).slice(0, 5);
 });
-const sidebarUiCollapsed = computed(() => state.sidebarCollapsed);
+const sidebarUiCollapsed = computed(() => !leftRailOpen.value);
 const activeContextBundle = computed(() => (state.activeSessionId ? contextBundleBySessionId[state.activeSessionId] : undefined));
 const activeContextSummary = computed(() => {
   const ctx = activeContextBundle.value;
@@ -943,6 +972,14 @@ const filteredPaletteCommands = computed(() => {
 });
 
 const sidebarWidth = computed(() => (sidebarUiCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
+const rightRailWidth = computed(() => (rightRailOpen.value ? RIGHT_RAIL_EXPANDED_WIDTH : RIGHT_RAIL_COLLAPSED_WIDTH));
+const showRightRail = computed(() => Boolean(currentProject.value && state.mode === 'session' && state.activeSessionId));
+const gridTemplateColumns = computed(() => {
+  if (!currentProject.value) return '1fr';
+  const cols = [`${sidebarWidth.value}px`, 'minmax(0, 1fr)'];
+  if (showRightRail.value) cols.push(`${rightRailWidth.value}px`);
+  return cols.join(' ');
+});
 const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();
 const staleSessionIds = reactive(new Set<string>());
@@ -1752,7 +1789,7 @@ function clampSidebarWidth(width: number) {
 }
 
 function toggleSidebarCollapse() {
-  state.sidebarCollapsed = !state.sidebarCollapsed;
+  toggleLeftRail();
   if (!sidebarUiCollapsed.value) {
     state.sidebarWidth = clampSidebarWidth(state.sidebarWidth);
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth));
@@ -2359,6 +2396,7 @@ async function confirmPromote() {
       promote.pushResult = await apiPost<{ remote: string; branch: string; upstream: string; sha: string }>('/git/push', {});
     }
     setTimeout(() => { state.promoteDialogOpen = false; }, 3000);
+    void onBoundaryPromoteComplete();
     appendTimelineEvent(state.activeSessionId, {
       id: `${state.activeSessionId}-${Date.now()}-promote`,
       kind: 'Promote',
@@ -2403,6 +2441,29 @@ async function confirmPromote() {
 function promoteCommitMessage(session: Session) {
   const title = session.title?.trim() || 'Session changes';
   return `glib-code: ${title}\n\nGenerated-by: glib-code\nSession-id: ${session.id}`;
+}
+
+async function discardEphemeral() {
+  if (!state.activeSessionId) return;
+  const session = activeSession.value;
+  if (!session?.projectPath) return;
+  rightRailDiscarding.value = true;
+  try {
+    await apiPost(`/sessions/${encodeURIComponent(state.activeSessionId)}/discard?projectPath=${encodeURIComponent(session.projectPath)}`, {});
+    await refreshBoundary();
+  } catch (error) {
+    // surface as a timeline notice — discard failing is notable
+    const message = error instanceof Error ? error.message : 'Discard failed';
+    appendTimelineEvent(state.activeSessionId, {
+      id: `${state.activeSessionId}-${Date.now()}-discard-err`,
+      kind: 'System',
+      text: `Discard failed: ${message}`,
+      time: 'now',
+      level: 'error'
+    });
+  } finally {
+    rightRailDiscarding.value = false;
+  }
 }
 
 async function stashAndRetryPromote() {
@@ -2889,6 +2950,8 @@ const shortcuts = useGlobalShortcuts({
   forms,
   filteredPaletteCommands,
   runPalette,
+  toggleLeftRail,
+  toggleRightRail,
   closeOnEscape: [
     () => {
       if (promote.fileMenuOpen) {
