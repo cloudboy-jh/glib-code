@@ -3,14 +3,14 @@
     <div class="grid h-full overflow-hidden" :style="{ gridTemplateColumns: gridTemplateColumns }">
       <div
         v-if="currentProject"
-        :class="['relative h-full min-w-0 border-r border-border/60 bg-card', sidebarUiCollapsed ? 'overflow-visible' : 'overflow-hidden']"
+        class="relative h-full min-w-0 overflow-hidden border-r border-border/60 bg-card"
       >
         <LeftSidebar
+          v-if="currentProject"
           :sessions="sidebarSessions"
           :active-id="state.activeSessionId"
           :current-project-path="currentProject?.path ?? ''"
           :current-project-name="currentProject?.name ?? ''"
-          :collapsed="sidebarUiCollapsed"
           :new-disabled="!currentProject"
           :logo-wordmark-src="logoWordmarkSrc"
           :logo-icon-src="logoIconSrc"
@@ -25,7 +25,7 @@
         />
 
         <button
-          v-if="!sidebarUiCollapsed"
+          v-if="currentProject && leftRailOpen"
           type="button"
           class="absolute inset-y-0 -right-2 z-10 hidden w-4 cursor-col-resize bg-transparent transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-border md:block"
           aria-label="Resize sidebar"
@@ -40,16 +40,20 @@
           :project="currentProject.name"
           :branch="currentProject.branch"
           :model="selectedModelLabel"
-            :status="activeSession?.status ?? 'disconnected'"
-            :theme-type="diffThemeType"
-            :git-action-label="promoteActionLabel"
-            :preferred-editor="settings.preferredEditor"
-            :session-id="activeSession?.id"
-            @diff-current="openCurrentSessionDiff"
-            @diff-commits="openCommitsListDiff"
+          :status="activeSession?.status ?? 'disconnected'"
+          :theme-type="diffThemeType"
+          :git-action-label="promoteActionLabel"
+          :preferred-editor="settings.preferredEditor"
+          :session-id="activeSession?.id"
+          :left-sidebar-open="leftRailOpen"
+          :right-sidebar-open="rightRailOpen && showRightRail"
+          @diff-current="openCurrentSessionDiff"
+          @diff-commits="openCommitsListDiff"
           @open-editor-settings="openSettings('Integrations')"
           @open-model="state.modelPickerOpen = true"
           @git-action="runPromote"
+          @toggle-left-sidebar="toggleLeftRail"
+          @toggle-right-sidebar="toggleRightRail"
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
@@ -141,17 +145,20 @@
         </main>
       </section>
 
-      <!-- ── Workspace panel ── always mounted in session mode, collapse drives width via grid -->
-      <RightSidebar
+      <!-- ── Right sidebar ── always in DOM when in session, hidden via 0px grid column -->
+      <div
         v-if="showRightRail"
-        :collapsed="!rightRailOpen"
-        :boundary="boundary"
-        :plan="boundaryPlan"
-        :discarding="rightRailDiscarding"
-        @toggle-collapse="toggleRightRail"
-        @promote="runPromote"
-        @discard="discardEphemeral"
-      />
+        class="h-full min-w-0 overflow-hidden border-l border-border/60"
+      >
+        <RightSidebar
+          :boundary="boundary"
+          :plan="boundaryPlan"
+          :discarding="rightRailDiscarding"
+          @toggle-collapse="toggleRightRail"
+          @promote="runPromote"
+          @discard="discardEphemeral"
+        />
+      </div>
     </div>
 
     <CommandPalette
@@ -971,14 +978,15 @@ const filteredPaletteCommands = computed(() => {
   return options.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
 });
 
-const sidebarWidth = computed(() => (sidebarUiCollapsed.value ? SIDEBAR_COLLAPSED_WIDTH : state.sidebarWidth));
-const rightRailWidth = computed(() => (rightRailOpen.value ? RIGHT_RAIL_EXPANDED_WIDTH : RIGHT_RAIL_COLLAPSED_WIDTH));
+const sidebarWidth = computed(() => (leftRailOpen.value ? state.sidebarWidth : 0));
+const rightRailWidth = computed(() => (rightRailOpen.value ? RIGHT_RAIL_EXPANDED_WIDTH : 0));
 const showRightRail = computed(() => Boolean(currentProject.value && state.mode === 'session' && state.activeSessionId));
 const gridTemplateColumns = computed(() => {
   if (!currentProject.value) return '1fr';
-  const cols = [`${sidebarWidth.value}px`, 'minmax(0, 1fr)'];
-  if (showRightRail.value) cols.push(`${rightRailWidth.value}px`);
-  return cols.join(' ');
+  const left = `${sidebarWidth.value}px`;
+  const center = 'minmax(0, 1fr)';
+  const right = showRightRail.value ? `${rightRailWidth.value}px` : null;
+  return [left, center, ...(right ? [right] : [])].join(' ');
 });
 const streamsBySessionId = new Map<string, EventSource>();
 const seenEventKeysBySessionId = new Map<string, Set<string>>();

@@ -1,50 +1,25 @@
 <template>
   <aside class="flex h-full min-h-0 flex-col bg-card/95 text-foreground">
-    <div :class="['flex h-full min-h-0 flex-col', collapsed ? 'px-2 py-3' : 'px-3 py-3']">
+    <div class="flex h-full min-h-0 flex-col px-3 py-3">
 
-      <!-- Expanded header: toggle left, label fills -->
-      <div v-if="!collapsed" class="relative flex h-9 items-center justify-center">
+      <!-- Header: close toggle left, label right -->
+      <div class="relative flex h-9 items-center justify-center">
         <span class="min-w-0 flex-1 truncate pl-8 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
           Workspace
         </span>
         <button
           type="button"
           class="absolute left-0 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="Collapse workspace panel"
+          aria-label="Close workspace panel"
           @click="$emit('toggleCollapse')"
         >
           <PanelRightClose class="rail-icon" />
         </button>
       </div>
 
-      <!-- Collapsed header: toggle only, centered -->
-      <div v-else class="flex h-9 items-center justify-center">
-        <button
-          type="button"
-          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="Expand workspace panel"
-          @click="$emit('toggleCollapse')"
-        >
-          <PanelRightOpen class="rail-icon" />
-        </button>
-      </div>
-
       <!-- Scrollable content -->
       <div class="min-h-0 flex-1 overflow-auto">
-
-        <!-- Collapsed: pending dot only -->
-        <template v-if="collapsed">
-          <div class="mt-3 flex flex-col items-center gap-2">
-            <span
-              v-if="boundary.state === 'pending'"
-              class="h-2.5 w-2.5 rounded-full bg-primary/80"
-              title="Ephemeral changes pending"
-            />
-          </div>
-        </template>
-
-        <!-- Expanded -->
-        <template v-else>
+        <template>
 
           <!-- ── Agent status ── -->
           <div class="mb-3 mt-2">
@@ -168,14 +143,13 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
-import { ArrowDown, FileCode, PanelRightClose, PanelRightOpen } from 'lucide-vue-next';
+import { ArrowDown, FileCode, PanelRightClose } from 'lucide-vue-next';
 import { useElapsed } from '../../composables/useElapsed';
 import type { BoundaryData, PlanData } from '../../composables/useBoundary';
 
 const FILE_LIMIT = 8;
 
 const props = defineProps<{
-  collapsed: boolean;
   boundary: BoundaryData;
   plan: PlanData;
   discarding: boolean;

@@ -1,5 +1,16 @@
 <template>
   <header class="flex h-[52px] items-center gap-2.5 border-b border-border/80 px-3 sm:px-4">
+    <!-- Left sidebar re-open -->
+    <button
+      v-if="!leftSidebarOpen"
+      type="button"
+      class="header-button shrink-0 px-2"
+      aria-label="Open left sidebar"
+      @click="$emit('toggleLeftSidebar')"
+    >
+      <PanelLeftOpen class="header-icon" />
+    </button>
+
     <div class="min-w-0 flex-1">
       <div class="truncate text-sm font-medium tracking-tight text-foreground">{{ title }}</div>
       <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
@@ -41,12 +52,23 @@
         <span>{{ gitActionLabel }}</span>
       </button>
     </div>
+
+    <!-- Right sidebar re-open -->
+    <button
+      v-if="!rightSidebarOpen"
+      type="button"
+      class="header-button shrink-0 px-2"
+      aria-label="Open right sidebar"
+      @click="$emit('toggleRightSidebar')"
+    >
+      <PanelRightOpen class="header-icon" />
+    </button>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { ChevronDown, CloudUpload, GitBranch, GitCompare } from 'lucide-vue-next';
+import { ChevronDown, CloudUpload, GitBranch, GitCompare, PanelLeftOpen, PanelRightOpen } from 'lucide-vue-next';
 import OpenInEditor from '../shared/OpenInEditor.vue';
 
 const diffMenuOpen = ref(false);
@@ -61,12 +83,26 @@ function onClickOutside(event: MouseEvent) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside));
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside));
 
-const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done'; themeType?: 'dark' | 'light'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
+const props = withDefaults(defineProps<{
+  title: string;
+  project: string;
+  branch: string;
+  model: string;
+  status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
+  themeType?: 'dark' | 'light';
+  gitActionLabel?: string;
+  preferredEditor?: string | null;
+  sessionId?: string;
+  leftSidebarOpen?: boolean;
+  rightSidebarOpen?: boolean;
+}>(), {
   preferredEditor: null,
   gitActionLabel: 'Commit',
-  themeType: 'dark'
+  themeType: 'dark',
+  leftSidebarOpen: true,
+  rightSidebarOpen: true,
 });
-defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; openEditorSettings: [] }>();
+defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; openEditorSettings: []; toggleLeftSidebar: []; toggleRightSidebar: [] }>();
 
 const statusDotClass = computed(() => {
   if (props.status === 'stale') return 'bg-amber-400';
