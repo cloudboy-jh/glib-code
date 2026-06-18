@@ -117,7 +117,7 @@
             :key="`tree-${tool.groupId}`"
             class="mt-1.5"
           >
-            <FileTreeView :paths="tool.treePaths!" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" />
+            <FileTreeView :paths="tool.treePaths!" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" :theme-type="themeType" />
           </div>
         </div>
       </article>

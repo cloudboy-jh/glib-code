@@ -1,6 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import electronUpdater, { type UpdateInfo, type ProgressInfo, type UpdateDownloadedEvent } from "electron-updater";
-const { autoUpdater } = electronUpdater;
+import { type UpdateInfo, type ProgressInfo, type UpdateDownloadedEvent } from "electron-updater";
+// electron-updater is a pure CJS module — require directly to avoid TypeScript's
+// __importDefault wrapper mangling the named exports.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -81,8 +84,9 @@ function markWelcomeSeen() {
 // ── Auto-updater setup ────────────────────────────────────────────────────
 
 function setupAutoUpdater(win: BrowserWindow) {
-  // Don't run updater in dev or when there's no publish config
-  if (isDev) return;
+  // Only run the updater when explicitly enabled (i.e. CI/release builds set GLIB_ENABLE_UPDATER=1).
+  // Local --dir builds and dev mode both skip it to avoid spurious "no disk space" / 404 errors.
+  if (isDev || process.env.GLIB_ENABLE_UPDATER !== "1") return;
 
   autoUpdater.autoDownload = false; // we notify the renderer first
   autoUpdater.autoInstallOnAppQuit = true;

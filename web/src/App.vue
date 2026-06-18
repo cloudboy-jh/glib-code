@@ -42,6 +42,7 @@
           :branch="currentProject.branch"
           :model="selectedModelLabel"
             :status="activeSession?.status ?? 'disconnected'"
+            :theme-type="diffThemeType"
             :git-action-label="promoteActionLabel"
             :preferred-editor="settings.preferredEditor"
             :session-id="activeSession?.id"

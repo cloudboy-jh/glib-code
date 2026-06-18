@@ -122,10 +122,11 @@ export async function resetKeybindings() {
 }
 
 const THEME_PRESETS = new Set([
+  "minimal-dark", "minimal-paper",
   "tokyo-night", "catppuccin-mocha", "gruvbox-dark", "nord", "rose-pine", "rose-pine-moon", "dracula",
   "kanagawa-wave", "kanagawa-dragon", "everforest-dark", "solarized-dark", "github-dark", "ayu-dark", "one-dark",
   "monokai-pro", "oxocarbon-dark", "night-owl", "material-palenight", "poimandres", "github-light", "solarized-light",
-  "catppuccin-latte", "ayu-mirage", "nightfox", "carbon", "synthwave", "matrix", "minimal-dark", "paper"
+  "catppuccin-latte", "ayu-mirage", "nightfox", "carbon", "synthwave", "matrix", "paper"
 ]);
 const EDITORS = new Set(["vscode", "cursor", "zed", "obsidian"]);
 

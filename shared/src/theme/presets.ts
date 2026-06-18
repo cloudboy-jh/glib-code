@@ -13,6 +13,32 @@ export type ThemeTokens = {
 };
 
 export const THEME_PRESETS = {
+  "minimal-dark": {
+    background: "0 0% 9%",
+    foreground: "0 0% 95%",
+    card: "0 0% 12%",
+    cardForeground: "0 0% 95%",
+    border: "0 0% 25%",
+    input: "0 0% 25%",
+    ring: "0 0% 70%",
+    primary: "0 0% 70%",
+    primaryForeground: "0 0% 9%",
+    muted: "0 0% 15%",
+    mutedForeground: "0 0% 65%"
+  },
+  "minimal-paper": {
+    background: "51 33% 92%",
+    foreground: "0 3% 6%",
+    card: "48 100% 97%",
+    cardForeground: "0 3% 6%",
+    border: "55 10% 79%",
+    input: "55 10% 79%",
+    ring: "0 3% 6%",
+    primary: "0 3% 6%",
+    primaryForeground: "48 100% 97%",
+    muted: "51 21% 88%",
+    mutedForeground: "45 2% 33%"
+  },
   "tokyo-night": {
     background: "222 47% 5%",
     foreground: "215 25% 91%",
@@ -363,19 +389,6 @@ export const THEME_PRESETS = {
     primaryForeground: "120 100% 2%",
     muted: "120 100% 8%",
     mutedForeground: "120 40% 60%"
-  },
-  "minimal-dark": {
-    background: "0 0% 9%",
-    foreground: "0 0% 95%",
-    card: "0 0% 12%",
-    cardForeground: "0 0% 95%",
-    border: "0 0% 25%",
-    input: "0 0% 25%",
-    ring: "0 0% 70%",
-    primary: "0 0% 70%",
-    primaryForeground: "0 0% 9%",
-    muted: "0 0% 15%",
-    mutedForeground: "0 0% 65%"
   },
   "paper": {
     background: "45 29% 97%",

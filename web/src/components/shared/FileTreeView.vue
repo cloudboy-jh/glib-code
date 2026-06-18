@@ -14,10 +14,12 @@ const props = withDefaults(
     paths: string[];
     gitStatus?: Record<string, string>;
     themePreset?: ThemePreset;
+    themeType?: 'dark' | 'light';
   }>(),
   {
     gitStatus: () => ({}),
-    themePreset: 'catppuccin-mocha'
+    themePreset: 'catppuccin-mocha',
+    themeType: undefined
   }
 );
 
@@ -46,11 +48,26 @@ function gitStatusEntries(): GitStatusEntry[] {
 
 const treeCssVars = computed<Record<string, string>>(() => {
   const preset = THEME_PRESETS[props.themePreset] ?? THEME_PRESETS['catppuccin-mocha'];
-  const isLight = props.themePreset.includes('light') || props.themePreset.includes('latte') || props.themePreset === 'paper' || props.themePreset === 'solarized-light' || props.themePreset === 'github-light';
+
+  // Derive light/dark from the background lightness if no explicit themeType prop given.
+  // Same formula as diffThemeType in App.vue — background token is "H S% L%".
+  const isLight = props.themeType
+    ? props.themeType === 'light'
+    : Number(preset.background.split(' ')[2]?.replace('%', '') ?? '0') > 50;
+
   const bg = `hsl(${preset.background})`;
   const fg = `hsl(${preset.foreground})`;
   const muted = `hsl(${preset.mutedForeground})`;
   const border = `hsl(${preset.border})`;
+
+  // Git decoration colors — Flexoki 600s on light themes (darker, legible on warm paper),
+  // bright 400-range on dark themes (saturated, readable against dark surfaces).
+  const gitModified  = isLight ? `hsl(45 99% 34%)`  : `hsl(35 88% 62%)`;   // yellow-600 / yellow-400
+  const gitAdded     = isLight ? `hsl(73 84% 27%)`  : `hsl(142 70% 50%)`;  // green-600  / green-400
+  const gitDeleted   = isLight ? `hsl(3 62% 42%)`   : `hsl(0 76% 63%)`;    // red-600    / red-400
+  const gitUntracked = isLight ? `hsl(212 68% 39%)` : `hsl(215 25% 75%)`; // blue-600   / blue-muted
+  const gitRenamed   = isLight ? `hsl(175 57% 33%)` : `hsl(200 80% 60%)`; // cyan-600   / cyan-400
+
   const styles = themeToTreeStyles({
     type: isLight ? 'light' : 'dark',
     bg,
@@ -61,12 +78,12 @@ const treeCssVars = computed<Record<string, string>>(() => {
       'sideBar.background': bg,
       'sideBar.foreground': fg,
       'sideBar.border': border,
-      'gitDecoration.modifiedResourceForeground': `hsl(35 88% 62%)`,
-      'gitDecoration.addedResourceForeground': `hsl(142 70% 50%)`,
-      'gitDecoration.deletedResourceForeground': `hsl(0 76% 63%)`,
-      'gitDecoration.untrackedResourceForeground': `hsl(215 25% 75%)`,
+      'gitDecoration.modifiedResourceForeground': gitModified,
+      'gitDecoration.addedResourceForeground': gitAdded,
+      'gitDecoration.deletedResourceForeground': gitDeleted,
+      'gitDecoration.untrackedResourceForeground': gitUntracked,
       'gitDecoration.ignoredResourceForeground': `hsl(${preset.muted})`,
-      'gitDecoration.renamedResourceForeground': `hsl(200 80% 60%)`,
+      'gitDecoration.renamedResourceForeground': gitRenamed,
       'sideBarSectionHeader.background': `hsl(${preset.card})`,
       'sideBarSectionHeader.foreground': muted,
       'list.hoverBackground': `hsl(${preset.muted} / 0.34)`,
@@ -77,10 +94,10 @@ const treeCssVars = computed<Record<string, string>>(() => {
       'input.border': border,
       'foreground': fg,
       'descriptionForeground': muted,
-      'terminal.ansiBrightGreen': `hsl(142 70% 50%)`,
-      'terminal.ansiBrightRed': `hsl(0 76% 63%)`,
-      'terminal.ansiBrightYellow': `hsl(35 88% 62%)`,
-      'terminal.ansiBrightBlue': `hsl(200 80% 60%)`,
+      'terminal.ansiBrightGreen': gitAdded,
+      'terminal.ansiBrightRed': gitDeleted,
+      'terminal.ansiBrightYellow': gitModified,
+      'terminal.ansiBrightBlue': gitUntracked,
       'terminal.ansiWhite': fg
     }
   });

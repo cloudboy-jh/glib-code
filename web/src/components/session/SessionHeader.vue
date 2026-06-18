@@ -61,9 +61,10 @@ function onClickOutside(event: MouseEvent) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside));
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside));
 
-const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
+const props = withDefaults(defineProps<{ title: string; project: string; branch: string; model: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done'; themeType?: 'dark' | 'light'; gitActionLabel?: string; preferredEditor?: string | null; sessionId?: string }>(), {
   preferredEditor: null,
-  gitActionLabel: 'Commit'
+  gitActionLabel: 'Commit',
+  themeType: 'dark'
 });
 defineEmits<{ diffCurrent: []; diffCommits: []; openModel: []; gitAction: []; openEditorSettings: [] }>();
 
@@ -85,12 +86,24 @@ const statusLabel = computed(() => {
 });
 
 const statusBadgeClass = computed(() => {
-  if (props.status === 'running') return 'border-sky-500/45 bg-sky-500/15 text-sky-100';
-  if (props.status === 'stale') return 'border-amber-500/40 bg-amber-500/12 text-amber-100';
-  if (props.status === 'connecting') return 'border-violet-500/35 bg-violet-500/12 text-violet-100';
-  if (props.status === 'done') return 'border-zinc-500/40 bg-zinc-500/15 text-zinc-300';
+  const light = props.themeType === 'light';
+  if (props.status === 'running') return light
+    ? 'border-sky-600/50 bg-sky-500/12 text-sky-700'
+    : 'border-sky-500/45 bg-sky-500/15 text-sky-100';
+  if (props.status === 'stale') return light
+    ? 'border-amber-600/50 bg-amber-500/12 text-amber-700'
+    : 'border-amber-500/40 bg-amber-500/12 text-amber-100';
+  if (props.status === 'connecting') return light
+    ? 'border-violet-600/50 bg-violet-500/12 text-violet-700'
+    : 'border-violet-500/35 bg-violet-500/12 text-violet-100';
+  if (props.status === 'done') return light
+    ? 'border-zinc-400/60 bg-zinc-500/10 text-zinc-600'
+    : 'border-zinc-500/40 bg-zinc-500/15 text-zinc-300';
   if (props.status === 'disconnected') return 'border-border/70 bg-background/45 text-muted-foreground';
-  return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-100';
+  // connected
+  return light
+    ? 'border-emerald-600/50 bg-emerald-500/12 text-emerald-700'
+    : 'border-emerald-500/35 bg-emerald-500/12 text-emerald-100';
 });
 
 </script>
