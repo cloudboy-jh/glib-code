@@ -55,6 +55,10 @@
               <div class="flex items-center gap-1.5">
                 <span :class="['h-1.5 w-1.5 rounded-full', ephemeralDotClass]" />
                 <span class="text-[10px] font-semibold uppercase tracking-[0.08em]" :class="ephemeralLabelClass">Ephemeral</span>
+                <span v-if="boundary.state === 'pending' && (boundary.additions > 0 || boundary.deletions > 0)" class="flex items-center gap-0.5 font-mono text-[9px]">
+                  <span class="text-emerald-400/80">+{{ boundary.additions }}</span>
+                  <span class="text-red-400/70">-{{ boundary.deletions }}</span>
+                </span>
               </div>
               <button
                 v-if="boundary.state === 'pending' && !isPromoting"

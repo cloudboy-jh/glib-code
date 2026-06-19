@@ -1,38 +1,30 @@
 import { Hono } from "hono";
-import { deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
+import { appendEvents, deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
 import { getCurrentProjectId, getProjectById, getRecents, listRegisteredProjects } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
-import { abortRunningTurn, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
+import { abortRunningTurn, broadcast, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
 import { routeError } from "../lib/route-error";
 import { canonicalProjectPath } from "../lib/project-path";
+import { clearBoundaryCache, computeBoundary, filesFromPatch, toBoundaryEvent } from "../services/boundary-service";
+import type { SessionMeta } from "../services/session-store";
 
-// ── Boundary diff cache ────────────────────────────────────────────────────
-// Keyed by gittrixSessionId. TTL 10s — cheap polling from the right rail
-// without hammering git on every render tick.
-type BoundaryCacheEntry = {
-  touchedFiles: string[];
-  hasPendingChanges: boolean;
-  cachedAt: number;
-};
-const BOUNDARY_CACHE_TTL_MS = 10_000;
-const boundaryCache = new Map<string, BoundaryCacheEntry>();
-
-function boundaryFromCache(gittrixSessionId: string): BoundaryCacheEntry | null {
-  const entry = boundaryCache.get(gittrixSessionId);
-  if (!entry) return null;
-  if (Date.now() - entry.cachedAt > BOUNDARY_CACHE_TTL_MS) {
-    boundaryCache.delete(gittrixSessionId);
-    return null;
+// Recompute the boundary for a session and broadcast it to connected SSE
+// clients (also appended so it's replayable on reconnect). Best-effort —
+// boundary failures must never break the originating request.
+async function emitBoundary(meta: SessionMeta, projectPath: string) {
+  try {
+    clearBoundaryCache(meta.gittrixSessionId);
+    const payload = await computeBoundary(meta, projectPath, { fresh: true });
+    const event = toBoundaryEvent(meta.id, payload);
+    await appendEvents(projectPath, meta.id, [event]).catch(() => undefined);
+    broadcast(meta.id, event);
+  } catch (error) {
+    logError("server", "emitBoundary failed", error, { sessionId: meta.id });
   }
-  return entry;
-}
-
-function putBoundaryCache(gittrixSessionId: string, entry: Omit<BoundaryCacheEntry, "cachedAt">) {
-  boundaryCache.set(gittrixSessionId, { ...entry, cachedAt: Date.now() });
 }
 
 function mustProject() {
@@ -63,16 +55,6 @@ async function listSessionsAcrossProjects() {
   }
 
   return [...merged.values()].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
-}
-
-function filesFromPatch(patch: string) {
-  const files = new Set<string>();
-  for (const match of patch.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) files.add((match[2] || match[1] || "").trim());
-  for (const match of patch.matchAll(/^\+\+\+\s+(?:b\/)?([^\t\n\r]+)$/gm)) {
-    const file = (match[1] || "").trim();
-    if (file && file !== "/dev/null") files.add(file);
-  }
-  return [...files].filter(Boolean);
 }
 
 async function durableDirtyFiles(projectPath: string) {
@@ -209,21 +191,15 @@ export const sessionsRoutes = new Hono()
 
     try {
       // Get file count before promoting — the workspace is gone after promote.
-      // Prefer the boundary cache; fall back to a fresh diff for mode:all.
       let fileCount = 0;
       if (body.selector.mode === "files") {
         fileCount = body.selector.files.length;
       } else {
-        const cached = boundaryCache.get(doc.meta.gittrixSessionId);
-        if (cached) {
-          fileCount = cached.touchedFiles.length;
-        } else {
-          try {
-            const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
-            fileCount = filesFromPatch(patch).length;
-          } catch {
-            fileCount = 0;
-          }
+        try {
+          const boundary = await computeBoundary(doc.meta, projectPath!);
+          fileCount = boundary.touchedFileCount;
+        } catch {
+          fileCount = 0;
         }
       }
 
@@ -247,6 +223,21 @@ export const sessionsRoutes = new Hono()
         status: "done",
         promoteHistory: nextHistory,
       }).catch(() => undefined);
+
+      // Push a settled "promoted" boundary so all connected clients converge.
+      clearBoundaryCache(doc.meta.gittrixSessionId);
+      const promotedEvent = toBoundaryEvent(doc.meta.id, {
+        state: "promoted",
+        touchedFiles: [],
+        touchedFileCount: 0,
+        additions: 0,
+        deletions: 0,
+        baselineSha: doc.meta.baselineSha ?? null,
+        lastPromotedAt: nextHistory.at(-1)?.at ?? null,
+        promoteHistory: nextHistory,
+      });
+      await appendEvents(projectPath!, doc.meta.id, [promotedEvent]).catch(() => undefined);
+      broadcast(doc.meta.id, promotedEvent);
       return c.json(result);
     } catch (error) {
       const conflict = error as Partial<{ code: string; conflictingFiles: string[]; durableSha: string; baselineSha: string }>;
@@ -335,65 +326,19 @@ export const sessionsRoutes = new Hono()
     return c.json({ ok: true, result });
   })
   // ── Boundary state ────────────────────────────────────────────────────────
-  // Lightweight poll endpoint for the right-rail boundary zone. Returns the
-  // ephemeral/durable state + touched file list without transmitting the full
-  // diff patch. Results are cached for 10s per gittrix session.
+  // Hydration endpoint for the right-rail boundary zone. Live updates arrive via
+  // the `boundary_changed` SSE event; this endpoint serves the initial state on
+  // session load (and any client without an open stream). Derivation lives in
+  // boundary-service.computeBoundary, which caches for 10s to debounce polls.
   .get("/:id/boundary", async (c) => {
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
     const { existing: doc, projectPath } = await resolveSession(requestedProjectPath, c.req.param("id"));
     if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
 
-    if (!doc.meta.gittrixSessionId) {
-      return c.json({
-        state: "no_workspace" as const,
-        touchedFiles: [],
-        touchedFileCount: 0,
-        baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
-        promoteHistory: doc.meta.promoteHistory ?? [],
-      });
-    }
-
-    // Return from cache if fresh
-    const cached = boundaryFromCache(doc.meta.gittrixSessionId);
-    if (cached) {
-      return c.json({
-        state: cached.hasPendingChanges ? ("pending" as const) : ("clean" as const),
-        touchedFiles: cached.touchedFiles,
-        touchedFileCount: cached.touchedFiles.length,
-        baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
-        promoteHistory: doc.meta.promoteHistory ?? [],
-      });
-    }
-
-    const project = getProjectById(doc.meta.projectId);
     try {
-      const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
-      const touchedFiles = filesFromPatch(patch);
-      const hasPendingChanges = touchedFiles.length > 0;
-      putBoundaryCache(doc.meta.gittrixSessionId, { touchedFiles, hasPendingChanges });
-      return c.json({
-        state: hasPendingChanges ? ("pending" as const) : ("clean" as const),
-        touchedFiles,
-        touchedFileCount: touchedFiles.length,
-        baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
-        promoteHistory: doc.meta.promoteHistory ?? [],
-      });
+      const payload = await computeBoundary(doc.meta, projectPath!);
+      return c.json(payload);
     } catch (error) {
-      const code = (error as { code?: string })?.code;
-      if (code === "SESSION_EXPIRED") {
-        return c.json({
-          state: "clean" as const,
-          touchedFiles: [],
-          touchedFileCount: 0,
-          baselineSha: doc.meta.baselineSha ?? null,
-          lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
-          promoteHistory: doc.meta.promoteHistory ?? [],
-          alreadyPromoted: true,
-        });
-      }
       logError("server", "boundary check failed", error, {
         sessionId: doc.meta.id,
         gittrixSessionId: doc.meta.gittrixSessionId,
@@ -432,8 +377,20 @@ export const sessionsRoutes = new Hono()
     // and the next send will re-initialize a fresh ephemeral workspace.
     await patchSessionMeta(projectPath!, doc.meta.id, { status: "idle" } as any);
 
-    // Bust the boundary cache so the next poll reflects the now-clean state immediately
-    boundaryCache.delete(doc.meta.gittrixSessionId);
+    // Bust the cache and push a clean boundary so all clients converge immediately.
+    clearBoundaryCache(doc.meta.gittrixSessionId);
+    const cleanEvent = toBoundaryEvent(doc.meta.id, {
+      state: "clean",
+      touchedFiles: [],
+      touchedFileCount: 0,
+      additions: 0,
+      deletions: 0,
+      baselineSha: doc.meta.baselineSha ?? null,
+      lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
+      promoteHistory: doc.meta.promoteHistory ?? [],
+    });
+    await appendEvents(projectPath!, doc.meta.id, [cleanEvent]).catch(() => undefined);
+    broadcast(doc.meta.id, cleanEvent);
 
     return c.json({ ok: true, sessionId: doc.meta.id });
   });

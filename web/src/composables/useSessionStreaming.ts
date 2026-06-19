@@ -12,6 +12,7 @@ export function useSessionStreaming(options: {
   sessionNoticeById: Record<string, string | undefined>;
   setSessionStatus: (sessionId: string, status: SessionLike['status']) => void;
   reduceAgentEventToTimeline: (sessionId: string, event: AgentEvent) => void;
+  onBoundaryEvent?: (sessionId: string, event: Extract<AgentEvent, { type: 'boundary_changed' }>) => void;
   hydrateSessionDoc: (sessionId: string) => Promise<unknown>;
 }) {
   function connectSessionStream(sessionId: string) {
@@ -27,7 +28,7 @@ export function useSessionStreaming(options: {
     }
     options.setSessionStatus(sessionId, 'connecting');
     const stream = new EventSource(`${options.apiBase}/agent/sessions/${encodeURIComponent(sessionId)}/stream?projectPath=${encodeURIComponent(session.projectPath)}&replay=150`);
-    const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error'];
+    const names = ['session_start', 'user_turn', 'turn_start', 'turn_end', 'aborted', 'step_start', 'text_part', 'tool_call', 'step_end', 'error', 'boundary_changed'];
     for (const name of names) {
       stream.addEventListener(name, (evt) => {
         options.streamErrorCountBySessionId.set(sessionId, 0);
@@ -37,6 +38,10 @@ export function useSessionStreaming(options: {
         const message = evt as MessageEvent<string>;
         try {
           const parsed = JSON.parse(message.data) as AgentEvent;
+          if (parsed.type === 'boundary_changed') {
+            options.onBoundaryEvent?.(sessionId, parsed);
+            return;
+          }
           options.reduceAgentEventToTimeline(sessionId, parsed);
         } catch {
           // ignore malformed data

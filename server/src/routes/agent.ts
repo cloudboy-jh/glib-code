@@ -8,8 +8,61 @@ import { requiredProjectPath, resolveAgentCwd, resolveSession } from "../service
 import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
+import { clearBoundaryCache, computeBoundary, toBoundaryEvent } from "../services/boundary-service";
 import { log, logError } from "../lib/log";
 import { routeError } from "../lib/route-error";
+
+// ── Boundary push scheduler ────────────────────────────────────────────────
+// File-mutating tool calls fire rapidly during a turn. Coalesce boundary
+// recomputes to at most one in flight per session, with a trailing recompute if
+// another mutation lands while one is running. turn_end forces a final flush.
+const boundaryRecomputePending = new Set<string>();
+const boundaryRecomputeRunning = new Set<string>();
+
+const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
+
+async function recomputeAndBroadcastBoundary(sessionId: string, projectPath: string) {
+  const result = await resolveSession(projectPath, sessionId);
+  const doc = result.existing;
+  if (!doc) return;
+  clearBoundaryCache(doc.meta.gittrixSessionId);
+  const payload = await computeBoundary(doc.meta, result.projectPath ?? projectPath, { fresh: true });
+  const event = toBoundaryEvent(sessionId, payload);
+  await appendEvents(result.projectPath ?? projectPath, sessionId, [event]).catch(() => undefined);
+  broadcast(sessionId, event);
+}
+
+// Debounced trigger: recompute now if idle, otherwise mark a trailing pass.
+function scheduleBoundaryRecompute(sessionId: string, projectPath: string) {
+  if (boundaryRecomputeRunning.has(sessionId)) {
+    boundaryRecomputePending.add(sessionId);
+    return;
+  }
+  void runBoundaryRecompute(sessionId, projectPath);
+}
+
+async function runBoundaryRecompute(sessionId: string, projectPath: string) {
+  boundaryRecomputeRunning.add(sessionId);
+  try {
+    do {
+      boundaryRecomputePending.delete(sessionId);
+      await recomputeAndBroadcastBoundary(sessionId, projectPath);
+    } while (boundaryRecomputePending.has(sessionId));
+  } catch (error) {
+    logError("agent", "boundary recompute failed", error, { sessionId });
+  } finally {
+    boundaryRecomputeRunning.delete(sessionId);
+  }
+}
+
+// Forces a final boundary recompute, waiting for any in-flight pass to settle.
+async function flushBoundaryRecompute(sessionId: string, projectPath: string) {
+  // Drain any in-flight loop first so we don't double-run concurrently.
+  while (boundaryRecomputeRunning.has(sessionId)) {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  await runBoundaryRecompute(sessionId, projectPath);
+}
 
 onSessionInfoChanged(async (sessionId, name) => {
   try {
@@ -201,6 +254,11 @@ export const agentRoutes = new Hono()
       provider: existing.meta.provider,
       onEvent: async (event) => {
         await appendEvents(projectPath, id, [event]);
+        // Push a boundary update as soon as a file-mutating tool lands so the
+        // right rail tracks changes live, not on a poll timer.
+        if (event.type === "tool_call" && MUTATING_TOOLS.has(event.tool)) {
+          scheduleBoundaryRecompute(id, projectPath);
+        }
         if (event.type === "turn_end") {
           const patch: Record<string, unknown> = {
             status: event.reason === "error" ? "error" : event.reason === "aborted" ? "aborted" : "done"
@@ -221,6 +279,8 @@ export const agentRoutes = new Hono()
             }
           }
           await patchSessionMeta(projectPath, id, patch as any);
+          // Guaranteed final boundary flush after the turn settles.
+          void flushBoundaryRecompute(id, projectPath);
         }
       }
     }).catch((error) => logError("agent", "runTurn promise rejected", error, { sessionId: id, turnId }));
@@ -300,6 +360,8 @@ export const agentRoutes = new Hono()
     broadcast(id, abortedEvt);
     broadcast(id, turnEndEvt);
     await patchSessionMeta(projectPath, id, { status: "aborted" });
+    // Reflect any partial changes the aborted turn made.
+    void flushBoundaryRecompute(id, projectPath);
     return c.json({ ok: true, sessionId: id, turnId });
   })
   .delete("/sessions/:id", async (c) => {

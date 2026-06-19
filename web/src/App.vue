@@ -871,11 +871,10 @@ const activeSession = computed(() => sessions.find((s) => s.id === state.activeS
 // ── Boundary composable — drives the right rail ────────────────────────────
 // Must live after `state` and `activeSession` are declared.
 const rightRailDiscarding = ref(false);
-const { boundary, refresh: refreshBoundary, onPromoteComplete: onBoundaryPromoteComplete } = useBoundary({
+const { boundary, refresh: refreshBoundary, applyBoundaryEvent, onPromoteComplete: onBoundaryPromoteComplete } = useBoundary({
   sessionId: () => state.activeSessionId || null,
   projectPath: () => activeSession.value?.projectPath ?? currentProject.value?.path ?? null,
   isSessionActive: () => Boolean(state.activeSessionId && currentProject.value && state.mode === 'session'),
-  isRunning: () => activeSession.value?.status === 'running',
 });
 
 const sidebarSessions = computed(() => {
@@ -1014,6 +1013,9 @@ const { connectSessionStream, syncActiveSessionStream, disconnectSessionStream, 
   sessionNoticeById,
   setSessionStatus,
   reduceAgentEventToTimeline,
+  onBoundaryEvent: (sessionId, event) => {
+    if (sessionId === state.activeSessionId) applyBoundaryEvent(event);
+  },
   hydrateSessionDoc
 });
 
@@ -1091,6 +1093,7 @@ function eventKey(event: AgentEvent) {
   if (event.type === 'step_end') return `step_end:${event.turnId}:${event.stepId}:${event.at}`;
   if (event.type === 'text_part') return `text_part:${event.turnId}:${event.stepId}:${event.partId}`;
   if (event.type === 'tool_call') return `tool_call:${event.turnId}:${event.stepId}:${event.callId}:${event.output ? 'end' : 'start'}`;
+  if (event.type === 'boundary_changed') return `boundary_changed:${event.sessionId}:${event.at}`;
   return `error:${event.turnId}:${event.name}:${event.at}`;
 }
 
@@ -1367,6 +1370,11 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
   seen.add(key);
   seenEventKeysBySessionId.set(sessionId, seen);
 
+  if (event.type === 'boundary_changed') {
+    // Replayed on hydration / reconnect — keep the rail in sync for the active session.
+    if (sessionId === state.activeSessionId) applyBoundaryEvent(event);
+    return;
+  }
   if (event.type === 'user_turn') {
     const id = `${event.turnId}-user`;
     if (!findTimelineEntry(sessionId, id)) {
