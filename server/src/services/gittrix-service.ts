@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { GitTrix, BaselineConflictError } from "gittrix";
 import type { DurableAdapter, EphemeralAdapter, PromoteOpts, PromoteResult, UserSession } from "gittrix";
+import { logError } from "../lib/log";
 import { GitHubDurableAdapter, CloudflareArtifactsEphemeralAdapter } from "./gittrix-cloud-adapters";
 import { LocalDurableAdapter, LocalEphemeralAdapter } from "./gittrix-local-adapter";
 import { getConfigDir } from "../lib/paths";
@@ -194,8 +195,41 @@ export async function promote(
       };
       throw payload;
     }
+
+    // On Windows, the ephemeral workspace dir can be locked (EBUSY) by git or
+    // antivirus at eviction time. The gittrix library wraps eviction failure in
+    // PromoteFailedError('apply', ...) even though applyCommit() already
+    // succeeded and the commit is in the durable repo. Detect this case and
+    // return a synthetic success so the UI doesn't show a false failure.
+    if (isEvictionBusyError(error)) {
+      logError("server", "promote eviction EBUSY — commit succeeded, workspace cleanup skipped", error, {
+        gittrixSessionId,
+        projectPath
+      });
+      try {
+        const rt = await getRuntime(projectPath, branch);
+        const sha = await (rt as unknown as { durable: { getHead(b: string): Promise<string> } }).durable.getHead(branch ?? "main");
+        return { sha, branch: branch ?? "main" } as PromoteResult;
+      } catch {
+        // Can't read HEAD — still don't fail the promote; return a minimal result.
+        return { sha: null, branch: branch ?? "main" } as unknown as PromoteResult;
+      }
+    }
+
     throw error;
   }
+}
+
+function isEvictionBusyError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // gittrix wraps as: "Promotion failed during apply: EBUSY: resource busy or locked, rm '...'"
+  if (!error.message.startsWith("Promotion failed during apply:")) return false;
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    return (cause as NodeJS.ErrnoException).code === "EBUSY";
+  }
+  // Sometimes the cause message is embedded directly in error.message
+  return error.message.includes("EBUSY");
 }
 
 export async function evict(projectPath: string, gittrixSessionId: string, branch?: string) {

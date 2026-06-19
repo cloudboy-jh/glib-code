@@ -165,9 +165,28 @@ export class LocalEphemeralAdapter implements EphemeralAdapter {
     const info = await this.loadWorkspaceMetadata(sessionId);
     const workspacePath = this.sessionPath(sessionId);
     if (info?.workspaceKind === "worktree") {
-      try {
-        await runGit(["worktree", "remove", "--force", workspacePath], info.durablePath);
-      } catch {
+      // On Windows, git may still hold a handle on the worktree dir for a short
+      // window after the last git operation. Retry worktree remove a few times
+      // before falling back to a plain rm.
+      let worktreeRemoved = false;
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          await runGit(["worktree", "remove", "--force", workspacePath], info.durablePath);
+          worktreeRemoved = true;
+          break;
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          const msg = (err as Error).message ?? "";
+          const isLocked = code === "EBUSY" || code === "EPERM" || code === "EACCES" || msg.includes("EBUSY");
+          if (isLocked && attempt < 5) {
+            await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+            continue;
+          }
+          // Non-locking error or exhausted retries — fall through to rmRetry below.
+          break;
+        }
+      }
+      if (!worktreeRemoved) {
         await rmRetry(workspacePath);
       }
       try {
