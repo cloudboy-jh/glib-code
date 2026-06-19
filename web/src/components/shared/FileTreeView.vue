@@ -1,6 +1,6 @@
 <template>
-  <div class="file-tree-shell rounded-lg border border-border/80 bg-[hsl(var(--card))]/65 overflow-x-auto">
-    <div ref="containerRef" class="min-w-full" :style="{ height: containerHeight, minWidth: 'max-content', ...treeCssVars }" />
+  <div class="file-tree-shell rounded-lg border border-border/80 bg-[hsl(var(--card))]/65">
+    <div ref="containerRef" class="w-full" :style="{ height: containerHeight, ...treeCssVars }" />
   </div>
 </template>
 
@@ -119,47 +119,7 @@ function createInstance(): FileTree {
     icons: { set: 'complete', colored: true },
     search: false,
     flattenEmptyDirectories: true,
-    initialExpansion: 'closed',
-    // Disable the @pierre/truncate middle-truncation so full names are visible.
-    // The outer shell has overflow-x:auto so long names scroll instead of clip.
-    unsafeCSS: `
-      [data-item-section='content'] {
-        max-width: none !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        white-space: nowrap !important;
-      }
-      [data-truncate-group-container='middle'] {
-        min-width: max-content !important;
-        overflow: visible !important;
-      }
-      [data-truncate-group-container='middle'] > div,
-      [data-truncate-group-container='middle'] > div[data-truncate-segment-priority='1'],
-      [data-truncate-group-container='middle'] > div[data-truncate-segment-priority='2'] {
-        min-width: max-content !important;
-        flex: 0 0 auto !important;
-      }
-      [data-truncate-container],
-      [data-truncate-grid],
-      [data-truncate-content='visible'] {
-        overflow: visible !important;
-        margin-top: 0 !important;
-        word-break: normal !important;
-      }
-      [data-truncate-content='visible'] {
-        opacity: 1 !important;
-      }
-      [data-truncate-content='overflow'],
-      [data-truncate-marker-cell] {
-        display: none !important;
-        opacity: 0 !important;
-        margin-top: 0 !important;
-      }
-      [data-truncate-marker],
-      [data-truncate-fade] {
-        display: none !important;
-      }
-    `
+    initialExpansion: 'closed'
   });
 }
 
