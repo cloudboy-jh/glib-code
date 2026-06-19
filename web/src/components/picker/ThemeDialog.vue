@@ -13,24 +13,53 @@
       />
 
       <div class="max-h-[420px] space-y-1 overflow-auto pr-1">
-        <button
-          v-for="themeId in filteredThemes"
-          :key="themeId"
-          :class="[
-            'flex h-11 w-full items-center rounded-lg border px-3 text-left transition',
-            modelValue === themeId ? 'border-border bg-muted/80' : 'border-transparent hover:border-border/60 hover:bg-muted/55'
-          ]"
-          @click="$emit('update:modelValue', themeId)"
-        >
-          <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ formatName(themeId) }}</span>
-          <span class="mr-2 inline-flex items-center gap-1.5">
-            <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].background})` }" />
-            <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].foreground})` }" />
-            <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].primary})` }" />
-            <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].border})` }" />
-          </span>
-          <Check v-if="modelValue === themeId" class="h-4 w-4 text-primary" />
-        </button>
+        <div v-if="inHouseThemes.length" class="space-y-1">
+          <div class="flex items-center gap-2 px-1 pb-0.5 pt-1">
+            <span class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">In-House Glib Themes</span>
+            <span class="rounded border border-border/60 px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Curated</span>
+          </div>
+          <button
+            v-for="themeId in inHouseThemes"
+            :key="themeId"
+            :class="[
+              'flex h-11 w-full items-center rounded-lg border px-3 text-left transition',
+              modelValue === themeId ? 'border-border bg-muted/80' : 'border-transparent hover:border-border/60 hover:bg-muted/55'
+            ]"
+            @click="$emit('update:modelValue', themeId)"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ formatName(themeId) }}</span>
+            <span class="mr-2 inline-flex items-center gap-1.5">
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].background})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].foreground})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].primary})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].border})` }" />
+            </span>
+            <Check v-if="modelValue === themeId" class="h-4 w-4 text-primary" />
+          </button>
+        </div>
+
+        <div v-if="inHouseThemes.length && otherThemes.length" class="my-1 h-px bg-border/50" />
+
+        <div v-if="otherThemes.length" class="space-y-1">
+          <button
+            v-for="themeId in otherThemes"
+            :key="themeId"
+            :class="[
+              'flex h-11 w-full items-center rounded-lg border px-3 text-left transition',
+              modelValue === themeId ? 'border-border bg-muted/80' : 'border-transparent hover:border-border/60 hover:bg-muted/55'
+            ]"
+            @click="$emit('update:modelValue', themeId)"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ formatName(themeId) }}</span>
+            <span class="mr-2 inline-flex items-center gap-1.5">
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].background})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].foreground})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].primary})` }" />
+              <span class="theme-dot" :style="{ backgroundColor: `hsl(${THEME_PRESETS[themeId].border})` }" />
+            </span>
+            <Check v-if="modelValue === themeId" class="h-4 w-4 text-primary" />
+          </button>
+        </div>
 
         <p v-if="!filteredThemes.length" class="px-1 py-3 text-sm text-muted-foreground">No themes found.</p>
       </div>
@@ -49,11 +78,16 @@ defineEmits<{ close: []; 'update:modelValue': [value: ThemePreset] }>();
 
 const query = ref('');
 
+const IN_HOUSE_THEMES = ['minimal-dark', 'minimal-paper'] as const;
+
 const filteredThemes = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (!q) return THEME_PRESET_IDS;
   return THEME_PRESET_IDS.filter((id) => id.toLowerCase().includes(q) || formatName(id).toLowerCase().includes(q));
 });
+
+const inHouseThemes = computed(() => filteredThemes.value.filter((id) => (IN_HOUSE_THEMES as readonly string[]).includes(id)));
+const otherThemes = computed(() => filteredThemes.value.filter((id) => !(IN_HOUSE_THEMES as readonly string[]).includes(id)));
 
 function formatName(value: string) {
   return value

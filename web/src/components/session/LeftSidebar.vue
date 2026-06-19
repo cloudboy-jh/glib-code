@@ -160,6 +160,19 @@
           <Settings2 class="sidebar-icon" />
           Settings
         </button>
+        <template v-if="isMinimalTheme">
+          <div class="my-1 h-px bg-border/60" />
+          <button
+            type="button"
+            class="flex h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-sm text-muted-foreground/75 transition-colors hover:bg-accent hover:text-foreground"
+            :title="`Switch to ${themePreset === 'minimal-dark' ? 'Minimal Paper' : 'Minimal Dark'}`"
+            :aria-label="`Switch to ${themePreset === 'minimal-dark' ? 'Minimal Paper' : 'Minimal Dark'}`"
+            @click="$emit('toggleMinimalTheme')"
+          >
+            <Moon v-if="themePreset === 'minimal-dark'" class="sidebar-icon" />
+            <Sun v-else class="sidebar-icon" />
+          </button>
+        </template>
       </div>
     </div>
   </aside>
@@ -167,7 +180,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { House, Plus, Search, Settings2, Pencil, Download, Trash2, PanelLeftClose } from 'lucide-vue-next';
+import { House, Plus, Search, Settings2, Pencil, Download, Trash2, PanelLeftClose, Sun, Moon } from 'lucide-vue-next';
+import type { ThemePreset } from '@glib-code/shared/theme/presets';
 
 type SessionRow = {
   id: string;
@@ -190,11 +204,14 @@ const props = withDefaults(
     logoIconSrc?: string;
     disabled?: boolean;
     newDisabled?: boolean;
+    themePreset?: ThemePreset;
   }>(),
-  { disabled: false, newDisabled: false }
+  { disabled: false, newDisabled: false, themePreset: 'catppuccin-mocha' }
 );
 
-defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string]; rename: [id: string]; openSearch: [] }>();
+defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string]; rename: [id: string]; openSearch: []; toggleMinimalTheme: [] }>();
+
+const isMinimalTheme = computed(() => props.themePreset === 'minimal-dark' || props.themePreset === 'minimal-paper');
 
 const expandedOpenGroups = ref(new Set<string>());
 const showAllOtherGroupKeys = ref(new Set<string>());

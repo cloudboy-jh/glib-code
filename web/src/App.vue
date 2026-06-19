@@ -14,6 +14,7 @@
           :new-disabled="!currentProject"
           :logo-wordmark-src="logoWordmarkSrc"
           :logo-icon-src="logoIconSrc"
+          :theme-preset="settings.themePreset"
           @select="selectSessionFromSidebar"
           @new="createSession"
           @go-home="goHome"
@@ -23,6 +24,7 @@
           @export="openExportDialog"
           @rename="openRenameDialog"
           @open-search="openCommandPalette"
+          @toggle-minimal-theme="toggleMinimalTheme"
         />
 
         <button
@@ -1678,6 +1680,11 @@ async function updateTheme(theme: ThemePreset, options: { persist?: boolean } = 
   applyTheme(theme);
   if (options.persist === false) return;
   await apiPatch('/settings', { themePreset: theme });
+}
+
+function toggleMinimalTheme() {
+  const next: ThemePreset = settings.themePreset === 'minimal-dark' ? 'minimal-paper' : 'minimal-dark';
+  void updateTheme(next);
 }
 
 function startThemeCycleDemo() {
