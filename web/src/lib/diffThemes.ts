@@ -26,6 +26,8 @@ export const DIFF_THEME_VARS_BY_PRESET: Partial<Record<ThemePreset, DiffThemeVar
     '--diffs-bg-hover-override': 'hsl(var(--muted) / 0.55)',
     '--diffs-bg-context-override': 'hsl(var(--muted) / 0.35)',
     '--diffs-bg-separator-override': 'hsl(var(--muted) / 0.6)',
+    '--diffs-addition-color-override': '#66800B',
+    '--diffs-deletion-color-override': '#AF3029',
     '--diffs-fg-number-override': 'hsl(var(--muted-foreground) / 0.85)',
     // Flexoki green-600 (#66800B) → 73 84% 27%
     '--diffs-fg-number-addition-override': 'hsl(73 84% 27%)',

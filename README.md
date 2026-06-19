@@ -35,6 +35,7 @@ glib-code is an AI coding agent that lives next to your local repos. Open a proj
 - Review commit history and working tree diffs before prompting the agent
 - Runs sessions in an isolated workspace — your real checkout stays untouched
 - Streams assistant output, tool calls, and errors in a live timeline
+- Keeps promote state in a dedicated right rail — review ephemeral changes, compare diffs, then commit only what you accept
 - Shows a full session diff so you see exactly what the agent changed
 - Apply only the files you accept back to your real repo
 - Provider key management, model selection, GitHub push, local commit flows

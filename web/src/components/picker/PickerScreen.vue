@@ -157,6 +157,12 @@ function onPickerKeydown(event: KeyboardEvent) {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.logo-wordmark:hover {
+  opacity: 0.85;
+  filter: drop-shadow(0 0 12px hsl(var(--primary) / 0.15));
 }
 
 .picker-row {
@@ -170,11 +176,19 @@ function onPickerKeydown(event: KeyboardEvent) {
   background: hsl(var(--background) / 0.25);
   padding: 0 12px;
   color: hsl(var(--foreground));
+  transition: transform 0.18s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.18s ease;
 }
 
 .picker-row:hover {
   border-color: hsl(var(--border));
   background: hsl(var(--muted) / 0.55);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.08);
+}
+
+.picker-row:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .picker-row-active {

@@ -5,7 +5,7 @@ import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
-import { abortRunningTurn, disposeRuntimeSession, getSessionPlanSnapshot, getSessionStatsFromPi } from "../services/agent-runtime";
+import { abortRunningTurn, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
 import { routeError } from "../lib/route-error";
 import { canonicalProjectPath } from "../lib/project-path";
@@ -208,14 +208,45 @@ export const sessionsRoutes = new Hono()
     }
 
     try {
+      // Get file count before promoting — the workspace is gone after promote.
+      // Prefer the boundary cache; fall back to a fresh diff for mode:all.
+      let fileCount = 0;
+      if (body.selector.mode === "files") {
+        fileCount = body.selector.files.length;
+      } else {
+        const cached = boundaryCache.get(doc.meta.gittrixSessionId);
+        if (cached) {
+          fileCount = cached.touchedFiles.length;
+        } else {
+          try {
+            const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
+            fileCount = filesFromPatch(patch).length;
+          } catch {
+            fileCount = 0;
+          }
+        }
+      }
+
       const result = await gittrixService.promote(
         projectPath!,
         doc.meta.gittrixSessionId,
         { selector: body.selector, strategy: body.strategy, message: body.message },
         project?.branch ?? "main"
       );
-      // Mark session as done so the client knows the workspace is gone
-      await patchSessionMeta(projectPath!, doc.meta.id, { status: "done" }).catch(() => undefined);
+      const promotedSha = (result as { sha?: string | null } | null)?.sha ?? null;
+      const nextHistory = [
+        ...(doc.meta.promoteHistory ?? []),
+        {
+          at: new Date().toISOString(),
+          fromSha: doc.meta.baselineSha ?? null,
+          toSha: promotedSha,
+          fileCount,
+        },
+      ];
+      await patchSessionMeta(projectPath!, doc.meta.id, {
+        status: "done",
+        promoteHistory: nextHistory,
+      }).catch(() => undefined);
       return c.json(result);
     } catch (error) {
       const conflict = error as Partial<{ code: string; conflictingFiles: string[]; durableSha: string; baselineSha: string }>;
@@ -318,7 +349,8 @@ export const sessionsRoutes = new Hono()
         touchedFiles: [],
         touchedFileCount: 0,
         baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: null,
+        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
+        promoteHistory: doc.meta.promoteHistory ?? [],
       });
     }
 
@@ -330,7 +362,8 @@ export const sessionsRoutes = new Hono()
         touchedFiles: cached.touchedFiles,
         touchedFileCount: cached.touchedFiles.length,
         baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: null,
+        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
+        promoteHistory: doc.meta.promoteHistory ?? [],
       });
     }
 
@@ -345,7 +378,8 @@ export const sessionsRoutes = new Hono()
         touchedFiles,
         touchedFileCount: touchedFiles.length,
         baselineSha: doc.meta.baselineSha ?? null,
-        lastPromotedAt: null,
+        lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
+        promoteHistory: doc.meta.promoteHistory ?? [],
       });
     } catch (error) {
       const code = (error as { code?: string })?.code;
@@ -355,7 +389,8 @@ export const sessionsRoutes = new Hono()
           touchedFiles: [],
           touchedFileCount: 0,
           baselineSha: doc.meta.baselineSha ?? null,
-          lastPromotedAt: null,
+          lastPromotedAt: doc.meta.promoteHistory?.at(-1)?.at ?? null,
+          promoteHistory: doc.meta.promoteHistory ?? [],
           alreadyPromoted: true,
         });
       }
@@ -366,43 +401,6 @@ export const sessionsRoutes = new Hono()
       });
       return c.json(routeError(error instanceof Error ? error.message : "boundary check failed", "BOUNDARY_CHECK_FAILED", true), 500);
     }
-  })
-  // ── Task plan snapshot ────────────────────────────────────────────────────
-  // Glanceable snapshot of agent progress for the right-rail task-state panel.
-  // Derives from in-memory runtime state + the session event log; no new storage.
-  .get("/:id/plan", async (c) => {
-    const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));
-    const { existing: doc } = await resolveSession(requestedProjectPath, c.req.param("id"));
-    if (!doc) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
-
-    const runtimeSnapshot = getSessionPlanSnapshot(c.req.param("id"));
-
-    // Derive turn count, tool call count, and recent tools from event log
-    let turnCount = 0;
-    let toolCallCount = 0;
-    const recentTools: string[] = [];
-
-    for (const event of doc.events) {
-      if (event.type === "turn_end") turnCount += 1;
-      if (event.type === "tool_call" && event.output !== "") {
-        // Only count completed tool calls (output present means end event)
-        toolCallCount += 1;
-        recentTools.push(event.tool);
-      }
-    }
-
-    // Keep last 8 unique-ish tool names for glanceability
-    const recentToolsSlice = recentTools.slice(-8);
-
-    return c.json({
-      status: doc.meta.status,
-      isRunning: runtimeSnapshot.isRunning,
-      currentTurnId: runtimeSnapshot.currentTurnId,
-      turnStartedAt: runtimeSnapshot.turnStartedAt,
-      turnCount,
-      toolCallCount,
-      recentTools: recentToolsSlice,
-    });
   })
   // ── Discard ephemeral ─────────────────────────────────────────────────────
   // Evicts the ephemeral GitTrix workspace without deleting the glib session.

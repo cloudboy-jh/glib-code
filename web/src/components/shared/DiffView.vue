@@ -1,15 +1,15 @@
 <template>
-  <div class="diff-shell max-h-[calc(100vh-220px)] overflow-auto rounded-lg border border-border/80 bg-[hsl(var(--card))]/65">
+  <div class="diff-shell max-h-[calc(100vh-220px)] overflow-auto rounded-lg border border-border/80 bg-[hsl(var(--card))]/65" :style="diffCssVars">
     <div v-if="errorMessage" class="p-3 text-xs text-red-300">{{ errorMessage }}</div>
     <div v-else-if="!patch.trim()" class="p-3 text-xs text-muted-foreground">No diff available for this file.</div>
-    <component :is="DIFFS_TAG_NAME" v-else ref="containerRef" class="block w-full" :style="diffCssVars" />
+    <component :is="DIFFS_TAG_NAME" v-else ref="containerRef" class="block w-full" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { FileDiff, DIFFS_TAG_NAME, getSingularPatch, type BaseDiffOptions, type FileDiffMetadata } from '@pierre/diffs';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { ThemePreset } from '@glib-code/shared/theme/presets';
+import { THEME_PRESETS, type ThemePreset } from '@glib-code/shared/theme/presets';
 import { getDiffThemeVars } from '../../lib/diffThemes';
 
 const props = withDefaults(
@@ -41,15 +41,27 @@ const parsedPatch = computed<FileDiffMetadata | undefined>(() => {
   }
 });
 
-const diffCssVars = computed<Record<string, string>>(() => ({
-  '--shiki-bg': 'hsl(var(--background))',
-  '--shiki-dark-bg': 'hsl(var(--background))',
-  '--shiki-light-bg': 'hsl(var(--background))',
-  ...getDiffThemeVars(props.themePreset, props.themeType)
-}));
+const diffCssVars = computed<Record<string, string>>(() => {
+  const preset = THEME_PRESETS[props.themePreset] ?? THEME_PRESETS['catppuccin-mocha'];
+  const bg = `hsl(${preset.card})`;
+  const fg = `hsl(${preset.foreground})`;
+  const muted = `hsl(${preset.mutedForeground})`;
+  return {
+    '--shiki': fg,
+    '--shiki-dark': fg,
+    '--shiki-light': fg,
+    '--shiki-bg': bg,
+    '--shiki-dark-bg': bg,
+    '--shiki-light-bg': bg,
+    '--diff-shell-fg': fg,
+    '--diff-shell-muted': muted,
+    ...getDiffThemeVars(props.themePreset, props.themeType)
+  };
+});
 
 function getOptions(): BaseDiffOptions {
   return {
+    theme: getHighlighterTheme(),
     diffStyle: props.diffStyle,
     diffIndicators: 'bars',
     lineDiffType: 'word-alt',
@@ -60,6 +72,13 @@ function getOptions(): BaseDiffOptions {
     disableBackground: false,
     themeType: props.themeType
   };
+}
+
+function getHighlighterTheme(): string | { dark: string; light: string } {
+  if (props.themePreset === 'minimal-paper') {
+    return { dark: 'pierre-dark', light: 'github-light' };
+  }
+  return { dark: 'pierre-dark', light: 'pierre-light' };
 }
 
 async function mountOrRender() {
@@ -107,4 +126,14 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.diff-shell {
+  color: var(--diff-shell-fg);
+}
+
+.diff-shell :deep([data-diffs-file-header]),
+.diff-shell :deep([data-diffs-meta]),
+.diff-shell :deep([data-diffs-empty]) {
+  color: var(--diff-shell-muted);
+}
+</style>

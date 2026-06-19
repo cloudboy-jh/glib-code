@@ -22,6 +22,7 @@
           @delete="confirmDeleteSession"
           @export="openExportDialog"
           @rename="openRenameDialog"
+          @open-search="openCommandPalette"
         />
 
         <button
@@ -33,25 +34,19 @@
         />
       </div>
 
-      <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[54px_1fr]' : 'grid-rows-[1fr]']">
+      <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[44px_1fr]' : 'grid-rows-[1fr]']">
           <SessionHeader
             v-if="currentProject && state.mode === 'session'"
           :title="activeSession?.title ?? 'No active session'"
-          :project="currentProject.name"
-          :branch="currentProject.branch"
           :model="selectedModelLabel"
           :status="activeSession?.status ?? 'disconnected'"
           :theme-type="diffThemeType"
-          :git-action-label="promoteActionLabel"
           :preferred-editor="settings.preferredEditor"
           :session-id="activeSession?.id"
           :left-sidebar-open="leftRailOpen"
           :right-sidebar-open="rightRailOpen && showRightRail"
-          @diff-current="openCurrentSessionDiff"
-          @diff-commits="openCommitsListDiff"
           @open-editor-settings="openSettings('Integrations')"
           @open-model="state.modelPickerOpen = true"
-          @git-action="runPromote"
           @toggle-left-sidebar="toggleLeftRail"
           @toggle-right-sidebar="toggleRightRail"
         />
@@ -152,11 +147,15 @@
       >
         <RightSidebar
           :boundary="boundary"
-          :plan="boundaryPlan"
           :discarding="rightRailDiscarding"
+          :branch="currentProject?.branch"
+          :session-status="activeSession?.status"
+          :should-push="promoteShouldPush"
           @toggle-collapse="toggleRightRail"
           @promote="runPromote"
           @discard="discardEphemeral"
+          @diff-current="openCurrentSessionDiff()"
+          @diff-commits="openCommitsListDiff"
         />
       </div>
     </div>
@@ -872,10 +871,11 @@ const activeSession = computed(() => sessions.find((s) => s.id === state.activeS
 // ── Boundary composable — drives the right rail ────────────────────────────
 // Must live after `state` and `activeSession` are declared.
 const rightRailDiscarding = ref(false);
-const { boundary, plan: boundaryPlan, refresh: refreshBoundary, onPromoteComplete: onBoundaryPromoteComplete } = useBoundary({
+const { boundary, refresh: refreshBoundary, onPromoteComplete: onBoundaryPromoteComplete } = useBoundary({
   sessionId: () => state.activeSessionId || null,
   projectPath: () => activeSession.value?.projectPath ?? currentProject.value?.path ?? null,
   isSessionActive: () => Boolean(state.activeSessionId && currentProject.value && state.mode === 'session'),
+  isRunning: () => activeSession.value?.status === 'running',
 });
 
 const sidebarSessions = computed(() => {
@@ -1058,7 +1058,6 @@ const promoteCommitLabel = computed(() => {
   return 'Commit selected';
 });
 const promoteShouldPush = computed(() => settings.durableProvider === 'github' || (settings.durableProvider === 'local' && gitState.canPush));
-const promoteActionLabel = computed(() => promoteShouldPush.value ? 'Commit + Push' : 'Commit');
 const promoteFlowLabel = computed(() => {
   if (settings.durableProvider === 'github') return 'GitHub durable repo -> pushed branch';
   if (gitState.canPush) return `Local repo -> ${gitState.upstream}`;
@@ -1449,6 +1448,9 @@ function reduceAgentEventToTimeline(sessionId: string, event: AgentEvent) {
       }
     }
     void refreshSessionMeta(sessionId);
+    // Immediately refresh the boundary so the rail reflects the settled file
+    // list as soon as the agent finishes — don't wait for the next poll cycle.
+    if (sessionId === state.activeSessionId) void refreshBoundary();
   }
 }
 

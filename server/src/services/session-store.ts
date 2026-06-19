@@ -10,6 +10,13 @@ function normalizeProjectPath(path: string) {
   return canonicalProjectPath(path) ?? path.replace(/\\/g, "/").trim();
 }
 
+export type PromoteEntry = {
+  at: string;
+  fromSha: string | null;
+  toSha: string | null;
+  fileCount: number;
+};
+
 export type SessionMeta = {
   id: string;
   projectId: string;
@@ -27,6 +34,7 @@ export type SessionMeta = {
   totalTokens: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number };
   createdAt: string;
   updatedAt: string;
+  promoteHistory?: PromoteEntry[];
 };
 
 type SessionDoc = {
@@ -243,7 +251,7 @@ export async function appendEvents(projectPath: string, sessionId: string, event
 export async function patchSessionMeta(
   projectPath: string,
   sessionId: string,
-  partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider" | "totalCost" | "totalTokens">>
+  partial: Partial<Pick<SessionMeta, "title" | "status" | "model" | "provider" | "totalCost" | "totalTokens" | "promoteHistory">>
 ) {
   projectPath = normalizeProjectPath(projectPath);
   return withSessionWriteLock(projectPath, sessionId, async () => {

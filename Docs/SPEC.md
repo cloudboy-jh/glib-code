@@ -91,13 +91,13 @@ Surface determines adapter selection and deployment topology, not whether GitTri
 
 - Project picker + recents + init/create repo
 - Diff workbench (commit history + uncommitted diff + file-level navigation)
-- Session workspace shell (sidebar/header/timeline/composer)
+- Session workspace shell (left sessions rail, compact header, inline timeline/composer, right promote-readiness rail)
 - Settings + keybindings persistence
 - Model picker + provider key management
 - GitHub account/device auth for GitHub durable promote
 - Session timeline with streamed assistant text, errors, and compact tool-call cards (diff, code, json, terminal, tree, error)
 - Inline file-tree artifacts in timeline via composer button, `/tree` command, or agent-emitted scoped tree
-- Session diff review and commit-all/file-selected promote
+- Session diff review and explicit ephemeral→durable promote with right-rail boundary state, promote history, and rail-owned diff/commit actions
 - Local dirty-repo stash-and-continue plus local upstream push after promote
 - Readiness and health endpoints
 

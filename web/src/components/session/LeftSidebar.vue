@@ -31,6 +31,7 @@
         type="button"
         :disabled="disabled"
         class="mt-3 mb-3 flex h-9 items-center gap-2 rounded-lg border border-border/80 bg-background/70 px-2.5 text-left text-xs text-muted-foreground shadow-sm/5 transition-colors hover:bg-accent/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        @click="$emit('openSearch')"
       >
         <Search class="sidebar-icon" />
         <span class="flex-1">Search sessions</span>
@@ -193,7 +194,7 @@ const props = withDefaults(
   { disabled: false, newDisabled: false }
 );
 
-defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string]; rename: [id: string] }>();
+defineEmits<{ select: [id: string]; new: []; openSettings: []; toggleCollapse: []; goHome: []; delete: [id: string]; export: [id: string]; rename: [id: string]; openSearch: [] }>();
 
 const expandedOpenGroups = ref(new Set<string>());
 const showAllOtherGroupKeys = ref(new Set<string>());

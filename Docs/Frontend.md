@@ -136,7 +136,10 @@ Current state:
 - Session infra/send failures show a compact banner with Reload sessions and New replacement actions instead of polluting the timeline.
 - Composer disables only for stale sessions or in-flight sends and preserves draft text on failures.
 - Composer drafts are scoped per session.
-- Header/sidebar show compact session states: connected, connecting, disconnected, stale, running.
+- Header shows a single-line session title with inline status pill plus compact controls (open in editor, model picker, rail reopen toggles). Repo/branch context was removed from the header and now lives in the right rail.
+- Left sidebar groups sessions by current project / other projects, includes a search affordance wired to the command palette, and exposes Home / New session / Settings footer actions.
+- Right rail is a promote-readiness surface, not an agent-status surface. It shows Session info (branch, state, baseline SHA), the ephemeral→durable boundary, promote history, and a footer with Diff(s) + Commit / Commit+Push actions.
+- Boundary polling is boundary-only; the old `/plan` right-rail task-state surface was removed. Poll cadence still speeds up while the active session is running and now refreshes immediately on `turn_end` so touched files update as soon as the agent settles.
 - Empty session state explains active model/provider key failures and offers key/model actions.
 
 ## File tree artifact
@@ -154,6 +157,7 @@ Behavior:
 - Container height is computed from path count (22px compact row height), clamped 120–520px. Trees uses virtualized rendering and requires a concrete container height.
 - Density: `compact`. Icons: `complete` with per-file-type colors. All directories start collapsed.
 - Theme computed from glib-code's `THEME_PRESETS` tokens via `themeToTreeStyles()` (VS Code–style color keys) plus CSS variable overrides. No hardcoded per-preset map.
+- Long path labels are rendered without the library's middle-truncation affordance in the glib wrapper; the tree host scrolls horizontally instead of clipping directory names with internal ellipsis markers.
 - Three triggers with scope separation:
   - Composer footer "Tree" button → full repo tree (fetches `/api/fs/paths` + `/api/git/status`).
   - `/tree` slash command → same as button, full repo tree.
