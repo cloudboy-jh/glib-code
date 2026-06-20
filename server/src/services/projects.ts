@@ -1,8 +1,18 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { ensureRepoGlibIgnore } from "../lib/paths";
+
+// Expand a leading "~" to the user's home dir before path.resolve, which does
+// not understand tilde and would otherwise produce "<cwd>/~/...".
+function expandHome(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed === "~") return homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) return join(homedir(), trimmed.slice(2));
+  return trimmed;
+}
 
 export type RecentPathStatus = "ok" | "missing_path" | "missing_git";
 
@@ -39,6 +49,10 @@ async function currentBranch(path: string) {
 }
 
 export async function openProject(path: string): Promise<OpenProjectResult> {
+  // Reject Windows drive-letter paths on POSIX before resolve() mangles them.
+  if (process.platform !== "win32" && /^[a-zA-Z]:[\\/]/.test(path.trim())) {
+    return { ok: false, needsInit: true };
+  }
   const full = resolve(path);
   if (!hasGit(full)) return { ok: false, needsInit: true };
   const branch = await currentBranch(full);
@@ -105,7 +119,16 @@ export async function cloneProject(url: string, destination: string) {
     throw error;
   }
 
-  const parent = resolve(destination.trim());
+  // Reject Windows drive-letter destinations on POSIX. resolve() treats them as
+  // relative and silently produces garbage like "/server/cwd/C:/repos/foo".
+  const destTrimmed = expandHome(destination);
+  if (process.platform !== "win32" && /^[a-zA-Z]:[\\/]/.test(destTrimmed)) {
+    const error = new Error(`"${destTrimmed}" is a Windows path; provide an absolute path for this machine`);
+    (error as Error & { code?: string }).code = "INVALID_DESTINATION";
+    throw error;
+  }
+
+  const parent = resolve(destTrimmed);
   if (!parent) {
     const error = new Error("destination path required");
     (error as Error & { code?: string }).code = "INVALID_INPUT";

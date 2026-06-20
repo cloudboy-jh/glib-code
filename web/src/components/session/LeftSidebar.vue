@@ -43,10 +43,6 @@
         <div v-if="sortedSessions.length === 0" class="px-2 py-1 text-xs text-muted-foreground/75">No sessions yet</div>
         <div class="mb-2.5 mt-1 space-y-3">
           <div v-if="currentProjectSessions.length" class="space-y-1">
-            <div class="px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
-              Current project
-              <span class="ml-1 normal-case tracking-normal text-muted-foreground/55">/ {{ currentProjectLabel }}</span>
-            </div>
             <div
               v-for="s in visibleCurrentProjectSessions"
               :key="s.id"
@@ -248,8 +244,6 @@ const otherProjectGroups = computed(() => {
   if (!canonicalCurrentProjectPath.value) return groupedExpandedSessions.value;
   return groupedExpandedSessions.value.filter((g) => canonicalizePath(g.sessions[0]?.projectPath ?? '') !== canonicalCurrentProjectPath.value);
 });
-
-const currentProjectLabel = computed(() => props.currentProjectName || props.currentProjectPath || 'project');
 
 const visibleCurrentProjectSessions = computed(() =>
   showAllCurrentProject.value ? currentProjectSessions.value : currentProjectSessions.value.slice(0, expandedGroupSessionLimit)

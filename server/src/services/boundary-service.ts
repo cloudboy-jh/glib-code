@@ -46,8 +46,15 @@ export function diffStats(patch: string): { additions: number; deletions: number
 
 export function filesFromPatch(patch: string): string[] {
   const files = new Set<string>();
+  // git-style headers: `diff --git a/X b/X`
   for (const match of patch.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) files.add((match[2] || match[1] || "").trim());
-  for (const match of patch.matchAll(/^\+\+\+\s+(?:b\/)?([^\t\n\r]+)$/gm)) {
+  // jsdiff createPatch headers (used by gittrix): `Index: X`
+  for (const match of patch.matchAll(/^Index:\s+(.+?)\s*$/gm)) {
+    const file = (match[1] || "").trim();
+    if (file) files.add(file);
+  }
+  // `+++ b/X` (git) and `+++ X\tb` (jsdiff) — stop at tab OR end of line.
+  for (const match of patch.matchAll(/^\+\+\+\s+(?:b\/)?([^\t\n\r]+?)(?:\t.*)?$/gm)) {
     const file = (match[1] || "").trim();
     if (file && file !== "/dev/null") files.add(file);
   }
@@ -185,24 +192,16 @@ export async function computeBoundary(
       additions = durable.additions;
       deletions = durable.deletions;
     } else {
-      // Git-backed ephemeral workspace (worktree/clone/remote) — Gittrix diff is
-      // authoritative.
+      // Git-backed ephemeral workspace (worktree/clone/remote) — the Gittrix
+      // diff is the sole authority. We intentionally do NOT fall back to the
+      // durable working tree here: the durable repo is shared across every
+      // session of the project, so its dirt cannot be attributed to this
+      // session and would bleed leftover changes into fresh sessions.
       const patch = await gittrixService.diff(projectPath, meta.gittrixSessionId, branch);
       touchedFiles = filesFromPatch(patch);
       const stats = diffStats(patch);
       additions = stats.additions;
       deletions = stats.deletions;
-
-      // Defensive fallback: if Gittrix reports nothing but the durable tree is
-      // dirty (e.g. native tool wrote outside the workspace), surface that.
-      if (touchedFiles.length === 0) {
-        const durable = await durableWorkingTreeChanges(projectPath);
-        if (durable.touchedFiles.length > 0) {
-          touchedFiles = durable.touchedFiles;
-          additions = durable.additions;
-          deletions = durable.deletions;
-        }
-      }
     }
 
     const hasPendingChanges = touchedFiles.length > 0;

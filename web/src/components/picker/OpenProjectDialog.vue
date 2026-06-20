@@ -7,17 +7,14 @@
 
     <div class="space-y-4 p-6 pt-1 pb-4">
       <div class="rounded-xl border border-border/70 bg-background/35 p-3">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mb-2 flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-foreground">Choose a repository folder</p>
-            <p class="mt-1 text-xs text-muted-foreground">Use the native folder picker in desktop, or pick from recents/zoxide below.</p>
+            <p class="text-sm font-medium text-foreground">Browse for a repository folder</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">Navigate to the repo, or search recents/zoxide below.</p>
           </div>
-          <UiButton :disabled="!canBrowse" @click="browseFolder">Browse folders</UiButton>
+          <UiButton v-if="canBrowseNative" variant="outline" class="h-7 px-2 text-xs" @click="browseNative">Native picker…</UiButton>
         </div>
-        <p v-if="!canBrowse" class="mt-2 text-xs text-muted-foreground">Native folder picking is only available in the desktop app.</p>
-        <div v-if="path" class="mt-3 rounded-lg border border-border/70 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
-          Selected: <span class="font-mono text-foreground">{{ path }}</span>
-        </div>
+        <DirectoryBrowser :start-path="path" @update:path="$emit('update:path', $event)" />
       </div>
 
       <div>
@@ -65,6 +62,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
 import UiInput from '../ui/input.vue';
+import DirectoryBrowser from './DirectoryBrowser.vue';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const props = defineProps<{ path: string }>();
@@ -72,7 +70,9 @@ const emit = defineEmits<{ close: []; open: [payload: { mode: 'diff' | 'session'
 
 type Candidate = { name: string; path: string; source: string };
 const candidates = ref<Candidate[]>([]);
-const canBrowse = typeof window !== 'undefined' && Boolean(window.glibDesktop?.pickProjectDirectory);
+// Desktop native picker as a shortcut; the server-driven DirectoryBrowser is
+// the cross-platform path (works in the browser too).
+const canBrowseNative = typeof window !== 'undefined' && Boolean(window.glibDesktop?.pickProjectDirectory);
 
 const filteredCandidates = computed(() => {
   const q = props.path.trim().toLowerCase();
@@ -87,7 +87,7 @@ async function loadCandidates() {
   candidates.value = await response.json();
 }
 
-async function browseFolder() {
+async function browseNative() {
   const selected = await window.glibDesktop?.pickProjectDirectory();
   if (!selected) return;
   emit('update:path', selected);

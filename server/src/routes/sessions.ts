@@ -137,6 +137,8 @@ export const sessionsRoutes = new Hono()
     if (!doc.meta.gittrixSessionId) return c.json(routeError("session has no gittrix mapping", "SESSION_NO_GITTRIX_MAPPING"), 400);
     const project = getProjectById(doc.meta.projectId);
     try {
+      // Gittrix ephemeral diff is authoritative — no durable fallback (the
+      // durable tree is shared across sessions; see boundary-service).
       const patch = await gittrixService.diff(projectPath!, doc.meta.gittrixSessionId, project?.branch ?? "main");
       return c.json({ diff: patch, files: filesFromPatch(patch) });
     } catch (error) {

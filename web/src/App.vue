@@ -40,6 +40,7 @@
           <SessionHeader
             v-if="currentProject && state.mode === 'session'"
           :title="activeSession?.title ?? 'No active session'"
+          :project-name="currentProject?.name ?? ''"
           :model="selectedModelLabel"
           :status="activeSession?.status ?? 'disconnected'"
           :theme-type="diffThemeType"
@@ -61,7 +62,7 @@
             :commits-by-path="pickerCommitsByPath"
             :logo-src="logoWordmarkSrc"
             @open-project="state.openProjectDialogOpen = true"
-            @open-clone="state.cloneDialogOpen = true"
+            @open-clone="openCloneDialog"
             @open-palette="openCommandPalette"
             @open-settings="openSettings($event)"
             @open-recent="openRecentProject"
@@ -663,7 +664,7 @@ const recents = reactive<RecentEntry[]>([]);
 const picker = reactive({
   openPath: '',
   cloneUrl: '',
-  cloneDestination: 'C:/repos',
+  cloneDestination: '',
   cloneMode: 'diff' as 'diff' | 'session',
   cloneError: ''
 });
@@ -1901,6 +1902,22 @@ async function openExistingProject(payload: { mode: 'diff' | 'session' }) {
   if (!opened.ok) return;
   await queueProjectOpen(opened.name, opened.path, payload.mode, { branch: opened.branch, projectId: opened.id });
   void hydrateRecents();
+}
+
+async function openCloneDialog() {
+  state.cloneDialogOpen = true;
+  picker.cloneError = '';
+  // Prefill a real, platform-correct destination from the server so users
+  // never have to know or type an absolute path. Only set if still empty so we
+  // don't clobber a value the user already entered.
+  if (!picker.cloneDestination.trim()) {
+    try {
+      const { path } = await apiGet<{ path: string }>('/projects/default-clone-dir');
+      if (path && !picker.cloneDestination.trim()) picker.cloneDestination = path;
+    } catch {
+      // non-fatal — user can still type a path
+    }
+  }
 }
 
 async function cloneRepository(mode: 'diff' | 'session') {

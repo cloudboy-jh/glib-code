@@ -242,7 +242,11 @@ export const agentRoutes = new Hono()
     await patchSessionMeta(projectPath, id, { status: "running" });
 
     const agentCwd = resolveAgentCwd(projectPath, existing.meta.ephemeralPath, existing.meta.isGitBacked);
-    const sessionContext = `Session repo metadata:\n- durable repo: ${projectPath}\n- agent cwd: ${agentCwd}\n- gittrix ephemeral workspace: ${existing.meta.ephemeralPath || "none"}\n- gittrix workspace kind: ${existing.meta.workspaceKind || "unknown"}\n- gittrix git-backed: ${existing.meta.isGitBacked === true ? "yes" : "no"}\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
+    // Do NOT expose the durable repo path to the agent. It runs inside an
+    // isolated ephemeral workspace (agentCwd); leaking the durable path makes
+    // the model edit there with absolute paths, bypassing isolation so changes
+    // never land in the workspace the diff/promote flow reads.
+    const sessionContext = `Workspace rules:\n- Your working directory is: ${agentCwd}\n- Do ALL file reads and edits inside this working directory, using relative paths (or paths under it). Never write to any other absolute path.\n- This is an isolated workspace; your changes are reviewed and promoted to the real repo separately. Do not try to locate or modify the "real" repo yourself.\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
     const agentPrompt = await buildAgentPrompt(`${sessionContext}\n\n${prompt}`, body?.context, projectPath);
 
     void runTurn({

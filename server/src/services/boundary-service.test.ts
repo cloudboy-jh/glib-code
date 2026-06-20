@@ -58,6 +58,23 @@ describe("filesFromPatch", () => {
     const patch = "diff --git a/gone.txt b/gone.txt\n--- a/gone.txt\n+++ /dev/null\n";
     expect(filesFromPatch(patch)).toEqual(["gone.txt"]);
   });
+
+  // gittrix computeDiff uses jsdiff createPatch, which emits `Index:` headers and
+  // `+++ <file>\tb` (tab-suffixed) instead of git's `+++ b/<file>`. The parser
+  // must handle this or the ephemeral zone shows "clean" despite real changes.
+  test("extracts file paths from jsdiff createPatch headers", () => {
+    const patch = [
+      "Index: README.md",
+      "===================================================================",
+      "--- README.md\ta",
+      "+++ README.md\tb",
+      "@@ -1,8 +1,10 @@",
+      " # Title",
+      "+## Getting Started",
+      "+",
+    ].join("\n");
+    expect(filesFromPatch(patch)).toEqual(["README.md"]);
+  });
 });
 
 describe("durableWorkingTreeChanges", () => {

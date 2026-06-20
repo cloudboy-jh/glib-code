@@ -12,8 +12,12 @@
       </div>
 
       <div>
-        <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Destination path</label>
-        <UiInput :model-value="destination" placeholder="C:/repos/repo" class="h-10 rounded-lg bg-background/70" @update:model-value="$emit('update:destination', $event)" />
+        <div class="mb-1.5 flex items-center justify-between">
+          <label class="block text-xs font-medium text-muted-foreground">Destination folder</label>
+          <UiButton v-if="canBrowseNative" variant="outline" class="h-7 px-2 text-xs" @click="browseNative">Native picker…</UiButton>
+        </div>
+        <DirectoryBrowser :start-path="destination" @update:path="$emit('update:destination', $event)" />
+        <p class="mt-1.5 text-xs text-muted-foreground">Navigate to the folder to clone into. The repo lands in a new subfolder here.</p>
       </div>
 
       <div>
@@ -34,7 +38,7 @@
 
       <div class="flex justify-end gap-2 border-t border-border/70 pt-4">
         <UiButton variant="outline" @click="$emit('close')">Cancel</UiButton>
-        <UiButton @click="$emit('clone', mode)">Clone</UiButton>
+        <UiButton :disabled="!url.trim() || !destination.trim()" @click="$emit('clone', mode)">Clone</UiButton>
       </div>
     </div>
   </UiDialog>
@@ -44,8 +48,18 @@
 import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
 import UiInput from '../ui/input.vue';
+import DirectoryBrowser from './DirectoryBrowser.vue';
 import { GitBranch, MessageSquare } from 'lucide-vue-next';
 
 defineProps<{ url: string; destination: string; mode: 'diff' | 'session'; error?: string }>();
-defineEmits<{ close: []; clone: [mode: 'diff' | 'session']; 'update:url': [value: string]; 'update:destination': [value: string]; 'update:mode': [value: 'diff' | 'session'] }>();
+const emit = defineEmits<{ close: []; clone: [mode: 'diff' | 'session']; 'update:url': [value: string]; 'update:destination': [value: string]; 'update:mode': [value: 'diff' | 'session'] }>();
+
+// Desktop gets the OS-native picker as a shortcut; the server-driven
+// DirectoryBrowser is the cross-platform path that always works (incl. browser).
+const canBrowseNative = typeof window !== 'undefined' && Boolean(window.glibDesktop?.pickProjectDirectory);
+
+async function browseNative() {
+  const selected = await window.glibDesktop?.pickProjectDirectory();
+  if (selected) emit('update:destination', selected);
+}
 </script>

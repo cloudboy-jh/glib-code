@@ -54,6 +54,35 @@ describe('useBoundary.applyBoundaryEvent', () => {
     expect(boundary.value.touchedFiles).toEqual([]);
   });
 
+  it('hydrates when projectPath resolves after the sessionId (reload race)', async () => {
+    // On a full reload the sessionId is set before the session doc / project
+    // path resolve. The composable must hydrate once the prerequisites land,
+    // not stay empty forever.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => pendingPayload(),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    let projectPath: string | null = null;
+    let active = false;
+    const sessionId = () => 's1';
+    const { refresh } = useBoundary({
+      sessionId,
+      projectPath: () => projectPath,
+      isSessionActive: () => active,
+    });
+
+    // Immediate watch ran with null projectPath → no fetch yet.
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // Prerequisites resolve; consumer re-triggers (mirrors reactive deps).
+    projectPath = '/repo';
+    active = true;
+    await refresh();
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it('does not clobber state during a promote animation', async () => {
     vi.useFakeTimers();
     const { boundary, applyBoundaryEvent, onPromoteComplete } = useBoundary({

@@ -116,11 +116,22 @@ export function useBoundary(options: {
   }
 
   // Hydrate once whenever the active session changes.
+  // Hydrate whenever the active session changes OR its prerequisites
+  // (projectPath / active flag) become available. On a full reload the
+  // sessionId is set before the session doc / project path resolve, so keying
+  // on sessionId alone races: the watcher fires once with a null projectPath,
+  // skips the fetch, and never re-runs. Watching all three inputs fixes that.
+  let lastSessionId: string | null = null;
   watch(
-    () => options.sessionId(),
-    (id) => {
-      boundary.value = emptyBoundary();
-      if (id && options.projectPath() && options.isSessionActive()) {
+    () => [options.sessionId(), options.projectPath(), options.isSessionActive()] as const,
+    ([id, projectPath, active]) => {
+      // Reset the zone only when the session itself changes — not when a
+      // prerequisite resolves for the same session (that would clobber state).
+      if (id !== lastSessionId) {
+        boundary.value = emptyBoundary();
+        lastSessionId = id;
+      }
+      if (id && projectPath && active && !promoteAnimating.value) {
         void refresh();
       }
     },

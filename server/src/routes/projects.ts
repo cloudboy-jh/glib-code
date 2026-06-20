@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { cloneProject, createProject, forgetProject, initProject, openProject, projectCandidates } from "../services/projects";
 import {
   getRecents,
@@ -15,6 +18,15 @@ import { getPiCapabilities } from "../services/pi-capabilities";
 export const projectsRoutes = new Hono()
   .get("/recents", async (c) => c.json(await getRecents()))
   .get("/candidates", async (c) => c.json(await projectCandidates(c.req.query("q") ?? "")))
+  // A real, platform-correct default clone destination so the web client never
+  // has to guess (and never ships a Windows path as the default).
+  .get("/default-clone-dir", (c) => {
+    const home = homedir();
+    const preferred = ["proj", "repos", "code", "Developer", "dev"]
+      .map((name) => join(home, name))
+      .find((dir) => existsSync(dir));
+    return c.json({ path: preferred ?? home });
+  })
   .get("/recents/status", async (c) => {
     const recents = await getRecents();
     return c.json(
@@ -66,7 +78,7 @@ export const projectsRoutes = new Hono()
     } catch (error) {
       const e = error as Error & { code?: string };
       const code = e.code || "CLONE_FAILED";
-      const status = code === "INVALID_URL" || code === "TARGET_EXISTS" || code === "INVALID_INPUT" || code === "DESTINATION_CREATE_FAILED" ? 400 : 500;
+      const status = code === "INVALID_URL" || code === "TARGET_EXISTS" || code === "INVALID_INPUT" || code === "INVALID_DESTINATION" || code === "DESTINATION_CREATE_FAILED" ? 400 : 500;
       return c.json({ ok: false, code, message: e.message || "clone failed" }, status);
     }
   })

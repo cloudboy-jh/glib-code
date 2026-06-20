@@ -91,18 +91,13 @@
             <div v-else class="mt-1 text-[10px] italic text-muted-foreground/55">No pending changes</div>
           </div>
 
-          <!-- Promote arrow -->
+          <!-- Promote connector (visual only — action lives in the footer) -->
           <div class="flex flex-col items-center py-1.5">
             <div :class="['h-3 w-px', arrowLineClass]" />
-            <button
-              type="button"
-              :disabled="promoteDisabled"
-              :class="['inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-all duration-200', promoteBtnClass]"
-              @click="$emit('promote')"
-            >
+            <div :class="['inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold', promoteIndicatorClass]">
               <ArrowDown class="h-2.5 w-2.5" />
               {{ promoteLabel }}
-            </button>
+            </div>
             <div :class="['h-3 w-px', arrowLineClass]" />
           </div>
 
@@ -262,13 +257,10 @@ const ephemeralLabelClass = computed(() =>
   props.boundary.state === 'pending' ? 'text-primary/70' : 'text-muted-foreground/50'
 );
 
-const promoteDisabled = computed(() =>
-  props.boundary.state !== 'pending' || isPromoting.value
-);
-const promoteBtnClass = computed(() => {
-  if (isPromoting.value) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400/70 cursor-default';
-  if (props.boundary.state === 'pending') return 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25 hover:border-primary/70 cursor-pointer';
-  return 'border-border/30 bg-transparent text-muted-foreground/40 cursor-not-allowed';
+const promoteIndicatorClass = computed(() => {
+  if (isPromoting.value) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400/70';
+  if (props.boundary.state === 'pending') return 'border-primary/40 bg-primary/10 text-primary/80';
+  return 'border-border/30 bg-transparent text-muted-foreground/40';
 });
 const promoteLabel = computed(() => {
   if (props.boundary.state === 'promoting') return 'Promoting…';

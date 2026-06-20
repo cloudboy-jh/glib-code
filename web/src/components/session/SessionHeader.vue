@@ -12,7 +12,11 @@
     </button>
 
     <div class="flex min-w-0 flex-1 items-center gap-2">
-      <div class="truncate text-sm font-medium tracking-tight text-foreground">{{ title }}</div>
+      <div class="flex min-w-0 items-center gap-1.5 text-sm tracking-tight">
+        <span v-if="projectName" class="shrink-0 truncate font-medium text-muted-foreground/80">{{ projectName }}</span>
+        <span v-if="projectName" class="shrink-0 text-muted-foreground/40">/</span>
+        <span class="truncate font-medium text-foreground">{{ title }}</span>
+      </div>
       <span :class="['inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]', statusBadgeClass]">
         <span :class="['h-1.5 w-1.5 rounded-full', statusDotClass]" />
         {{ statusLabel }}
@@ -47,6 +51,7 @@ import OpenInEditor from '../shared/OpenInEditor.vue';
 
 const props = withDefaults(defineProps<{
   title: string;
+  projectName?: string;
   model: string;
   status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
   themeType?: 'dark' | 'light';
@@ -55,6 +60,7 @@ const props = withDefaults(defineProps<{
   leftSidebarOpen?: boolean;
   rightSidebarOpen?: boolean;
 }>(), {
+  projectName: '',
   preferredEditor: null,
   themeType: 'dark',
   leftSidebarOpen: true,
