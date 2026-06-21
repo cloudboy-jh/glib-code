@@ -331,7 +331,7 @@
       </div>
     </div>
 
-    <div v-if="state.promoteDialogOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="(!promote.result || promote.alreadyPromoted) && (state.promoteDialogOpen = false)">
+    <div v-if="state.promoteDialogOpen" class="fixed inset-0 z-50 flex items-stretch justify-center bg-black/55 p-4 sm:p-6" @click.self="state.promoteDialogOpen = false">
       <div class="flex h-full max-h-[calc(100vh-2rem)] w-full max-w-[min(1500px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40 sm:max-h-[calc(100vh-3rem)]">
 
         <!-- Header — hidden on success or already promoted -->
@@ -387,7 +387,10 @@
           </div>
 
           <!-- Success state — full bleed, animated checkmark -->
-          <div v-else-if="promote.result" class="promote-success grid h-full place-items-center">
+          <div v-else-if="promote.result" class="promote-success relative grid h-full place-items-center">
+            <button class="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">
+              <svg class="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13" /></svg>
+            </button>
             <div class="flex flex-col items-center gap-5 text-center">
               <div class="promote-check-wrap">
                 <svg class="promote-check-svg" viewBox="0 0 52 52" fill="none">
@@ -406,6 +409,7 @@
                   <span v-if="promote.pushResult">· pushed {{ promote.pushResult.upstream }} <span class="font-mono text-[11px]">{{ promote.pushResult.sha.slice(0, 7) }}</span></span>
                 </div>
               </div>
+              <button class="rounded-md border border-border/70 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Done</button>
             </div>
           </div>
 

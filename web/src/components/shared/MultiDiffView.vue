@@ -84,35 +84,33 @@ function setRef(el: unknown, i: number) {
 
 function cleanUpAll() {
   for (const inst of instances.value) {
-    if (inst) inst.cleanUp();
+    if (inst) {
+      try {
+        inst.cleanUp();
+      } catch {
+        // @pierre/diffs ResizeManager can throw if the element was already
+        // unobserved by another instance — safe to swallow here.
+      }
+    }
   }
   instances.value = [];
   containerRefs.value = [];
 }
 
 async function mountAll() {
+  // Always nuke existing instances first to avoid ResizeManager double-ownership
+  // when the watcher fires before the previous mount cycle finishes.
+  cleanUpAll();
   await nextTick();
   const files = parsedFiles.value;
-  // clean up extras if file count shrank
-  for (let i = files.length; i < instances.value.length; i++) {
-    instances.value[i]?.cleanUp();
-    instances.value[i] = null;
-  }
-  instances.value.length = files.length;
+  instances.value = new Array(files.length).fill(null);
 
   for (let i = 0; i < files.length; i++) {
     const el = containerRefs.value[i];
     if (!el) continue;
-    const fileDiff = files[i];
-    const opts = getOptions();
-    if (!instances.value[i]) {
-      const inst = new FileDiff(opts, undefined, true);
-      inst.hydrate({ fileContainer: el, fileDiff });
-      instances.value[i] = inst;
-    } else {
-      instances.value[i]!.setOptions(opts);
-      instances.value[i]!.render({ forceRender: true, fileDiff });
-    }
+    const inst = new FileDiff(getOptions(), undefined, true);
+    inst.hydrate({ fileContainer: el, fileDiff: files[i] });
+    instances.value[i] = inst;
   }
 }
 
