@@ -342,6 +342,22 @@ function classifyToolResult(result: unknown, isError: boolean) {
     };
   }
 
+  // list_files/tree tools embed structured path data in details.tree — promote
+  // to first-class tree artifact so the frontend renders a FileTreeView.
+  const detailsTree = (result as any)?.details?.tree;
+  if (detailsTree && typeof detailsTree === "object" && Array.isArray(detailsTree.paths)) {
+    const paths = detailsTree.paths as string[];
+    const gitStatus = (detailsTree.gitStatus && typeof detailsTree.gitStatus === "object")
+      ? detailsTree.gitStatus as Record<string, string>
+      : {};
+    return {
+      output: raw,
+      resultType: "tree" as const,
+      summary: contentText || `${paths.length} paths`,
+      artifact: { tree: { paths, gitStatus } }
+    };
+  }
+
   // edit/write tools embed a diff in details.diff — promote to first-class diff
   if (contentText) {
     const detailsDiff = (result as any)?.details?.diff;

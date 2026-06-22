@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { bootSettingsStore } from "./services/settings-store";
+import { pruneStaleIndexEntries } from "./services/session-store";
 import { mountApiRoutes } from "./routes";
 import { log, logError } from "./lib/log";
 
@@ -40,6 +41,7 @@ if (import.meta.main) {
   process.on("unhandledRejection", (error) => logError("server", "unhandled rejection", error));
   process.on("uncaughtException", (error) => logError("server", "uncaught exception", error));
   await bootSettingsStore();
+  void pruneStaleIndexEntries().catch((error) => logError("server", "session index prune failed", error));
   Bun.serve({
     port,
     idleTimeout: 60,

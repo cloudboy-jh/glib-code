@@ -5,6 +5,7 @@ import type { AgentEvent } from "@glib-code/shared/events/agent";
 import { ensureDir, getConfigDir, repoGlibDir } from "../lib/paths";
 import { writeJsonAtomic } from "../lib/atomic-write";
 import { canonicalProjectPath } from "../lib/project-path";
+import { log } from "../lib/log";
 
 function normalizeProjectPath(path: string) {
   return canonicalProjectPath(path) ?? path.replace(/\\/g, "/").trim();
@@ -291,4 +292,39 @@ export async function forkSession(projectPath: string, sourceSessionId: string) 
   await writeSessionDoc(projectPath, doc);
   await indexSession(id, projectPath);
   return doc;
+}
+
+// Walk the global session index and remove entries whose session JSON files no
+// longer exist on disk. Called once at boot to prevent the index from growing
+// unbounded as sessions are deleted, projects are removed, or `.glib` dirs are
+// wiped. Best-effort — errors on individual entries are logged and skipped.
+export async function pruneStaleIndexEntries() {
+  const index = await readSessionIndex();
+  const entries = Object.entries(index);
+  if (entries.length === 0) return;
+
+  const stale: string[] = [];
+  for (const [sessionId, projectPath] of entries) {
+    const docPath = sessionPath(projectPath, sessionId);
+    if (!existsSync(docPath)) {
+      stale.push(sessionId);
+    }
+  }
+
+  if (stale.length === 0) return;
+
+  await withIndexWriteLock(async () => {
+    const current = await readSessionIndex();
+    let removed = 0;
+    for (const sessionId of stale) {
+      if (current[sessionId]) {
+        delete current[sessionId];
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      await writeSessionIndex(current);
+      log("server", "pruned stale index entries", { removed });
+    }
+  });
 }

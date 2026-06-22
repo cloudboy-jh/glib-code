@@ -122,8 +122,9 @@
               class="recent-session-row"
               @click="$emit('continueSession', { name: r.name, path: r.path, sessionId: session.id })"
             >
-              <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
-              <span class="shrink-0 text-[11px] text-muted-foreground/75">{{ session.time }}</span>
+              <span v-if="statusDotClass(session.status)" class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(session.status)" />
+              <span class="min-w-0 flex-1 truncate leading-none">{{ session.title }}</span>
+              <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ session.time }}</span>
             </button>
             <button
               v-if="sessionsForPath(r.path).length > 5"
@@ -148,13 +149,16 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ArrowLeft, Folder, GitBranch, History, PlusSquare } from 'lucide-vue-next';
+import { canonicalizeProjectPath as canonicalizePath } from '../../composables/usePickerSessions';
+
+type SessionStatus = 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running' | 'done';
 
 type CommitRow = { ref: string; shortRef: string; title: string };
 
 const props = withDefaults(
   defineProps<{
     recents: Array<{ id: string; name: string; path: string; lastOpenedAt: string; status: 'ok' | 'missing_path' | 'missing_git' }>;
-    sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string }>>;
+    sessionsByPath?: Record<string, Array<{ id: string; title: string; time: string; updatedAt?: string; status?: SessionStatus }>>;
     commitsByPath?: Record<string, CommitRow[]>;
     activeIndex?: number;
     activeOffset?: number;
@@ -228,12 +232,12 @@ function toggleShowAllSessions(path: string) {
   showAllSessionPaths.value = next;
 }
 
-function canonicalizePath(path: string) {
-  const slashNormalized = path.replace(/\\/g, '/').trim();
-  const withoutTrailing = slashNormalized.replace(/\/+$/g, '');
-  const maybeDrive = /^[A-Za-z]:\//.test(withoutTrailing);
-  const normalizedDrive = maybeDrive ? `${withoutTrailing[0].toLowerCase()}${withoutTrailing.slice(1)}` : withoutTrailing;
-  return normalizedDrive.toLowerCase();
+function statusDotClass(status?: SessionStatus) {
+  if (status === 'stale') return 'bg-amber-400';
+  if (status === 'running') return 'bg-sky-400';
+  if (status === 'connecting') return 'bg-violet-400';
+  if (status === 'done' || status === 'disconnected') return 'bg-zinc-500';
+  return '';
 }
 </script>
 

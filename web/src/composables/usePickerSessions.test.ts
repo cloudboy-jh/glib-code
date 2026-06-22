@@ -2,11 +2,47 @@ import { describe, expect, it } from 'vitest';
 import { reactive } from 'vue';
 import { canonicalizeProjectPath, usePickerSessions } from './usePickerSessions';
 
-describe('usePickerSessions', () => {
+describe('canonicalizeProjectPath', () => {
   it('canonicalizes windows-like paths consistently', () => {
     expect(canonicalizeProjectPath('C:\\Repo\\App\\')).toBe('c:/repo/app');
     expect(canonicalizeProjectPath('c:/repo/app')).toBe('c:/repo/app');
   });
+
+  it('normalizes drive casing', () => {
+    expect(canonicalizeProjectPath('D:\\Projects\\Foo')).toBe('d:/projects/foo');
+    expect(canonicalizeProjectPath('d:/projects/foo')).toBe('d:/projects/foo');
+  });
+
+  it('normalizes backslashes to forward slashes', () => {
+    expect(canonicalizeProjectPath('C:\\Users\\johns\\Dev')).toBe('c:/users/johns/dev');
+    expect(canonicalizeProjectPath('C:/Users/johns/Dev')).toBe('c:/users/johns/dev');
+  });
+
+  it('strips trailing slashes', () => {
+    expect(canonicalizeProjectPath('C:/repo/app/')).toBe('c:/repo/app');
+    expect(canonicalizeProjectPath('C:/repo/app//')).toBe('c:/repo/app');
+    expect(canonicalizeProjectPath('C:\\repo\\app\\')).toBe('c:/repo/app');
+  });
+
+  it('handles mixed slash styles', () => {
+    expect(canonicalizeProjectPath('C:\\Users/johns\\Desktop\\Proj')).toBe('c:/users/johns/desktop/proj');
+  });
+
+  it('lowercases everything', () => {
+    expect(canonicalizeProjectPath('C:/REPO/MyApp')).toBe('c:/repo/myapp');
+  });
+
+  it('handles non-drive paths', () => {
+    expect(canonicalizeProjectPath('/home/johns/repo')).toBe('/home/johns/repo');
+    expect(canonicalizeProjectPath('/home/johns/repo/')).toBe('/home/johns/repo');
+  });
+
+  it('trims whitespace', () => {
+    expect(canonicalizeProjectPath('  C:/repo/app  ')).toBe('c:/repo/app');
+  });
+});
+
+describe('usePickerSessions', () => {
 
   it('groups and sorts sessions by canonical project path', async () => {
     const pickerSessionCatalog = reactive<Array<{ id: string; title: string; time: string; updatedAt?: string; status: 'connected' | 'connecting' | 'disconnected' | 'stale' | 'running'; projectPath: string }>>([]);

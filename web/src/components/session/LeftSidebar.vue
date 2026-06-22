@@ -71,7 +71,7 @@
             <button
               v-if="currentProjectSessions.length > expandedGroupSessionLimit"
               type="button"
-              class="ml-2 rounded px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+              class="ml-2 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
               @click="showAllCurrentProject = !showAllCurrentProject"
             >
               {{ showAllCurrentProject ? 'Show less' : `Show ${currentProjectSessions.length - expandedGroupSessionLimit} more` }}
@@ -118,7 +118,7 @@
                 <button
                   v-if="group.sessions.length > expandedGroupSessionLimit"
                   type="button"
-                  class="ml-1 rounded px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  class="ml-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   @click="toggleShowAllOtherGroup(group.key)"
                 >
                   {{ showAllOtherGroupKeys.has(group.key) ? 'Show less' : `Show ${group.sessions.length - expandedGroupSessionLimit} more` }}
@@ -178,6 +178,7 @@
 import { computed, ref } from 'vue';
 import { House, Plus, Search, Settings2, Pencil, Download, Trash2, PanelLeftClose, Sun, Moon } from 'lucide-vue-next';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
+import { canonicalizeProjectPath as canonicalizePath } from '../../composables/usePickerSessions';
 
 type SessionRow = {
   id: string;
@@ -263,12 +264,6 @@ function toggleShowAllOtherGroup(key: string) {
   const next = new Set(showAllOtherGroupKeys.value);
   if (next.has(key)) next.delete(key); else next.add(key);
   showAllOtherGroupKeys.value = next;
-}
-
-function canonicalizePath(path: string) {
-  const s = path.replace(/\\/g, '/').trim().replace(/\/+$/g, '');
-  const hasDrive = /^[A-Za-z]:\//.test(s);
-  return (hasDrive ? `${s[0].toLowerCase()}${s.slice(1)}` : s).toLowerCase();
 }
 
 function statusDotClass(status: SessionRow['status']) {

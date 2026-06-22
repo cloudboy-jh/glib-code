@@ -67,6 +67,11 @@ function renderMarkdown(doc: SessionDoc) {
     } else if (event.type === "tool_call") {
       flushAssistant();
       lines.push(`### Tool: ${event.tool}`, "", `**${event.title || event.tool}**`, "", "```json", JSON.stringify(event.input, null, 2), "```", "", "```", event.output || "", "```", "");
+      if (event.resultType === "tree" && event.artifact?.tree?.paths?.length) {
+        lines.push("", `<details><summary>${event.artifact.tree.paths.length} paths</summary>`, "", "```", event.artifact.tree.paths.join("\n"), "```", "", "</details>", "");
+      } else if (event.resultType === "diff" && event.artifact?.patch) {
+        lines.push("", "```diff", event.artifact.patch, "```", "");
+      }
     } else if (event.type === "error") {
       flushAssistant();
       lines.push("## Error", "", event.message || event.name, "");
@@ -133,6 +138,8 @@ function renderPiJsonl(doc: SessionDoc) {
         toolName: event.tool,
         content: event.output,
         details: event.metadata,
+        resultType: event.resultType,
+        artifact: event.artifact,
         isError: false
       }, "tool_result");
     } else if (event.type === "turn_end" && turnId) {
