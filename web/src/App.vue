@@ -558,6 +558,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient();
 const demoMode = new URLSearchParams(window.location.search).get('demo');
 const isThemeCycleDemo = demoMode === 'theme-cycle';
+const isOnboardingDemo = demoMode === 'onboarding';
 
  type Session = {
    id: string;
@@ -1038,6 +1039,7 @@ const {
   downloadUpdate,
   installUpdate,
   dismissUpdate,
+  seedDemo: seedFirstLaunchDemo,
 } = useFirstLaunch();
 
 const activeSessionNotice = computed(() => (state.activeSessionId ? sessionNoticeById[state.activeSessionId] : undefined));
@@ -1810,7 +1812,13 @@ async function saveProviderAuth(providerId: string, apiKey: string) {
 
 async function removeProviderAuth(providerId: string) {
   if (!providerId) return;
-  await apiDelete('/providers/' + encodeURIComponent(providerId) + '/auth');
+  try {
+    await apiDelete('/providers/' + encodeURIComponent(providerId) + '/auth');
+  } catch (error) {
+    // 404 = nothing to remove (stale hasAuth from pi discovery). Treat as
+    // idempotent success and re-hydrate so the UI syncs to the real state.
+    if (!(error instanceof ApiRequestError) || error.status !== 404) throw error;
+  }
   await hydrateProviders();
 }
 
@@ -3094,7 +3102,11 @@ onMounted(() => {
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
   shortcuts.bind();
-  void initFirstLaunch().catch(() => undefined);
+  if (isOnboardingDemo) {
+    seedFirstLaunchDemo();
+  } else {
+    void initFirstLaunch().catch(() => undefined);
+  }
 });
 
 const selectedModelLabel = computed(() => `${settings.defaultProvider}/${settings.defaultModel}`);

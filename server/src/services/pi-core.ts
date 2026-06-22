@@ -49,7 +49,13 @@ export async function hasUsableProviderAuth(provider: string) {
     return authStorage.getOAuthProviders().some((oauthProvider) => oauthProvider.id === provider);
   }
 
-  return true;
+  // Mirror the actual session-spawn path: a provider is only authed if we can
+  // retrieve a usable API key for it. Without this, providers that pi knows
+  // about and have *any* ambient auth source (generic OPENAI_API_KEY env, gh
+  // fallback, etc.) reported hasAuth=true even when no key was stored for them,
+  // causing stale UI state and 404s on DELETE /providers/:id/auth.
+  const apiKey = await authStorage.getApiKey(provider, { includeFallback: true });
+  return Boolean(apiKey);
 }
 
 export async function validateProviderAuth(provider: string) {

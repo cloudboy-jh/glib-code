@@ -83,6 +83,18 @@ export function useFirstLaunch() {
     unsubscribers.length = 0;
   }
 
+  // Browser-only demo path: opens the overlay without the desktop bridge so the
+  // onboarding flow can be exercised in pure dev (e.g. ?demo=onboarding).
+  // advanceStep / completeFirstLaunch already short-circuit desktop calls when
+  // window.glibDesktop is missing, so the interactive flow works end-to-end.
+  function seedDemo(opts: { platform?: string; appVersion?: string; needsFsPermissionRationale?: boolean } = {}) {
+    platform.value = opts.platform ?? "win32";
+    appVersion.value = opts.appVersion ?? "dev";
+    needsFsPermissionRationale.value = opts.needsFsPermissionRationale ?? true;
+    showFirstLaunch.value = true;
+    step.value = "welcome";
+  }
+
   async function advanceStep() {
     if (step.value === "welcome") {
       step.value = needsFsPermissionRationale.value ? "permissions" : "signin";
@@ -142,5 +154,6 @@ export function useFirstLaunch() {
     installUpdate,
     dismissUpdate,
     openExternal,
+    seedDemo,
   };
 }
