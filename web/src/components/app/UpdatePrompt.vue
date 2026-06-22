@@ -2,7 +2,7 @@
   <Transition name="update-slide" appear>
     <div
       v-if="visible"
-      class="fixed bottom-4 right-4 z-[90] w-[360px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40"
+      class="fixed bottom-4 right-4 z-[101] w-[360px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40"
       style="backdrop-filter: blur(8px);"
       role="status"
       aria-live="polite"

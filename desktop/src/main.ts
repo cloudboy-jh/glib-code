@@ -67,8 +67,12 @@ function hasSeenWelcome(): boolean {
   try {
     const raw = readFileSync(getFirstLaunchFlagPath(), "utf-8");
     return JSON.parse(raw)?.seen === true;
-  } catch {
-    return false;
+  } catch (error: any) {
+    // If the file exists but can't be parsed, it's corrupted. Treat as seen
+    // so the user doesn't get the full first-run flow again just because
+    // the flag file was locked or partially written.
+    if (error?.code === "ENOENT") return false;
+    return true;
   }
 }
 

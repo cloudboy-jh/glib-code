@@ -101,7 +101,15 @@ export function useFirstLaunch() {
     } else if (step.value === "permissions") {
       step.value = "signin";
     } else if (step.value === "signin") {
-      await completeFirstLaunch();
+      await finishFromSignin();
+    }
+  }
+
+  function goBackStep() {
+    if (step.value === "signin") {
+      step.value = needsFsPermissionRationale.value ? "permissions" : "welcome";
+    } else if (step.value === "permissions") {
+      step.value = "welcome";
     }
   }
 
@@ -111,6 +119,19 @@ export function useFirstLaunch() {
     }
     showFirstLaunch.value = false;
     step.value = "done";
+  }
+
+  // Signals that the user finished the signin step (not skipped). App.vue uses
+  // this to show a post-onboarding hint on the picker.
+  const justCompleted = ref(false);
+
+  async function finishFromSignin() {
+    justCompleted.value = true;
+    await completeFirstLaunch();
+  }
+
+  function clearJustCompleted() {
+    justCompleted.value = false;
   }
 
   async function downloadUpdate() {
@@ -123,7 +144,11 @@ export function useFirstLaunch() {
 
   async function installUpdate() {
     if (!isDesktop) return;
-    await glibDesktop()!.installUpdate();
+    try {
+      await glibDesktop()!.installUpdate();
+    } catch (error) {
+      updateState.value = { phase: "error", message: error instanceof Error ? error.message : "Install failed" };
+    }
   }
 
   function dismissUpdate() {
@@ -149,7 +174,10 @@ export function useFirstLaunch() {
     init,
     cleanup,
     advanceStep,
+    goBackStep,
     completeFirstLaunch,
+    justCompleted: readonly(justCompleted),
+    clearJustCompleted,
     downloadUpdate,
     installUpdate,
     dismissUpdate,

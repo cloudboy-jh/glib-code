@@ -213,3 +213,19 @@ samp,
 @keyframes promote-countdown {
   to { stroke-dashoffset: 151; }
 }
+
+/* Post-onboarding hint banner */
+.hint-fade-enter-active,
+.hint-fade-leave-active {
+  transition: opacity 0.3s ease, max-height 0.3s ease;
+  overflow: hidden;
+}
+.hint-fade-enter-from,
+.hint-fade-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.hint-fade-enter-to,
+.hint-fade-leave-from {
+  max-height: 60px;
+}

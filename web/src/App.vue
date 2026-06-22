@@ -55,6 +55,21 @@
         />
 
         <main class="min-h-0 min-w-0 overflow-hidden">
+          <!-- Post-onboarding hint -->
+          <Transition name="hint-fade">
+            <div v-if="showPostOnboardingHint" class="flex items-center justify-between gap-3 border-b border-primary/20 bg-primary/5 px-6 py-2.5 text-sm">
+              <span class="text-muted-foreground">
+                <span class="font-medium text-foreground">Welcome to glib-code.</span>
+                Open a project or clone a repo to get started.
+              </span>
+              <button type="button" class="text-muted-foreground/60 transition-colors hover:text-foreground" aria-label="Dismiss" @click="dismissPostOnboardingHint">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </Transition>
+
           <PickerView
             v-if="!currentProject"
             :recents="recents"
@@ -485,14 +500,21 @@
       </div>
     </div>
 
-    <!-- ── First-launch overlay (z-100, full-screen, only on first run) ── -->
+    <!-- First-launch overlay (z-100, full-screen, only on first run) -->
     <FirstLaunchOverlay
       :show="showFirstLaunch"
       :step="firstLaunchStep"
       :app-version="firstLaunchAppVersion"
       :needs-fs-permission-rationale="needsFsPermissionRationale"
       :logo-icon-src="logoIconSrc"
+      :git-ready="readiness.gitOk"
+      :pi-ready="readiness.piOk"
+      :readiness-loaded="readiness.loaded"
       @advance="advanceFirstLaunchStep"
+      @back="goBackFirstLaunchStep"
+      @skip="completeFirstLaunch"
+      @dismiss="completeFirstLaunch"
+      @open-settings="handleOnboardingOpenSettings"
     />
 
     <!-- ── Update toast (z-90, bottom-right corner) ── -->
@@ -714,6 +736,12 @@ const providerCapabilities = reactive<{ ok: boolean; error?: string; providers: 
   ok: false,
   error: undefined,
   providers: []
+});
+
+const readiness = reactive<{ gitOk: boolean; piOk: boolean; loaded: boolean }>({
+  gitOk: false,
+  piOk: false,
+  loaded: false
 });
 
 const keybindings = reactive([
@@ -1036,6 +1064,10 @@ const {
   init: initFirstLaunch,
   cleanup: cleanupFirstLaunch,
   advanceStep: advanceFirstLaunchStep,
+  goBackStep: goBackFirstLaunchStep,
+  completeFirstLaunch,
+  justCompleted: firstLaunchJustCompleted,
+  clearJustCompleted: clearFirstLaunchJustCompleted,
   downloadUpdate,
   installUpdate,
   dismissUpdate,
@@ -1588,6 +1620,31 @@ function openSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'K
   state.settingsOpen = true;
 }
 
+async function handleOnboardingOpenSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings') {
+  await completeFirstLaunch();
+  openSettings(tab);
+}
+
+const showPostOnboardingHint = ref(false);
+let postOnboardingHintTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(firstLaunchJustCompleted, (completed) => {
+  if (!completed) return;
+  showPostOnboardingHint.value = true;
+  clearFirstLaunchJustCompleted();
+  postOnboardingHintTimer = setTimeout(() => {
+    showPostOnboardingHint.value = false;
+  }, 8000);
+});
+
+function dismissPostOnboardingHint() {
+  showPostOnboardingHint.value = false;
+  if (postOnboardingHintTimer) {
+    clearTimeout(postOnboardingHintTimer);
+    postOnboardingHintTimer = null;
+  }
+}
+
 function openGitTrixFromSettings() {
   state.settingsOpen = false;
   if (currentProject.value) {
@@ -1647,6 +1704,13 @@ async function hydrateProviders() {
   providerCapabilities.providers = providers.providers;
   settings.defaultProvider = providers.defaultProvider;
   settings.defaultModel = providers.defaultModel;
+}
+
+async function hydrateReadiness() {
+  const report = await apiGet<{ ok: boolean; checks: { git: { ok: boolean }; pi: { ok: boolean } } }>('/readiness');
+  readiness.gitOk = report.checks.git.ok;
+  readiness.piOk = report.checks.pi.ok;
+  readiness.loaded = true;
 }
 
 async function hydrateSettings() {
@@ -3101,6 +3165,7 @@ onMounted(() => {
   }
   void hydrateAuth().catch(() => undefined);
   void hydrateProviders().catch(() => undefined);
+  void hydrateReadiness().catch(() => undefined);
   shortcuts.bind();
   if (isOnboardingDemo) {
     seedFirstLaunchDemo();
