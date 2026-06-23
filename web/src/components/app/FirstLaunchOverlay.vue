@@ -45,12 +45,13 @@
             glib-code
           </h1>
           <p class="mb-2 text-center text-base text-muted-foreground leading-relaxed">
-            An AI coding agent that lives in your terminal's neighbourhood.
-            Review diffs, run agent sessions, ship changes.
+            Run AI coding agents on your git repos. Review every diff,
+            then ship the changes you want.
           </p>
-          <p class="mb-8 text-center text-sm text-muted-foreground/60">
+          <p v-if="appVersion" class="mb-8 text-center text-sm text-muted-foreground/60">
             v{{ appVersion }}
           </p>
+          <div v-else class="mb-8" aria-hidden="true" />
 
           <div class="flex flex-col gap-3">
             <button
@@ -68,8 +69,7 @@
           <div class="mb-6 text-center">
             <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-border/80 bg-card">
               <svg class="h-6 w-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-                <path d="M16 3v4M8 3v4M3 11h18" />
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
             <h2 class="text-xl font-semibold">Before we continue</h2>
@@ -102,7 +102,7 @@
               Back
             </button>
             <button type="button" class="fl-btn-primary flex-1" @click="$emit('advance')">
-              Got it, continue
+              Continue
             </button>
           </div>
         </div>
@@ -118,7 +118,7 @@
             </div>
             <h2 class="text-xl font-semibold">Connect your AI provider</h2>
             <p class="mt-1.5 text-sm text-muted-foreground">
-              glib-code works with any OpenAI-compatible provider. Add an API key to start running sessions, or set up GitHub for durable storage.
+              Add a key from OpenAI, Anthropic, Google, or another supported provider to start running sessions. Connect GitHub to back up sessions and open PRs.
             </p>
           </div>
 
@@ -146,7 +146,7 @@
                 </div>
                 <div class="min-w-0 flex-1 text-left">
                   <div class="text-sm font-medium">Add an API key</div>
-                  <div class="text-xs text-muted-foreground">Open Settings to paste a key from OpenAI, Anthropic, or any compatible provider. Stored locally, never sent to our servers.</div>
+                  <div class="text-xs text-muted-foreground">Open Settings to paste a key from OpenAI, Anthropic, Google, and others. Stored locally, never sent to our servers.</div>
                 </div>
                 <svg class="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="m9 18 6-6-6-6" />
@@ -164,7 +164,7 @@
                 </div>
                 <div class="min-w-0 flex-1 text-left">
                   <div class="text-sm font-medium">Connect GitHub</div>
-                  <div class="text-xs text-muted-foreground">Open Settings to sign in with GitHub for durable session storage and PR workflows.</div>
+                  <div class="text-xs text-muted-foreground">Open Settings to sign in with GitHub. Backs up your sessions and lets you open pull requests.</div>
                 </div>
                 <svg class="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="m9 18 6-6-6-6" />
