@@ -290,13 +290,20 @@
 
     <TerminalDrawer
       v-if="state.terminalOpen"
+      :entries="terminal.entries"
       :input="forms.terminal"
-      :output="terminal.output"
       :status="terminal.status"
       :error="terminal.error"
+      :project-label="terminalProjectLabel"
+      :running-id="terminal.runningId"
+      :history="terminal.history"
+      :history-index="terminal.historyIndex"
       @close="state.terminalOpen = false"
       @run="runTerminal"
-      @update:input="forms.terminal = $event"
+      @cancel="cancelTerminal"
+      @clear="clearTerminal"
+      @update:input="onTerminalInput"
+      @navigate-history="navigateHistory"
     />
 
     <input ref="attachmentInputRef" type="file" multiple class="hidden" @change="onAttachmentInputChange" />
@@ -891,12 +898,33 @@ function viewTextAttachment(id: string) {
   textAttachmentModal.open = true;
 }
 
+interface TerminalChunk {
+  text: string;
+  stream: 'stdout' | 'stderr';
+}
+
+interface TerminalEntry {
+  id: string;
+  command: string;
+  chunks: TerminalChunk[];
+  exitCode: number | null;
+  status: 'running' | 'done' | 'error';
+}
+
 const terminal = reactive({
   status: 'closed' as 'connecting' | 'open' | 'reconnecting' | 'closed' | 'error' | 'unavailable',
-  output: 'No commands run yet.',
   error: '',
   sessionId: '',
-  reconnectAttempts: 0
+  reconnectAttempts: 0,
+  entries: [] as TerminalEntry[],
+  history: [] as string[],
+  historyIndex: -1,
+  runningId: null as string | null
+});
+
+const terminalProjectLabel = computed(() => {
+  if (!currentProject.value) return null;
+  return `${currentProject.value.name} · ${currentProject.value.branch}`;
 });
 
 let terminalSocket: WebSocket | null = null;
@@ -2710,17 +2738,37 @@ function openTerminalSocket(isReconnect = false) {
         return;
       }
       if (data.type === 'error') {
-        terminal.error = typeof data.message === 'string' ? data.message : 'Terminal error';
+        const message = typeof data.message === 'string' ? data.message : 'Terminal error';
+        const id = typeof data.id === 'string' ? data.id : null;
+        if (id) {
+          const entry = terminal.entries.find((e) => e.id === id);
+          if (entry && entry.status === 'running') {
+            entry.status = 'error';
+            terminal.runningId = null;
+          }
+        }
+        terminal.error = message;
         terminal.status = data.retryable ? terminal.status : 'error';
         return;
       }
-      if (data.type === 'output' && typeof data.text === 'string') {
-        terminal.output = `${terminal.output === 'No commands run yet.' ? '' : `${terminal.output}\n`}${data.text}`.trimStart();
+      if (data.type === 'output' && typeof data.text === 'string' && typeof data.id === 'string') {
+        const stream = data.stream === 'stderr' ? 'stderr' : 'stdout';
+        const entry = terminal.entries.find((e) => e.id === data.id);
+        if (entry) {
+          entry.chunks.push({ text: data.text, stream });
+        }
         return;
       }
       if (data.type === 'exit' && typeof data.id === 'string') {
         const code = typeof data.code === 'number' ? data.code : 1;
-        terminal.output = `${terminal.output}\n[exit ${data.id}: ${code}]`;
+        const entry = terminal.entries.find((e) => e.id === data.id);
+        if (entry) {
+          entry.exitCode = code;
+          entry.status = code === 0 ? 'done' : 'error';
+        }
+        if (terminal.runningId === data.id) {
+          terminal.runningId = null;
+        }
       }
     } catch {
       terminal.error = 'Received invalid terminal response';
@@ -2731,6 +2779,14 @@ function openTerminalSocket(isReconnect = false) {
   };
   ws.onclose = () => {
     terminalSocket = null;
+    // Mark any in-flight command as errored — the server killed it on disconnect.
+    for (const entry of terminal.entries) {
+      if (entry.status === 'running') {
+        entry.status = 'error';
+        entry.chunks.push({ text: '\n[connection lost]', stream: 'stderr' });
+      }
+    }
+    terminal.runningId = null;
     if (!state.terminalOpen) {
       terminal.status = 'closed';
       return;
@@ -2746,9 +2802,66 @@ function runTerminal() {
     terminal.error = 'Terminal is not connected';
     return;
   }
+  if (!currentProject.value) {
+    terminal.error = 'Open a project to run commands.';
+    return;
+  }
   const id = crypto.randomUUID().slice(0, 8);
-  terminal.output = `${terminal.output === 'No commands run yet.' ? '' : `${terminal.output}\n`}$ ${command}`.trimStart();
-  terminalSocket.send(JSON.stringify({ type: 'run', id, command }));
+  terminal.entries.push({
+    id,
+    command,
+    chunks: [],
+    exitCode: null,
+    status: 'running'
+  });
+  if (terminal.history[terminal.history.length - 1] !== command) {
+    terminal.history.push(command);
+  }
+  terminal.historyIndex = -1;
+  terminal.runningId = id;
+  terminal.error = '';
+  terminalSocket.send(JSON.stringify({ type: 'run', id, command, cwd: currentProject.value.path }));
+  forms.terminal = '';
+}
+
+function cancelTerminal() {
+  if (!terminal.runningId || !terminalSocket) return;
+  terminalSocket.send(JSON.stringify({ type: 'cancel', id: terminal.runningId }));
+}
+
+function clearTerminal() {
+  terminal.entries = [];
+  terminal.error = '';
+}
+
+function onTerminalInput(value: string) {
+  forms.terminal = value;
+  if (terminal.historyIndex !== -1) {
+    terminal.historyIndex = -1;
+  }
+}
+
+function navigateHistory(direction: 'prev' | 'next') {
+  const history = terminal.history;
+  if (history.length === 0) return;
+
+  if (direction === 'prev') {
+    if (terminal.historyIndex === -1) {
+      terminal.historyIndex = history.length - 1;
+    } else if (terminal.historyIndex > 0) {
+      terminal.historyIndex -= 1;
+    }
+  } else {
+    if (terminal.historyIndex === -1) return;
+    if (terminal.historyIndex < history.length - 1) {
+      terminal.historyIndex += 1;
+    } else {
+      terminal.historyIndex = -1;
+      forms.terminal = '';
+      return;
+    }
+  }
+  forms.terminal = history[terminal.historyIndex] ?? '';
 }
 
 function runPalette(id: string) {
@@ -3222,6 +3335,12 @@ watch(
     closeTerminalSocket();
     terminal.status = 'closed';
     terminal.error = '';
+    terminal.runningId = null;
+    for (const entry of terminal.entries) {
+      if (entry.status === 'running') {
+        entry.status = 'error';
+      }
+    }
   }
 );
 

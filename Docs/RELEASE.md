@@ -61,7 +61,7 @@ GitHub Releases. Both platform artifacts are attached to a version tag. Users do
 
 ```bash
 # 1. tag the release
-git tag v0.1.0
+git tag v1.0.0
 git push --tags
 
 # 2. on Mac

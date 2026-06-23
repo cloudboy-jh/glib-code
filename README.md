@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
-    <img src="https://img.shields.io/badge/version-0.1.5-1e293b?style=flat-square" alt="Latest release" />
+    <img src="https://img.shields.io/badge/version-1.0.0-1e293b?style=flat-square" alt="Latest release" />
   </a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-1e293b?style=flat-square" alt="Platforms" />
 </p>
@@ -25,9 +25,9 @@ glib-code is an AI coding agent that lives next to your local repos. Open a proj
 
 | Platform | File |
 |----------|------|
-| Windows | `glib-code-Setup-0.1.5.exe` |
-| Mac | `glib-code-0.1.5-arm64.dmg` |
-| Linux | `glib-code-0.1.5.AppImage` |
+| Windows | `glib-code-Setup-1.0.0.exe` |
+| Mac | `glib-code-1.0.0-arm64.dmg` |
+| Linux | `glib-code-1.0.0.AppImage` |
 
 ## What it does
 
@@ -71,8 +71,8 @@ bun run check          # typecheck all workspaces
 Push a version tag — GitHub Actions builds all three platforms and publishes to a GitHub Release automatically.
 
 ```bash
-git tag v0.x.y
-git push origin v0.x.y
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 Build output is in `desktop/dist-app/`. To build locally without publishing:

@@ -229,3 +229,20 @@ samp,
 .hint-fade-leave-from {
   max-height: 60px;
 }
+
+/* Terminal — entry entrance + connection dot pulse */
+@keyframes term-entry-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.term-entry {
+  animation: term-entry-in 0.15s ease-out;
+}
+
+@keyframes term-dot-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.term-dot-pulse {
+  animation: term-dot-pulse 1.2s ease-in-out infinite;
+}

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { websocket as honoWebSocket } from "hono/bun";
 import { bootSettingsStore } from "./services/settings-store";
 import { pruneStaleIndexEntries } from "./services/session-store";
 import { loadProjectOverrides } from "./services/project-store";
@@ -47,7 +48,8 @@ if (import.meta.main) {
   Bun.serve({
     port,
     idleTimeout: 60,
-    fetch: app.fetch
+    fetch: app.fetch,
+    websocket: honoWebSocket
   });
   log("server", `ready http://127.0.0.1:${port}`);
 }
