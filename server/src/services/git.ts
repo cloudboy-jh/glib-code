@@ -3,7 +3,8 @@ import { getCurrentProjectId, getProjectById } from "./project-store";
 
 const PROTECTED_PREFIX = ".glib/";
 
-function activeRepo() {
+function activeRepo(projectPath?: string) {
+  if (projectPath && projectPath.trim()) return projectPath.trim();
   const current = getCurrentProjectId();
   if (!current) return null;
   const project = getProjectById(current);
@@ -11,8 +12,8 @@ function activeRepo() {
   return project.path;
 }
 
-function getGit() {
-  const repo = activeRepo();
+function getGit(projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   return simpleGit(repo);
 }
@@ -49,9 +50,9 @@ function parsePorcelainPath(line: string) {
   return line.slice(3).trim();
 }
 
-export async function gitStatus() {
-  const git = getGit();
-  const repo = activeRepo();
+export async function gitStatus(projectPath?: string) {
+  const git = getGit(projectPath);
+  const repo = activeRepo(projectPath);
   if (!git || !repo) return null;
   const s = await git.status();
   const upstream = await runGit(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], repo).catch(() => "");
@@ -71,8 +72,8 @@ export async function gitStatus() {
   };
 }
 
-export async function gitBranches() {
-  const git = getGit();
+export async function gitBranches(projectPath?: string) {
+  const git = getGit(projectPath);
   if (!git) return null;
   const b = await git.branchLocal();
   return {
@@ -81,8 +82,8 @@ export async function gitBranches() {
   };
 }
 
-export async function gitLog(limit = 50) {
-  const git = getGit();
+export async function gitLog(limit = 50, projectPath?: string) {
+  const git = getGit(projectPath);
   if (!git) return null;
   const logs = await git.log({ maxCount: limit });
   return logs.all.map((item) => ({
@@ -94,8 +95,8 @@ export async function gitLog(limit = 50) {
   }));
 }
 
-export async function gitStash(message?: string) {
-  const repo = activeRepo();
+export async function gitStash(message?: string, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const dirty = (await runGit(["status", "--porcelain=v1"], repo)).split("\n").filter((line) => line.trim() && !line.slice(3).trim().startsWith(".glib/"));
   if (!dirty.length) return { stashed: false, message: "working tree clean" };
@@ -108,8 +109,8 @@ export async function gitStash(message?: string) {
   return { stashed: beforeTop !== afterTop, ref: beforeTop !== afterTop ? "stash@{0}" : "", message: output || label };
 }
 
-export async function gitPush() {
-  const repo = activeRepo();
+export async function gitPush(projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const branch = await runGit(["branch", "--show-current"], repo);
   const upstream = await runGit(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], repo).catch(() => "");
@@ -130,8 +131,8 @@ export async function gitPush() {
   return { ok: true, remote, branch, upstream, sha };
 }
 
-export async function gitStage(files?: unknown) {
-  const repo = activeRepo();
+export async function gitStage(files?: unknown, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const entries = sanitizeFiles(files);
   if (entries.some(isProtectedPath)) {
@@ -151,8 +152,8 @@ export async function gitStage(files?: unknown) {
   return { staged: entries };
 }
 
-export async function gitUnstage(files: unknown) {
-  const repo = activeRepo();
+export async function gitUnstage(files: unknown, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const entries = sanitizeFiles(files);
   if (!entries.length) {
@@ -168,8 +169,8 @@ export async function gitUnstage(files: unknown) {
   return { unstaged: entries };
 }
 
-export async function gitDiscard(files: unknown) {
-  const repo = activeRepo();
+export async function gitDiscard(files: unknown, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const entries = sanitizeFiles(files);
   if (!entries.length) {
@@ -202,8 +203,8 @@ export async function gitDiscard(files: unknown) {
   return { discarded: entries };
 }
 
-export async function gitCommit(message: string, files?: unknown) {
-  const repo = activeRepo();
+export async function gitCommit(message: string, files?: unknown, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const msg = message.trim();
   if (!msg) {
@@ -232,8 +233,8 @@ export async function gitCommit(message: string, files?: unknown) {
   return { sha, branch };
 }
 
-export async function gitPull() {
-  const repo = activeRepo();
+export async function gitPull(projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const branch = await runGit(["branch", "--show-current"], repo);
   if (!branch) {
@@ -263,8 +264,8 @@ export async function gitPull() {
   }
 }
 
-export async function gitCheckout(ref: string, create = false) {
-  const repo = activeRepo();
+export async function gitCheckout(ref: string, create = false, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const target = ref.trim();
   if (!target) {
@@ -284,8 +285,8 @@ export async function gitCheckout(ref: string, create = false) {
   return { ok: true, branch, ref: target };
 }
 
-export async function gitCreateBranch(name: string, from?: string, checkout = false) {
-  const repo = activeRepo();
+export async function gitCreateBranch(name: string, from?: string, checkout = false, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const next = name.trim();
   if (!next) {
@@ -301,8 +302,8 @@ export async function gitCreateBranch(name: string, from?: string, checkout = fa
   return { ok: true, name: next, from: from?.trim() || "", checkedOut: checkout };
 }
 
-export async function gitCommitDetail(sha: string) {
-  const repo = activeRepo();
+export async function gitCommitDetail(sha: string, projectPath?: string) {
+  const repo = activeRepo(projectPath);
   if (!repo) return null;
   const rev = sha.trim();
   if (!rev) return null;

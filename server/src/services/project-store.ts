@@ -97,6 +97,17 @@ export function listRegisteredProjects() {
   return [...store.projectsById.values()];
 }
 
+// Resolve a registered project by its filesystem path (normalized comparison).
+// Returns null when no registered project matches — callers decide the fallback.
+export function getProjectByPath(path: string) {
+  const target = path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  for (const project of store.projectsById.values()) {
+    const candidate = project.path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    if (candidate === target) return project;
+  }
+  return null;
+}
+
 const OVERRIDES_FILE = "project-overrides.json";
 
 function pruneOverride(override: ProjectOverride): ProjectOverride {

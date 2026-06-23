@@ -482,17 +482,26 @@ const selectionHunkCount = computed(() =>
 const hasDiffSelection = computed(() => selectionFileCount.value > 0 || selectionHunkCount.value > 0);
 const allFilesSelected = computed(() => state.files.length > 0 && state.selectedFiles.length === state.files.length);
 
+// Scope every request to this workbench's project. Skip if the caller already
+// put projectPath in the query (diff endpoints build their own query strings).
+function withProjectQuery(path: string): string {
+  if (/[?&]projectPath=/.test(path)) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}projectPath=${encodeURIComponent(props.currentProject.path)}`;
+}
+
 async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(`${API_BASE}${withProjectQuery(path)}`);
   if (!response.ok) throw await readError(response);
   return response.json() as Promise<T>;
 }
 
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const merged = 'projectPath' in body ? body : { ...body, projectPath: props.currentProject.path };
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(merged)
   });
   if (!response.ok) throw await readError(response);
   return response.json() as Promise<T>;

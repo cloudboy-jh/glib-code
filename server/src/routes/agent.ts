@@ -3,7 +3,8 @@ import type { AgentEvent, TokenUsage } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, broadcast, disposeRuntimeSession, getRunningTurn, onSessionInfoChanged, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/session-store";
 import { getProvidersState, getSettings } from "../services/settings-store";
-import { getCurrentProjectId, getProjectById, getProjectOverride } from "../services/project-store";
+import { getCurrentProjectId, getProjectById, getProjectByPath, getProjectOverride } from "../services/project-store";
+import { projectIdFromPath } from "../services/projects";
 import { requiredProjectPath, resolveAgentCwd, resolveSession } from "../services/session-resolver";
 import { getPiCapabilities } from "../services/pi-capabilities";
 import * as gittrixService from "../services/gittrix-service";
@@ -76,7 +77,15 @@ onSessionInfoChanged(async (sessionId, name) => {
   }
 });
 
-function mustProject() {
+function mustProject(projectPath?: string) {
+  if (projectPath && projectPath.trim()) {
+    const path = projectPath.trim();
+    const registered = getProjectByPath(path);
+    if (registered) return registered;
+    // Not registered (e.g. multi-tab opened elsewhere): synthesize a stable
+    // project so id-keyed lookups (overrides) and gittrix branch still work.
+    return { id: projectIdFromPath(path), name: path.split(/[\\/]/).pop() || path, path, branch: "main", isGitRepo: true as const };
+  }
   const projectId = getCurrentProjectId();
   if (!projectId) return null;
   return getProjectById(projectId);
@@ -137,9 +146,9 @@ function deriveSessionTitle(prompt: string): string {
 
 export const agentRoutes = new Hono()
   .post("/sessions", async (c) => {
-    const project = mustProject();
+    const body = await c.req.json().catch(() => null) as { title?: string; model?: string; provider?: string; projectPath?: string } | null;
+    const project = mustProject(body?.projectPath);
     if (!project) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 400);
-    const body = await c.req.json().catch(() => null) as { title?: string; model?: string; provider?: string } | null;
     const [providerState, capabilities] = await Promise.all([getProvidersState(), getPiCapabilities()]);
     if (!capabilities.ok) return c.json(routeError(capabilities.error ?? "pi provider discovery failed", "PI_CAPABILITIES_FAILED", true), 503);
     const projectOverride = getProjectOverride(project.id);

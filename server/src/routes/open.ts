@@ -19,7 +19,8 @@ const VALID_EDITORS = [
 
 type EditorId = typeof VALID_EDITORS[number];
 
-async function activeProjectPath() {
+async function activeProjectPath(projectPath?: string) {
+  if (projectPath && projectPath.trim()) return projectPath.trim();
   const current = getCurrentProjectId();
   if (!current) return null;
   return getProjectById(current)?.path ?? null;
@@ -112,7 +113,7 @@ export const openRoutes = new Hono()
     const { path, editor: requestedEditor, sessionId } = body;
     const target = body.target === "project" ? "project" : "file";
 
-    const root = await activeProjectPath();
+    const root = await activeProjectPath(body.projectPath);
     if (!root) return c.json({ ok: false, message: "no project open" }, 404);
 
     const resolved = await resolveOpenPath(root, target, path, sessionId);

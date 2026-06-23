@@ -4,14 +4,14 @@ import { routeError } from "../lib/route-error";
 
 export const gitRoutes = new Hono()
   .get("/status", async (c) => {
-    const status = await gitStatus();
+    const status = await gitStatus(c.req.query("projectPath"));
     if (!status) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(status);
   })
   .post("/stage", async (c) => {
-    const body = await c.req.json().catch(() => null) as { files?: string[] } | null;
+    const body = await c.req.json().catch(() => null) as { files?: string[]; projectPath?: string } | null;
     try {
-      const result = await gitStage(body?.files);
+      const result = await gitStage(body?.files, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -21,9 +21,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/unstage", async (c) => {
-    const body = await c.req.json().catch(() => null) as { files?: string[] } | null;
+    const body = await c.req.json().catch(() => null) as { files?: string[]; projectPath?: string } | null;
     try {
-      const result = await gitUnstage(body?.files);
+      const result = await gitUnstage(body?.files, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -33,9 +33,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/discard", async (c) => {
-    const body = await c.req.json().catch(() => null) as { files?: string[] } | null;
+    const body = await c.req.json().catch(() => null) as { files?: string[]; projectPath?: string } | null;
     try {
-      const result = await gitDiscard(body?.files);
+      const result = await gitDiscard(body?.files, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -46,9 +46,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/commit", async (c) => {
-    const body = await c.req.json().catch(() => null) as { message?: string; files?: string[] } | null;
+    const body = await c.req.json().catch(() => null) as { message?: string; files?: string[]; projectPath?: string } | null;
     try {
-      const result = await gitCommit(body?.message || "", body?.files);
+      const result = await gitCommit(body?.message || "", body?.files, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -61,8 +61,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/push", async (c) => {
+    const body = await c.req.json().catch(() => null) as { projectPath?: string } | null;
     try {
-      const result = await gitPush();
+      const result = await gitPush(body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -73,9 +74,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/stash", async (c) => {
-    const body = await c.req.json().catch(() => null) as { message?: string } | null;
+    const body = await c.req.json().catch(() => null) as { message?: string; projectPath?: string } | null;
     try {
-      const result = await gitStash(body?.message);
+      const result = await gitStash(body?.message, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -83,8 +84,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/pull", async (c) => {
+    const body = await c.req.json().catch(() => null) as { projectPath?: string } | null;
     try {
-      const result = await gitPull();
+      const result = await gitPull(body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       if (result.ok === false && (result as { code?: string }).code === "PULL_CONFLICT") {
         return c.json({ ...routeError("pull produced merge conflicts", "PULL_CONFLICT"), files: (result as { files?: string[] }).files ?? [] }, 409);
@@ -97,14 +99,14 @@ export const gitRoutes = new Hono()
     }
   })
   .get("/branches", async (c) => {
-    const branches = await gitBranches();
+    const branches = await gitBranches(c.req.query("projectPath"));
     if (!branches) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(branches);
   })
   .post("/checkout", async (c) => {
-    const body = await c.req.json().catch(() => null) as { ref?: string; create?: boolean } | null;
+    const body = await c.req.json().catch(() => null) as { ref?: string; create?: boolean; projectPath?: string } | null;
     try {
-      const result = await gitCheckout(body?.ref || "", body?.create === true);
+      const result = await gitCheckout(body?.ref || "", body?.create === true, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -115,9 +117,9 @@ export const gitRoutes = new Hono()
     }
   })
   .post("/branches", async (c) => {
-    const body = await c.req.json().catch(() => null) as { name?: string; from?: string; checkout?: boolean } | null;
+    const body = await c.req.json().catch(() => null) as { name?: string; from?: string; checkout?: boolean; projectPath?: string } | null;
     try {
-      const result = await gitCreateBranch(body?.name || "", body?.from, body?.checkout === true);
+      const result = await gitCreateBranch(body?.name || "", body?.from, body?.checkout === true, body?.projectPath);
       if (!result) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 404);
       return c.json(result);
     } catch (error) {
@@ -129,13 +131,13 @@ export const gitRoutes = new Hono()
   .get("/log", async (c) => {
     const limitRaw = c.req.query("limit");
     const limit = limitRaw ? Number(limitRaw) : 50;
-    const logs = await gitLog(Number.isFinite(limit) ? limit : 50);
+    const logs = await gitLog(Number.isFinite(limit) ? limit : 50, c.req.query("projectPath"));
     if (!logs) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(logs);
   })
   .get("/commit/:sha", async (c) => {
     const sha = c.req.param("sha");
-    const result = await gitCommitDetail(sha);
+    const result = await gitCommitDetail(sha, c.req.query("projectPath"));
     if (!result) return c.json(routeError("commit not found", "COMMIT_NOT_FOUND"), 404);
     return c.json(result);
   });

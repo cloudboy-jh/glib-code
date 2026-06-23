@@ -5,7 +5,8 @@ import { homedir } from "node:os";
 import { getCurrentProjectId, getProjectById } from "../services/project-store";
 import { inRepo } from "../lib/paths";
 
-async function activeProjectPath() {
+async function activeProjectPath(projectPath?: string) {
+  if (projectPath && projectPath.trim()) return projectPath.trim();
   const current = getCurrentProjectId();
   if (!current) return null;
   return getProjectById(current)?.path ?? null;
@@ -99,7 +100,7 @@ export const fsRoutes = new Hono()
     return c.json({ ok: true, ...(await listDirectories(target)) });
   })
   .get("/tree", async (c) => {
-    const root = await activeProjectPath();
+    const root = await activeProjectPath(c.req.query("projectPath"));
     if (!root) return c.json({ ok: false, message: "no project open" }, 404);
 
     const rel = c.req.query("path") ?? ".";
@@ -109,14 +110,14 @@ export const fsRoutes = new Hono()
     return c.json(await tree(full));
   })
   .get("/paths", async (c) => {
-    const root = await activeProjectPath();
+    const root = await activeProjectPath(c.req.query("projectPath"));
     if (!root) return c.json({ ok: false, message: "no project open" }, 404);
 
     const paths = await flattenPaths(root, root, "");
     return c.json({ ok: true, paths });
   })
   .get("/read", async (c) => {
-    const root = await activeProjectPath();
+    const root = await activeProjectPath(c.req.query("projectPath"));
     if (!root) return c.json({ ok: false, message: "no project open" }, 404);
 
     const rel = c.req.query("path");

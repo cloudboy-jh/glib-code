@@ -27,7 +27,8 @@ async function emitBoundary(meta: SessionMeta, projectPath: string) {
   }
 }
 
-function mustProject() {
+function mustProject(projectPath?: string) {
+  if (projectPath && projectPath.trim()) return { path: projectPath.trim() };
   const projectId = getCurrentProjectId();
   if (!projectId) return null;
   return getProjectById(projectId);
@@ -84,7 +85,7 @@ export const sessionsRoutes = new Hono()
     if (c.req.query("scope") === "all") {
       return c.json(await listSessionsAcrossProjects());
     }
-    const project = mustProject();
+    const project = mustProject(c.req.query("projectPath"));
     if (!project) return c.json([]);
     return c.json(await listSessions(project.path));
   })
@@ -106,7 +107,8 @@ export const sessionsRoutes = new Hono()
     return c.body(result.body);
   })
   .post("/:id/fork", async (c) => {
-    const project = mustProject();
+    const body = await c.req.json().catch(() => null) as { projectPath?: string } | null;
+    const project = mustProject(body?.projectPath);
     if (!project) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 400);
     const forked = await forkSession(project.path, c.req.param("id"));
     if (!forked) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
