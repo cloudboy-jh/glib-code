@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentRoutes } from "./agent";
-import { sessionsRoutes } from "./sessions";
+import { sessionsRoutes, invalidateSessionListCache } from "./sessions";
 import { appendEvents, createSession } from "../services/session-store";
 import { registerProject, resetProjectStoreForTests, setCurrentProject } from "../services/project-store";
 import { __setRunningTurnForTests } from "../services/agent-runtime";
@@ -40,6 +40,7 @@ beforeEach(async () => {
   await mkdir(repoA, { recursive: true });
   await mkdir(repoB, { recursive: true });
   resetProjectStoreForTests();
+  invalidateSessionListCache();
   registerProject({ id: "project-a", name: "repo-a", path: repoA, branch: "main", isGitRepo: true });
   registerProject({ id: "project-b", name: "repo-b", path: repoB, branch: "main", isGitRepo: true });
   setCurrentProject("project-b");

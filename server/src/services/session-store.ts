@@ -212,7 +212,6 @@ export async function listSessions(projectPath: string) {
     if (!name.endsWith(".json")) continue;
     const raw = await readSessionDoc(projectPath, name.slice(0, -5));
     if (!raw) continue;
-    await indexSession(raw.meta.id, raw.meta.projectPath || projectPath);
     metas.push(raw.meta);
   }
   return metas.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));

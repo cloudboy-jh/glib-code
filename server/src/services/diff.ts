@@ -54,6 +54,12 @@ export async function diffItems(source: string, limit = 50, projectPath?: string
     }));
   }
 
+  if (source === "branches") {
+    // Branch listing is handled by GET /git/branches; return empty here so
+    // the items endpoint doesn't 500 for the source type.
+    return [];
+  }
+
   return [];
 }
 
@@ -85,13 +91,32 @@ export async function diffFiles(source: string, ref?: string, projectPath?: stri
       });
   }
 
+  // Branch compare: ref is "base...head" (git merge-dot syntax).
+  if (source === "branches" && ref) {
+    const out = await gitRaw(["diff", "--name-status", ref], projectPath);
+    if (out == null) return null;
+    return out
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [status, ...rest] = line.split("\t");
+        return { file: rest.join("\t"), status };
+      });
+  }
+
   return [];
 }
 
 export async function diffHunks(source: string, file: string, ref?: string, projectPath?: string) {
-  const args = source === "commits" && ref
-    ? ["show", ref, "--", file]
-    : ["diff", "HEAD", "--", file];
+  let args: string[];
+  if (source === "commits" && ref) {
+    args = ["show", ref, "--", file];
+  } else if (source === "branches" && ref) {
+    args = ["diff", ref, "--", file];
+  } else {
+    args = ["diff", "HEAD", "--", file];
+  }
 
   const out = await gitRaw(args, projectPath);
   if (out == null) return null;
@@ -111,6 +136,8 @@ export async function packDiff(source: string, ref?: string, file?: string, proj
   let args: string[];
   if (source === "commits" && ref) {
     args = file ? ["show", ref, "--", file] : ["show", ref];
+  } else if (source === "branches" && ref) {
+    args = file ? ["diff", ref, "--", file] : ["diff", ref];
   } else {
     if (file && await isUntracked(file, projectPath)) {
       const diff = await untrackedFileDiff(file, projectPath);
@@ -138,4 +165,23 @@ export async function packDiff(source: string, ref?: string, file?: string, proj
       deletions: (diff.match(/^-[^-]/gm) || []).length
     }
   };
+}
+
+// Convenience: validate that base and head refs exist, then return packed diff.
+// ref format passed to git is "base...head" (three-dot merge-base diff).
+export async function branchCompare(base: string, head: string, projectPath?: string) {
+  const repo = repoPath(projectPath);
+  if (!repo) return null;
+
+  // Verify both refs resolve before diffing — gives a clean error instead of
+  // a cryptic git stderr.
+  for (const ref of [base, head]) {
+    const rev = await gitRaw(["rev-parse", "--verify", `${ref}^{commit}`], projectPath);
+    if (rev == null) return { ok: false, code: "BAD_REF", ref } as const;
+  }
+
+  const ref = `${base}...${head}`;
+  const packed = await packDiff("branches", ref, undefined, projectPath);
+  if (packed == null) return null;
+  return { ok: true as const, base, head, ...packed };
 }

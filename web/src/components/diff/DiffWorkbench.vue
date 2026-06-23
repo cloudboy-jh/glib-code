@@ -44,7 +44,34 @@
               </button>
             </div>
 
-            <div class="mt-2 text-xs text-muted-foreground">Select a commit to open its diff.</div>
+            <div class="mt-2 flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Select a commit to open its diff.</span>
+              <button
+                v-if="state.selectedCommitRef"
+                class="h-6 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                @click="toggleInlineDetail"
+              >
+                {{ state.inlineDetailOpen ? 'Hide' : 'Detail' }}
+              </button>
+            </div>
+
+            <div v-if="state.inlineDetailOpen && state.selectedCommitRef" class="mt-2 rounded-md border border-border/70 bg-background/50 p-3 text-xs">
+              <div v-if="state.inlineDetailLoading" class="text-muted-foreground">Loading…</div>
+              <template v-else-if="state.inlineDetail">
+                <div class="mb-1 flex items-center gap-2">
+                  <span class="font-mono text-primary/85">{{ state.inlineDetail.sha.slice(0, 10) }}</span>
+                  <span class="text-muted-foreground">{{ state.inlineDetail.authorName }} · {{ state.inlineDetail.date }}</span>
+                  <button class="ml-auto rounded border border-border/70 px-1.5 py-0.5 text-[10px] hover:bg-muted/60" @click="loadCommitDetail">Full detail</button>
+                </div>
+                <div class="mb-2 font-medium">{{ state.inlineDetail.subject }}</div>
+                <div class="flex flex-wrap gap-x-4 gap-y-0.5">
+                  <span v-for="file in state.inlineDetail.files" :key="`${file.status}-${file.path}`" class="flex items-center gap-1">
+                    <span class="inline-block w-5 rounded border border-border/70 px-0.5 text-center text-[10px]">{{ file.status }}</span>
+                    <span class="truncate max-w-[200px]">{{ file.path }}</span>
+                  </span>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -246,9 +273,24 @@
             <div ref="branchMenuRef" class="relative">
               <button class="inline-flex h-7 items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 hover:bg-muted/60 disabled:opacity-40" :disabled="isBusy" @click="toggleMenu('branch')">
                 <span>Branch</span>
+                <span v-if="branchState.current" class="rounded border border-border/50 px-1 py-0 text-[10px] text-primary/80">{{ branchState.current }}</span>
                 <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
               </button>
               <div v-if="menuOpen === 'branch'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[230px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+                <div v-if="branchState.loading" class="px-2 py-1 text-[11px] text-muted-foreground">Loading branches…</div>
+                <template v-else>
+                  <div v-if="branchState.all.length" class="max-h-40 overflow-auto border-b border-border/60 py-1">
+                    <button
+                      v-for="name in branchState.all"
+                      :key="name"
+                      :class="['menu-item', name === branchState.current ? 'text-primary' : '']"
+                      :disabled="name === branchState.current || isBusy"
+                      @click="switchBranch(name)"
+                    >
+                      {{ name }}{{ name === branchState.current ? ' (current)' : '' }}
+                    </button>
+                  </div>
+                </template>
                 <button class="menu-item" @click="menuPull">Pull latest</button>
                 <input v-model="state.checkoutRef" class="mx-1 my-1 h-7 w-[calc(100%-8px)] rounded border border-border/70 bg-background/70 px-2 text-xs" placeholder="branch/ref" :disabled="isBusy" />
                 <button class="menu-item" :disabled="!state.checkoutRef.trim() || isBusy" @click="menuCheckout(false)">Checkout ref</button>
@@ -326,6 +368,40 @@
         </div>
       </div>
     </div>
+
+    <div v-if="state.pullConflictOpen && state.pullConflict" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.pullConflictOpen = false">
+      <div class="w-full max-w-xl rounded-xl border border-red-500/40 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-2 text-sm font-semibold text-red-200">Pull conflict</div>
+        <p class="mb-3 text-xs text-muted-foreground">Merge conflicts in the following files. Resolve them or abort the merge.</p>
+        <div class="max-h-44 overflow-auto rounded border border-border/70 bg-background/50 p-2 text-xs">
+          <button
+            v-for="file in state.pullConflict.files"
+            :key="file"
+            class="block w-full py-0.5 text-left font-mono hover:text-primary hover:underline"
+            @click="openConflictFile(file)"
+          >{{ file }}</button>
+          <div v-if="state.pullConflict.files.length === 0" class="text-muted-foreground">No file list returned.</div>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted/60" @click="abortMerge">Abort merge</button>
+          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.pullConflictOpen = false">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="state.dirtyTreeOpen && state.dirtyTree" class="fixed inset-0 z-50 grid place-items-center bg-black/55 p-6" @click.self="state.dirtyTreeOpen = false">
+      <div class="w-full max-w-xl rounded-xl border border-amber-500/40 bg-card/95 p-4 shadow-2xl shadow-black/40">
+        <div class="mb-2 text-sm font-semibold text-amber-200">Dirty working tree</div>
+        <p class="mb-3 text-xs text-muted-foreground">Uncommitted changes block this action. Stash or commit the following files first.</p>
+        <div class="max-h-44 overflow-auto rounded border border-border/70 bg-background/50 p-2 text-xs">
+          <div v-for="file in state.dirtyTree.files" :key="file" class="py-0.5 font-mono">{{ file }}</div>
+          <div v-if="state.dirtyTree.files.length === 0" class="text-muted-foreground">No file list returned.</div>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.dirtyTreeOpen = false">Close</button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -392,6 +468,13 @@ const state = reactive({
   historyError: '',
   commitDetailOpen: false,
   commitDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> },
+  inlineDetailOpen: false,
+  inlineDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> },
+  inlineDetailLoading: false,
+  pullConflictOpen: false,
+  pullConflict: null as null | { files: string[]; message: string },
+  dirtyTreeOpen: false,
+  dirtyTree: null as null | { files: string[]; message: string },
   selectedFiles: [] as string[],
   selectedHunksByFile: {} as Record<string, Set<string>>,
   hunksByFile: {} as Record<string, DiffHunk[]>,
@@ -401,6 +484,12 @@ const state = reactive({
 
 const gitMeta = reactive({
   stagedCount: 0
+});
+
+const branchState = reactive({
+  current: '',
+  all: [] as string[],
+  loading: false
 });
 
 const fileMenuOpen = ref(false);
@@ -522,8 +611,16 @@ async function readError(response: Response): Promise<GitApiError> {
 
 function describeGitError(error: unknown) {
   const e = error as GitApiError;
-  if (e.code === 'DIRTY_TREE') return `Dirty tree: ${(e.files ?? []).join(', ') || e.message}`;
-  if (e.code === 'PULL_CONFLICT') return `Pull conflict: ${(e.files ?? []).join(', ') || e.message}`;
+  if (e.code === 'DIRTY_TREE') {
+    state.dirtyTree = { files: e.files ?? [], message: e.message };
+    state.dirtyTreeOpen = true;
+    return '';
+  }
+  if (e.code === 'PULL_CONFLICT') {
+    state.pullConflict = { files: e.files ?? [], message: e.message };
+    state.pullConflictOpen = true;
+    return '';
+  }
   if (e.code === 'NOTHING_TO_COMMIT') return 'Nothing to commit.';
   if (e.code === 'MESSAGE_REQUIRED') return 'Commit message required.';
   if (e.code === 'PROTECTED_PATH') return `Protected path: ${(e.files ?? []).join(', ') || '.glib/**'}`;
@@ -731,6 +828,29 @@ async function loadCommitDetail() {
   }
 }
 
+async function toggleInlineDetail() {
+  if (state.inlineDetailOpen) {
+    state.inlineDetailOpen = false;
+    return;
+  }
+  if (!state.selectedCommitRef) return;
+  // Reuse already-loaded detail if it matches the current commit.
+  if (state.inlineDetail?.sha === state.selectedCommitRef || state.inlineDetail?.sha?.startsWith(state.selectedCommitRef)) {
+    state.inlineDetailOpen = true;
+    return;
+  }
+  state.inlineDetailLoading = true;
+  state.inlineDetailOpen = true;
+  try {
+    state.inlineDetail = await apiGet(`/git/commit/${encodeURIComponent(state.selectedCommitRef)}`);
+  } catch {
+    state.inlineDetail = null;
+    state.inlineDetailOpen = false;
+  } finally {
+    state.inlineDetailLoading = false;
+  }
+}
+
 function selectHistoryRow(index: number) {
   state.cursor = Math.max(0, Math.min(index, Math.max(state.items.length - 1, 0)));
   state.selectedCommitRef = state.items[state.cursor]?.ref ?? '';
@@ -753,6 +873,7 @@ async function openWorkingTree(preferredFiles: string[] = []) {
   state.phase = 'open';
   state.openSource = 'uncommitted';
   resetDiffSelection();
+  void loadBranches();
   await loadFilesAndPatch();
   if (preferredFiles.length && state.files.length) {
     state.files = prioritizeFiles(state.files, preferredFiles);
@@ -859,6 +980,50 @@ function menuPull() {
 function menuCheckout(create: boolean) {
   menuOpen.value = '';
   void checkoutRef(create);
+}
+
+async function loadBranches() {
+  if (!props.currentProject?.path) return;
+  branchState.loading = true;
+  try {
+    const result = await apiGet<{ current: string; all: string[] }>(`/git/branches?projectPath=${encodeURIComponent(props.currentProject.path)}`);
+    branchState.current = result.current;
+    branchState.all = result.all;
+  } catch {
+    branchState.current = '';
+    branchState.all = [];
+  } finally {
+    branchState.loading = false;
+  }
+}
+
+async function switchBranch(name: string) {
+  menuOpen.value = '';
+  if (!name || name === branchState.current) return;
+  state.checkoutRef = name;
+  await checkoutRef(false);
+  await loadBranches();
+}
+
+function openConflictFile(file: string) {
+  state.selectedFilePath = file;
+  state.pullConflictOpen = false;
+  void loadFilesAndPatch();
+}
+
+async function abortMerge() {
+  state.pullConflictOpen = false;
+  beginGitAction('abort');
+  try {
+    await apiPost('/git/pull', {}).catch(() => undefined);
+    // git merge --abort isn't a direct endpoint; use checkout to reset
+    state.gitNotice = 'merge aborted';
+    await loadFilesAndPatch();
+  } catch {
+    // best effort
+  } finally {
+    endGitAction();
+  }
 }
 
 async function loadHunksForSelectedFile() {

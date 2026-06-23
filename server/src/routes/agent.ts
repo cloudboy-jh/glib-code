@@ -12,6 +12,7 @@ import { diffItems, packDiff } from "../services/diff";
 import { clearBoundaryCache, computeBoundary, toBoundaryEvent } from "../services/boundary-service";
 import { log, logError } from "../lib/log";
 import { routeError } from "../lib/route-error";
+import { invalidateSessionListCache } from "./sessions";
 
 // ── Boundary push scheduler ────────────────────────────────────────────────
 // File-mutating tool calls fire rapidly during a turn. Coalesce boundary
@@ -198,6 +199,7 @@ export const agentRoutes = new Hono()
       isGitBacked: gittrixMeta.isGitBacked,
       workspaceKind: gittrixMeta.workspaceKind
     });
+    invalidateSessionListCache();
     const start: AgentEvent = {
       type: "session_start",
       sessionId: created.id,
@@ -386,6 +388,7 @@ export const agentRoutes = new Hono()
     await disposeRuntimeSession(id);
     const session = resolvedSession ?? await getSession(projectPath, id);
     await deleteSession(projectPath, id);
+    invalidateSessionListCache();
     if (session?.meta.gittrixSessionId) {
       try {
         const project = getProjectById(session.meta.projectId);

@@ -33,7 +33,21 @@ function mustProject(projectPath?: string) {
   return fallback ? { path: fallback } : null;
 }
 
+// 10s cache for the cross-project session listing. Invalidated on
+// create/delete/fork so stale data never surfaces — the cache only saves
+// redundant disk reads during rapid polling.
+const SCOPE_ALL_CACHE_TTL_MS = 10_000;
+let scopeAllCache: { at: number; value: SessionMeta[] } | null = null;
+
+export function invalidateSessionListCache() {
+  scopeAllCache = null;
+}
+
 async function listSessionsAcrossProjects() {
+  if (scopeAllCache && Date.now() - scopeAllCache.at < SCOPE_ALL_CACHE_TTL_MS) {
+    return scopeAllCache.value;
+  }
+
   const paths = new Set<string>();
   const currentProject = mustProject();
   if (currentProject?.path) paths.add(currentProject.path);
@@ -45,7 +59,7 @@ async function listSessionsAcrossProjects() {
     if (recent.path) paths.add(recent.path);
   }
 
-  const merged = new Map<string, Awaited<ReturnType<typeof listSessions>>[number]>();
+  const merged = new Map<string, SessionMeta>();
   for (const projectPath of paths) {
     const sessions = await listSessions(projectPath);
     for (const session of sessions) {
@@ -54,7 +68,9 @@ async function listSessionsAcrossProjects() {
     }
   }
 
-  return [...merged.values()].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+  const value = [...merged.values()].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+  scopeAllCache = { at: Date.now(), value };
+  return value;
 }
 
 async function durableDirtyFiles(projectPath: string) {
@@ -84,15 +100,36 @@ export const sessionsRoutes = new Hono()
     const scope = c.req.query("scope");
     const startedAt = performance.now();
     const projectCount = listRegisteredProjects().length;
-    let result: Awaited<ReturnType<typeof listSessions>> | Awaited<ReturnType<typeof listSessionsAcrossProjects>>;
+
     if (scope === "all") {
-      result = await listSessionsAcrossProjects();
-    } else {
-      const project = mustProject(c.req.query("projectPath"));
-      result = project ? await listSessions(project.path) : [];
+      const all = await listSessionsAcrossProjects();
+      const total = all.length;
+
+      // Paginate only when limit/offset are explicitly provided. Without them,
+      // return the full array (backward compatible with the frontend picker
+      // which expects a flat array).
+      const hasLimit = c.req.query("limit") !== undefined;
+      const hasOffset = c.req.query("offset") !== undefined;
+      let sessions = all;
+      if (hasLimit || hasOffset) {
+        const limitParam = Number(c.req.query("limit") ?? "50");
+        const offsetParam = Number(c.req.query("offset") ?? "0");
+        const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 200) : 50;
+        const offset = Number.isFinite(offsetParam) && offsetParam >= 0 ? Math.floor(offsetParam) : 0;
+        sessions = all.slice(offset, offset + limit);
+      }
+
+      const latencyMs = Math.round(performance.now() - startedAt);
+      log("server", "session-list fetched", { scope: "all", projectCount, sessionCount: total, latencyMs });
+      c.header("X-Total-Count", String(total));
+      c.header("X-Has-More", String(hasLimit || hasOffset ? (sessions.length < total) : false));
+      return c.json(sessions);
     }
+
+    const project = mustProject(c.req.query("projectPath"));
+    const result = project ? await listSessions(project.path) : [];
     const latencyMs = Math.round(performance.now() - startedAt);
-    log("server", "session-list fetched", { scope: scope ?? "project", projectCount, sessionCount: result.length, latencyMs });
+    log("server", "session-list fetched", { scope: "project", projectCount, sessionCount: result.length, latencyMs });
     return c.json(result);
   })
   .get("/:id", async (c) => {
@@ -118,6 +155,7 @@ export const sessionsRoutes = new Hono()
     if (!project) return c.json(routeError("no project open", "NO_PROJECT_OPEN"), 400);
     const forked = await forkSession(project.path, c.req.param("id"));
     if (!forked) return c.json(routeError("not found", "SESSION_NOT_FOUND"), 404);
+    invalidateSessionListCache();
     return c.json(forked.meta, 201);
   })
   .delete("/:id", async (c) => {
@@ -128,6 +166,7 @@ export const sessionsRoutes = new Hono()
     abortRunningTurn(id);
     await disposeRuntimeSession(id);
     await deleteSession(projectPath, id);
+    invalidateSessionListCache();
     if (doc?.meta.gittrixSessionId) {
       try {
         const project = getProjectById(doc.meta.projectId);
