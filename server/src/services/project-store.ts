@@ -97,9 +97,44 @@ export function listRegisteredProjects() {
   return [...store.projectsById.values()];
 }
 
-export function setProjectOverride(projectId: string, override: ProjectOverride) {
-  const next = { ...(store.projectOverrides.get(projectId) ?? {}), ...override };
-  store.projectOverrides.set(projectId, next);
+const OVERRIDES_FILE = "project-overrides.json";
+
+function pruneOverride(override: ProjectOverride): ProjectOverride {
+  const next: ProjectOverride = {};
+  if (override.provider) next.provider = override.provider;
+  if (override.model) next.model = override.model;
+  return next;
+}
+
+async function persistOverrides() {
+  const record: Record<string, ProjectOverride> = {};
+  for (const [id, override] of store.projectOverrides) record[id] = override;
+  await writeAtomic(cfg(OVERRIDES_FILE), record);
+}
+
+// Load persisted per-project provider/model overrides into memory. Call once on boot.
+export async function loadProjectOverrides() {
+  const record = await readJson<Record<string, ProjectOverride>>(cfg(OVERRIDES_FILE), {});
+  store.projectOverrides.clear();
+  for (const [id, override] of Object.entries(record)) {
+    const pruned = pruneOverride(override ?? {});
+    if (pruned.provider || pruned.model) store.projectOverrides.set(id, pruned);
+  }
+}
+
+// Patch semantics: `undefined` leaves a field untouched, `null` or "" clears it.
+export async function setProjectOverride(
+  projectId: string,
+  patch: { provider?: string | null; model?: string | null }
+) {
+  const current = store.projectOverrides.get(projectId) ?? {};
+  const merged: ProjectOverride = { ...current };
+  if (patch.provider !== undefined) merged.provider = patch.provider || undefined;
+  if (patch.model !== undefined) merged.model = patch.model || undefined;
+  const next = pruneOverride(merged);
+  if (next.provider || next.model) store.projectOverrides.set(projectId, next);
+  else store.projectOverrides.delete(projectId);
+  await persistOverrides();
   return next;
 }
 

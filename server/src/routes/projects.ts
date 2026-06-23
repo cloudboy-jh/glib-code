@@ -10,10 +10,12 @@ import {
   registerProject,
   setCurrentProject,
   setProjectOverride,
+  getProjectOverride,
   getProjectById
 } from "../services/project-store";
 import { inspectRecentPath } from "../services/projects";
 import { getPiCapabilities } from "../services/pi-capabilities";
+import { getProvidersState } from "../services/settings-store";
 
 export const projectsRoutes = new Hono()
   .get("/recents", async (c) => c.json(await getRecents()))
@@ -96,11 +98,28 @@ export const projectsRoutes = new Hono()
     }
     return c.json({ ok: true, id: target?.id ?? id });
   })
+  .get("/:id/provider", async (c) => {
+    const id = c.req.param("id");
+    const project = getProjectById(id);
+    if (!project) return c.json({ ok: false, message: "project not found" }, 404);
+    const override = getProjectOverride(id);
+    const defaults = await getProvidersState();
+    return c.json({
+      ok: true,
+      id,
+      override: override ?? {},
+      defaults: { provider: defaults.defaultProvider, model: defaults.defaultModel },
+      effective: {
+        provider: override?.provider ?? defaults.defaultProvider,
+        model: override?.model ?? defaults.defaultModel
+      }
+    });
+  })
   .patch("/:id/provider", async (c) => {
     const id = c.req.param("id");
     const project = getProjectById(id);
     if (!project) return c.json({ ok: false, message: "project not found" }, 404);
-    const body = await c.req.json().catch(() => null) as { provider?: string; model?: string } | null;
+    const body = await c.req.json().catch(() => null) as { provider?: string | null; model?: string | null } | null;
     const capabilities = await getPiCapabilities();
     if (!capabilities.ok) return c.json({ ok: false, message: capabilities.error ?? "pi provider discovery failed" }, 503);
     if (body?.provider) {
@@ -110,6 +129,8 @@ export const projectsRoutes = new Hono()
         return c.json({ ok: false, message: "model not supported by provider" }, 400);
       }
     }
-    const next = setProjectOverride(id, { provider: body?.provider, model: body?.model });
+    // Pass provider/model through verbatim: undefined leaves a field untouched,
+    // null/"" clears it (handled in setProjectOverride).
+    const next = await setProjectOverride(id, { provider: body?.provider, model: body?.model });
     return c.json({ ok: true, id, override: next });
   });

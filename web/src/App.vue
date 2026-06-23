@@ -202,7 +202,11 @@
       :github-error="authState.githubError"
       :default-open-mode="settings.defaultOpenMode"
       :initial-tab="state.settingsTab"
+      :current-project-name="currentProject?.name"
+      :project-provider="projectProvider"
       @close="state.settingsOpen = false"
+      @project-override:pin="pinProjectToCurrentDefault"
+      @project-override:clear="clearProjectProviderOverride"
       @update:theme="updateTheme"
       @update:provider="updateDefaultProvider"
       @update:model="selectModel(settings.defaultProvider, $event)"
@@ -686,6 +690,13 @@ const DEMO_RECENTS: RecentEntry[] = [
 ];
 
 const currentProject = ref<{ id: string; name: string; branch: string; path: string } | null>(null);
+
+type ProjectProviderInfo = {
+  override: { provider?: string; model?: string };
+  defaults: { provider: string; model: string };
+  effective: { provider: string; model: string };
+};
+const projectProvider = ref<ProjectProviderInfo | null>(null);
 
 const recents = reactive<RecentEntry[]>([]);
 
@@ -1556,6 +1567,7 @@ async function hydrateSessions() {
 function openSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings' = 'Models') {
   state.settingsTab = tab;
   state.settingsOpen = true;
+  void loadProjectProvider();
 }
 
 async function handleOnboardingOpenSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings') {
@@ -2770,6 +2782,35 @@ async function selectModel(providerId: string, modelId: string) {
   settings.defaultProvider = saved.defaultProvider;
   settings.defaultModel = saved.defaultModel;
   state.modelPickerOpen = false;
+}
+
+async function loadProjectProvider() {
+  const project = currentProject.value;
+  if (!project) { projectProvider.value = null; return; }
+  try {
+    projectProvider.value = await apiGet<ProjectProviderInfo>(`/projects/${encodeURIComponent(project.id)}/provider`);
+  } catch {
+    projectProvider.value = null;
+  }
+}
+
+async function setProjectProviderOverride(patch: { provider?: string | null; model?: string | null }) {
+  const project = currentProject.value;
+  if (!project) return;
+  try {
+    await apiPatch(`/projects/${encodeURIComponent(project.id)}/provider`, patch);
+    await loadProjectProvider();
+  } catch {
+    // surface nothing; reload reconciles
+  }
+}
+
+function pinProjectToCurrentDefault() {
+  void setProjectProviderOverride({ provider: settings.defaultProvider, model: settings.defaultModel });
+}
+
+function clearProjectProviderOverride() {
+  void setProjectProviderOverride({ provider: null, model: null });
 }
 
 function openProviderAuth(providerId: string, modelId?: string) {

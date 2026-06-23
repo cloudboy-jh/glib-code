@@ -24,14 +24,6 @@ Keep `setCurrentProject` for desktop single-client convenience. Routes without `
 
 Frontend: update all API calls to include `projectPath` from `currentProject.value?.path`.
 
-### 3b. Persist project provider/model overrides
-
-`projectOverrides` Map (project-store.ts:30) is in-memory only. Persist to `<configDir>/project-overrides.json`. Load on boot.
-
-### 3c. Project-level provider/model override UX
-
-Backend `PATCH /api/projects/:id/provider` exists. Frontend needs: UI to set per-project provider/model, "Effective" label showing `override ?? default`, badge when override active.
-
 ### 3d. Project browsing beyond single-global
 
 With 3a done, frontend browses multiple projects without server tracking a global. Remove remaining single-project UI assumptions.
@@ -39,8 +31,8 @@ With 3a done, frontend browses multiple projects without server tracking a globa
 ### Verification
 - `bun run check && bun run build && bun test`
 - Manual: two browser tabs, different projects, no cross-contamination
-- Manual: project override persists across restart
-- Manual: effective provider/model label correct
+
+Note: 3b (persist overrides) and 3c (override UX) are done — see Done section. Only 3a/3d remain.
 
 ---
 
@@ -141,5 +133,6 @@ Session 5 (5a uses index prune from session 1, already done)
 ## Done
 - Session 1: session list polish, API contracts, path/fs tests, session-index prune
 - Session 2: diff workbench multi-file + per-file hunk selection (FileList checkboxes, HunkList, SelectionTray wired); widened startSessionFromDiff payload; SessionDiffOverlay file-list sidebar + focusFile refocus; FileTreeView path-click to open diff (via @pierre/trees onSelectionChange); extracted detailsDiffToUnifiedPatch to shared/src/diff/detailsToPatch.ts (server + web)
+- Session 3 (partial — 3b + 3c): persist per-project provider/model overrides to `<configDir>/project-overrides.json` with patch/clear semantics + boot load (`loadProjectOverrides`); `GET /api/projects/:id/provider` returns override/defaults/effective; Settings → Models "Project override" section (effective label, active badge, pin-current-default, clear); project-store persistence tests. 3a (eliminate global fallbacks) + 3d still pending.
 - Session 6: agent file tree wiring (classifyToolResult tree branch + export parity)
 - Onboarding tier 1+2+3: interactive signin cards, focus trap, readiness warnings, post-onboarding hint, corrupted flag file handling, update prompt z-index, docs update

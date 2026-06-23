@@ -42,6 +42,40 @@
               </div>
             </SectionShell>
 
+            <SectionShell
+              v-if="currentProjectName && projectProvider"
+              title="Project override"
+              :meta="projectOverrideActive ? 'Active' : 'Using default'"
+              aria-label="Project model override"
+            >
+              <div class="settings-row">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium">{{ currentProjectName }}</p>
+                  <p class="mt-0.5 truncate text-sm text-muted-foreground">
+                    Effective: {{ projectProvider.effective.provider }}/{{ projectProvider.effective.model }}
+                  </p>
+                  <p class="mt-0.5 text-[11px] text-muted-foreground">
+                    <span v-if="projectOverrideActive" class="text-primary">Pinned for this project</span>
+                    <span v-else>Inherits app default ({{ projectProvider.defaults.provider }}/{{ projectProvider.defaults.model }})</span>
+                  </p>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <UiButton
+                    v-if="projectOverrideActive"
+                    variant="outline"
+                    size="sm"
+                    @click="$emit('project-override:clear')"
+                  >Clear</UiButton>
+                  <UiButton
+                    variant="outline"
+                    size="sm"
+                    :disabled="projectProvider.effective.provider === settings.defaultProvider && projectProvider.effective.model === settings.defaultModel && projectOverrideActive"
+                    @click="$emit('project-override:pin')"
+                  >Pin current default</UiButton>
+                </div>
+              </div>
+            </SectionShell>
+
             <SectionShell title="Connected providers" :meta="`${connectedProviders.length} connected`" aria-label="Connected providers">
               <ProviderRow v-for="provider in connectedProviders" :key="provider.id" :provider="provider" :active="provider.id === settings.defaultProvider" @select="$emit('update:provider', provider.id)" @remove="$emit('provider:remove-auth', provider.id)" />
               <p v-if="connectedProviders.length === 0" class="px-4 py-4 text-sm text-muted-foreground">No connected providers yet.</p>
@@ -165,6 +199,12 @@ const props = defineProps<{
   githubError?: string;
   defaultOpenMode: 'diff' | 'session';
   initialTab?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance' | 'Keybindings';
+  currentProjectName?: string;
+  projectProvider?: {
+    override: { provider?: string; model?: string };
+    defaults: { provider: string; model: string };
+    effective: { provider: string; model: string };
+  } | null;
 }>();
 
 const emit = defineEmits<{
@@ -182,7 +222,13 @@ const emit = defineEmits<{
   'open-model-picker': [];
   'provider:add-auth': [providerId: string, apiKey: string];
   'provider:remove-auth': [providerId: string];
+  'project-override:pin': [];
+  'project-override:clear': [];
 }>();
+
+const projectOverrideActive = computed(() =>
+  Boolean(props.projectProvider?.override.provider || props.projectProvider?.override.model)
+);
 
 const tabs = ['Models', 'GitTrix', 'Editor', 'Appearance', 'Keybindings'] as const;
 const tab = ref<SettingsTab>(mapInitialTab(props.initialTab));
