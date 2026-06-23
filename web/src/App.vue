@@ -912,7 +912,9 @@ const paletteCommands = [
   { id: 'settings.open', label: 'Open settings' },
   { id: 'terminal.toggle', label: 'Toggle terminal drawer' },
   { id: 'session.new', label: 'Create new session' }
-];
+] as const;
+
+type PaletteCommand = { id: string; label: string; disabled?: boolean; disabledReason?: string };
 
 const activeSession = computed(() => sessions.find((s) => s.id === state.activeSessionId));
 
@@ -1018,9 +1020,23 @@ const diffThemeType = computed<'dark' | 'light'>(() => {
   return lightness <= 50 ? 'dark' : 'light';
 });
 
-const filteredPaletteCommands = computed(() => {
+const filteredPaletteCommands = computed<PaletteCommand[]>(() => {
   const q = forms.palette.trim().toLowerCase();
-  const options = paletteCommands.filter((c) => currentProject.value || c.id === 'picker.open');
+  const hasProject = Boolean(currentProject.value);
+  const hasAuthedProvider = providerCapabilities.providers.some((p) => p.hasAuth);
+
+  const withState: PaletteCommand[] = paletteCommands.map((c) => {
+    if (c.id === 'session.new' && !hasAuthedProvider) {
+      return { ...c, disabled: true, disabledReason: 'No authed providers — add a provider in Settings' };
+    }
+    if ((c.id === 'mode.diff' || c.id === 'mode.session') && !hasProject) {
+      return { ...c, disabled: true, disabledReason: 'No project open' };
+    }
+    return { ...c };
+  });
+
+  // `picker.open` always available; others shown (but possibly disabled) regardless of project state.
+  const options = withState;
   if (!q) return options;
   return options.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
 });
@@ -2736,6 +2752,11 @@ function runTerminal() {
 }
 
 function runPalette(id: string) {
+  const cmd = filteredPaletteCommands.value.find((c) => c.id === id);
+  if (cmd?.disabled) {
+    state.paletteOpen = false;
+    return;
+  }
   if (id === 'mode.diff' && currentProject.value) state.mode = 'diff';
   if (id === 'mode.session' && currentProject.value) state.mode = 'session';
   if (id === 'picker.open') {

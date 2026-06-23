@@ -272,7 +272,7 @@ function extractContentText(result: unknown): string {
   return "";
 }
 
-function classifyToolResult(result: unknown, isError: boolean) {
+function classifyToolResult(result: unknown, isError: boolean, input?: object) {
   const raw = redactSecrets(JSON.stringify(result ?? {}));
   const contentText = extractContentText(result);
   const text = contentText
@@ -311,7 +311,12 @@ function classifyToolResult(result: unknown, isError: boolean) {
   if (contentText) {
     const detailsDiff = (result as any)?.details?.diff;
     if (typeof detailsDiff === "string" && detailsDiff.trim()) {
-      const filePath = String((result as any)?.details?.filePath ?? "");
+      const filePath = String(
+        (result as any)?.details?.filePath
+        ?? (input as any)?.filePath
+        ?? (input as any)?.path
+        ?? ""
+      );
       const patch = detailsDiffToUnifiedPatch(detailsDiff, filePath);
       if (patch) {
         return {
@@ -578,7 +583,7 @@ function mapPiEvent(turnId: string, event: AgentSessionEvent | PiEvent): AgentEv
   }
   if (event.type === "tool_execution_end") {
     const toolCall = endToolCall(turnId, event);
-    const classified = classifyToolResult(event.result ?? {}, event.isError === true);
+    const classified = classifyToolResult(event.result ?? {}, event.isError === true, toolCall.input);
     return {
       type: "tool_call",
       turnId,

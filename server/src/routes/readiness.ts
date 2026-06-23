@@ -10,6 +10,18 @@ type Cached = {
 let cache: Cached | null = null;
 const TTL_MS = 30_000;
 
+// Version strings don't change during a process lifetime — cache them with a
+// long TTL so readiness recomputes only the provider/capability part on expiry.
+type VersionCache = {
+  at: number;
+  git: { ok: boolean; out: string; err: string };
+  pi: { ok: boolean; out: string; err: string };
+  gh: { ok: boolean; out: string; err: string };
+};
+
+let versionCache: VersionCache | null = null;
+const VERSION_TTL_MS = 3_600_000;
+
 async function run(cmd: string[]) {
   try {
     const proc = Bun.spawn({ cmd, stdout: "pipe", stderr: "pipe" });
@@ -22,14 +34,26 @@ async function run(cmd: string[]) {
   }
 }
 
+async function getVersionStrings(): Promise<VersionCache> {
+  if (versionCache && Date.now() - versionCache.at < VERSION_TTL_MS) {
+    return versionCache;
+  }
+  const [git, piVersion, gh] = await Promise.all([
+    run(["git", "--version"]),
+    run(["pi", "--version"]),
+    run(["gh", "--version"])
+  ]);
+  versionCache = { at: Date.now(), git, pi: piVersion, gh };
+  return versionCache;
+}
+
 export const readinessRoutes = new Hono().get("/", async (c) => {
   if (cache && Date.now() - cache.at < TTL_MS) {
     return c.json(cache.value);
   }
 
-  const git = await run(["git", "--version"]);
-  const piVersion = await run(["pi", "--version"]);
-  const gh = await run(["gh", "--version"]);
+  const versions = await getVersionStrings();
+  const { git, pi: piVersion, gh } = versions;
 
   const capabilities = await getPiCapabilities();
   const readyProviders = capabilities.providers.filter((p) => p.hasAuth).map((p) => p.id);

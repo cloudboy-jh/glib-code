@@ -3,7 +3,7 @@ import { appendEvents, deleteSession, forkSession, getSession, listSessions, pat
 import { fallbackProjectPath, getProjectById, getRecents, listRegisteredProjects } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
-import { logError } from "../lib/log";
+import { log, logError } from "../lib/log";
 import { getSettings } from "../services/settings-store";
 import { abortRunningTurn, broadcast, disposeRuntimeSession, getSessionStatsFromPi } from "../services/agent-runtime";
 import { exportSessionDoc, parseExportFormat } from "../services/session-export";
@@ -81,12 +81,19 @@ function dirtyFilesForSelector(files: string[], selector: { mode: "all" } | { mo
 
 export const sessionsRoutes = new Hono()
   .get("/", async (c) => {
-    if (c.req.query("scope") === "all") {
-      return c.json(await listSessionsAcrossProjects());
+    const scope = c.req.query("scope");
+    const startedAt = performance.now();
+    const projectCount = listRegisteredProjects().length;
+    let result: Awaited<ReturnType<typeof listSessions>> | Awaited<ReturnType<typeof listSessionsAcrossProjects>>;
+    if (scope === "all") {
+      result = await listSessionsAcrossProjects();
+    } else {
+      const project = mustProject(c.req.query("projectPath"));
+      result = project ? await listSessions(project.path) : [];
     }
-    const project = mustProject(c.req.query("projectPath"));
-    if (!project) return c.json([]);
-    return c.json(await listSessions(project.path));
+    const latencyMs = Math.round(performance.now() - startedAt);
+    log("server", "session-list fetched", { scope: scope ?? "project", projectCount, sessionCount: result.length, latencyMs });
+    return c.json(result);
   })
   .get("/:id", async (c) => {
     const requestedProjectPath = requiredProjectPath(c.req.query("projectPath"));

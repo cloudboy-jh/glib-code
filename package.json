@@ -15,6 +15,7 @@
     "build": "bun run --cwd shared build && bun run --cwd server build && bun run --cwd server bundle && bun run --cwd web build && bun run --cwd desktop build",
     "build:app": "bun run build && bun run --cwd desktop build:local",
     "build:app:win": "bun run build && bun run --cwd desktop build:local:win",
-    "check": "bun run --cwd shared check && bun run --cwd server check && bun run --cwd web check && bun run --cwd desktop check"
+    "check": "bun run --cwd shared check && bun run --cwd server check && bun run --cwd web check && bun run --cwd desktop check",
+    "test": "bun test shared server desktop && bun run --cwd web test"
   }
 }

@@ -11,18 +11,27 @@
       </div>
 
       <div class="max-h-[420px] overflow-auto p-2">
-        <button
+        <component
+          :is="c.disabled ? 'div' : 'button'"
           v-for="(c, i) in commands"
           :key="c.id"
+          :aria-disabled="c.disabled || undefined"
           :class="[
             'flex h-10 w-full items-center justify-between rounded-md border px-3 text-left text-sm transition',
-            i === highlightedIndex ? 'border-border bg-muted/80' : 'border-transparent hover:border-border/70 hover:bg-muted/55'
+            c.disabled
+              ? 'cursor-not-allowed border-transparent opacity-50'
+              : i === highlightedIndex
+                ? 'border-border bg-muted/80'
+                : 'border-transparent hover:border-border/70 hover:bg-muted/55'
           ]"
-          @click="$emit('run', c.id)"
+          @click="!c.disabled && $emit('run', c.id)"
         >
-          <span>{{ c.label }}</span>
+          <span class="flex flex-col gap-0.5">
+            <span>{{ c.label }}</span>
+            <span v-if="c.disabled && c.disabledReason" class="text-[11px] text-muted-foreground/80">{{ c.disabledReason }}</span>
+          </span>
           <span class="text-[11px] text-muted-foreground">{{ c.id }}</span>
-        </button>
+        </component>
 
         <div v-if="commands.length === 0" class="px-3 py-8 text-center text-sm text-muted-foreground">No matching commands</div>
       </div>
@@ -36,7 +45,7 @@ import UiDialog from '../ui/dialog.vue';
 withDefaults(
   defineProps<{
     query: string;
-    commands: Array<{ id: string; label: string }>;
+    commands: Array<{ id: string; label: string; disabled?: boolean; disabledReason?: string }>;
     highlightedIndex?: number;
   }>(),
   {

@@ -37,9 +37,8 @@ Add timing to `GET /api/sessions` + `scope=all`. Log route, scope, project count
 Done in Session 2 — `shared/src/diff/detailsToPatch.ts` now backs both server and web. Nothing left here.
 
 ### Verification
-- `bun run check && bun run build && bun test`
+- `bun run check && bun run build && bun run test`
 - Manual: no providers then palette disables `session.new`
-- Manual: turn timeout then timeline shows timeout
 - Manual: diff patch headers show real filenames
 
 ---
