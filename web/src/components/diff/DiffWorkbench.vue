@@ -93,11 +93,12 @@
           />
           
           <button
-            class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18"
+            class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18 disabled:opacity-40"
             :disabled="!state.files.length"
+            :title="hasDiffSelection ? `Start session scoped to ${selectionFileCount} file${selectionFileCount === 1 ? '' : 's'}${selectionHunkCount ? ` · ${selectionHunkCount} hunks` : ''}` : 'Start session from current file'"
             @click="emitStartSessionFromDiff"
           >
-            Start session from diff
+            Start session from diff{{ hasDiffSelection ? ` (${selectionFileCount}${selectionHunkCount ? `/${selectionHunkCount}h` : ''})` : '' }}
           </button>
           <button
             class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
@@ -119,9 +120,19 @@
 
             <div v-if="fileMenuOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-4" @click.self="fileMenuOpen = false">
               <div class="flex max-h-[min(72vh,560px)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
-                <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
-                  <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
-                  <div class="text-[11px] text-muted-foreground">{{ state.files.length }} files</div>
+                <div class="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2">
+                  <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select files</div>
+                  <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>{{ state.selectedFiles.length }} of {{ state.files.length }} scoped</span>
+                    <button
+                      type="button"
+                      class="h-6 rounded border border-border/70 px-2 text-[10px] hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+                      :disabled="!state.files.length"
+                      @click="toggleAllFiles"
+                    >
+                      {{ allFilesSelected ? 'Clear' : 'Select all' }}
+                    </button>
+                  </div>
                 </div>
 <div class="min-h-0 overflow-auto p-1">
                   <div
@@ -132,6 +143,15 @@
                       file.path === state.selectedFilePath ? 'bg-primary/20' : ''
                     ]"
                   >
+                    <button
+                      type="button"
+                      class="inline-grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px]"
+                      :class="state.selectedFiles.includes(file.path) ? 'border-primary/70 bg-primary/20 text-primary' : 'border-border/80 text-transparent'"
+                      :title="state.selectedFiles.includes(file.path) ? 'Remove from session scope' : 'Add to session scope'"
+                      @click.stop="toggleFileSelection(file.path)"
+                    >
+                      ✓
+                    </button>
                     <button
                       type="button"
                       :class="[
@@ -261,11 +281,31 @@
           <span class="truncate">{{ state.selectedFilePath || 'No file selected' }}</span>
         </div>
 
-        <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
+        <div class="grid gap-3 lg:grid-cols-[1fr_280px]">
+          <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
+          <HunkList
+            v-if="state.selectedFilePath"
+            :hunks="currentHunks"
+            :selected-ids="currentHunkSelection"
+            :loading="state.hunksLoading"
+            :error="state.hunksError"
+            @toggle="toggleHunkSelection"
+            @toggle-all="toggleAllHunksForFile"
+          />
+        </div>
 
         <div v-if="isCommitView && state.selectedCommitRef" class="mt-3">
           <button class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground" @click="loadCommitDetail">View commit detail</button>
         </div>
+
+        <SelectionTray
+          v-if="hasDiffSelection"
+          class="mt-3"
+          :file-count="selectionFileCount"
+          :hunk-count="selectionHunkCount"
+          @clear="clearDiffSelection"
+          @new="emitStartSessionFromDiff"
+        />
       </section>
     </template>
 
@@ -294,6 +334,8 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ChevronDown, CornerDownLeft, GitCommitHorizontal } from 'lucide-vue-next';
 import DiffView from '../shared/DiffView.vue';
 import OpenInEditor from '../shared/OpenInEditor.vue';
+import HunkList from './HunkList.vue';
+import SelectionTray from './SelectionTray.vue';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
 import diffsWordmark from '../../../../assets/diffs-glibiconmain.png';
 
@@ -327,9 +369,11 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:diffStyle': [value: 'split' | 'unified'];
   openProjects: [];
-  startSessionFromDiff: [payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string }];
+  startSessionFromDiff: [payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }> }];
   openSettings: [];
 }>();
+
+type DiffHunk = { id: string; header: string; startLine: number };
 
 const state = reactive({
   phase: 'history' as 'history' | 'open',
@@ -347,7 +391,12 @@ const state = reactive({
   pendingAction: '',
   historyError: '',
   commitDetailOpen: false,
-  commitDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> }
+  commitDetail: null as null | { sha: string; authorName: string; authorEmail: string; date: string; subject: string; body: string; files: Array<{ path: string; status: string }> },
+  selectedFiles: [] as string[],
+  selectedHunksByFile: {} as Record<string, Set<string>>,
+  hunksByFile: {} as Record<string, DiffHunk[]>,
+  hunksLoading: false,
+  hunksError: ''
 });
 
 const gitMeta = reactive({
@@ -414,6 +463,24 @@ const diffStats = computed(() => ({
   deletions: (state.patch.match(/^-[^-]/gm) ?? []).length
 }));
 const truncationCount = computed(() => Number(state.patch.match(/diff truncated \((\d+) lines hidden\)/)?.[1] ?? 0));
+
+const currentHunks = computed<DiffHunk[]>(() => state.hunksByFile[state.selectedFilePath] ?? []);
+const currentHunkSelection = computed(() => state.selectedHunksByFile[state.selectedFilePath] ?? new Set<string>());
+
+const selectionFileCount = computed(() => {
+  const files = new Set(state.selectedFiles);
+  for (const file of Object.keys(state.selectedHunksByFile)) {
+    if (state.selectedHunksByFile[file]?.size) files.add(file);
+  }
+  return files.size;
+});
+
+const selectionHunkCount = computed(() =>
+  Object.values(state.selectedHunksByFile).reduce((total, ids) => total + (ids?.size ?? 0), 0)
+);
+
+const hasDiffSelection = computed(() => selectionFileCount.value > 0 || selectionHunkCount.value > 0);
+const allFilesSelected = computed(() => state.files.length > 0 && state.selectedFiles.length === state.files.length);
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);
@@ -666,7 +733,9 @@ async function openSelectedCommit() {
   state.phase = 'open';
   state.openSource = 'commit';
   state.selectedCommitRef = state.items[state.cursor]?.ref ?? state.selectedCommitRef;
+  resetDiffSelection();
   await loadFilesAndPatch();
+  await loadHunksForSelectedFile();
 }
 
 async function openWorkingTree(preferredFiles: string[] = []) {
@@ -674,6 +743,7 @@ async function openWorkingTree(preferredFiles: string[] = []) {
   clearGitMessage();
   state.phase = 'open';
   state.openSource = 'uncommitted';
+  resetDiffSelection();
   await loadFilesAndPatch();
   if (preferredFiles.length && state.files.length) {
     state.files = prioritizeFiles(state.files, preferredFiles);
@@ -684,6 +754,7 @@ async function openWorkingTree(preferredFiles: string[] = []) {
       await loadFilesAndPatch();
     }
   }
+  await loadHunksForSelectedFile();
   await loadGitStatus();
 }
 
@@ -702,7 +773,9 @@ async function applyOpenRequest(request?: { token: number; mode: 'session' | 'hi
     state.selectedCommitRef = request.commitRef;
     state.openSource = 'commit';
     state.phase = 'open';
+    resetDiffSelection();
     await loadFilesAndPatch();
+    await loadHunksForSelectedFile();
     return;
   }
   if (request.mode === 'uncommitted') {
@@ -779,10 +852,79 @@ function menuCheckout(create: boolean) {
   void checkoutRef(create);
 }
 
+async function loadHunksForSelectedFile() {
+  const file = state.selectedFilePath;
+  if (!file) return;
+  if (state.hunksByFile[file]) return;
+  state.hunksError = '';
+  state.hunksLoading = true;
+  try {
+    const source = state.openSource === 'commit' ? 'commits' : 'uncommitted';
+    const params = new URLSearchParams({ source, file, projectPath: props.currentProject.path });
+    if (source === 'commits' && state.selectedCommitRef) params.set('ref', state.selectedCommitRef);
+    const rows = await apiGet<Array<{ header: string; startLine: number }>>(`/diff/hunks?${params.toString()}`);
+    state.hunksByFile[file] = rows.map((row) => ({ id: `${file}:${row.startLine}`, header: row.header, startLine: row.startLine }));
+  } catch (error) {
+    state.hunksError = error instanceof Error ? error.message : 'Failed to load hunks';
+    state.hunksByFile[file] = [];
+  } finally {
+    state.hunksLoading = false;
+  }
+}
+
+function toggleFileSelection(path: string) {
+  state.selectedFiles = state.selectedFiles.includes(path)
+    ? state.selectedFiles.filter((entry) => entry !== path)
+    : [...state.selectedFiles, path];
+}
+
+function toggleAllFiles() {
+  state.selectedFiles = allFilesSelected.value ? [] : state.files.map((file) => file.path);
+}
+
+function toggleHunkSelection(hunkId: string) {
+  const file = state.selectedFilePath;
+  if (!file) return;
+  const current = new Set(state.selectedHunksByFile[file] ?? []);
+  if (current.has(hunkId)) current.delete(hunkId);
+  else current.add(hunkId);
+  if (current.size) state.selectedHunksByFile[file] = current;
+  else delete state.selectedHunksByFile[file];
+}
+
+function toggleAllHunksForFile() {
+  const file = state.selectedFilePath;
+  if (!file) return;
+  const hunks = state.hunksByFile[file] ?? [];
+  const current = state.selectedHunksByFile[file];
+  if (current && current.size === hunks.length) {
+    delete state.selectedHunksByFile[file];
+    return;
+  }
+  state.selectedHunksByFile[file] = new Set(hunks.map((hunk) => hunk.id));
+}
+
+function clearDiffSelection() {
+  state.selectedFiles = [];
+  state.selectedHunksByFile = {};
+}
+
+function collectSelectedHunks() {
+  const hunks: Array<{ id: string; file: string; header: string; startLine: number }> = [];
+  for (const [file, ids] of Object.entries(state.selectedHunksByFile)) {
+    const fileHunks = state.hunksByFile[file] ?? [];
+    for (const hunk of fileHunks) {
+      if (ids.has(hunk.id)) hunks.push({ id: hunk.id, file, header: hunk.header, startLine: hunk.startLine });
+    }
+  }
+  return hunks;
+}
+
 async function selectFile(path: string) {
   if (state.selectedFilePath === path) return;
   state.selectedFilePath = path;
   await loadFilesAndPatch();
+  await loadHunksForSelectedFile();
 }
 
 async function selectFileFromMenu(path: string) {
@@ -836,11 +978,18 @@ async function openInEditor(editor: string) {
 }
 
 function emitStartSessionFromDiff() {
-  const payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string } = {
+  const payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }> } = {
     source: state.openSource
   };
   if (state.openSource === 'commit' && state.selectedCommitRef) payload.ref = state.selectedCommitRef;
-  if (state.selectedFilePath) payload.file = state.selectedFilePath;
+
+  const hunks = collectSelectedHunks();
+  if (state.selectedFiles.length) payload.files = [...state.selectedFiles];
+  if (hunks.length) payload.hunks = hunks;
+
+  if (!payload.files?.length && !payload.hunks?.length && state.selectedFilePath) {
+    payload.file = state.selectedFilePath;
+  }
   emit('startSessionFromDiff', payload);
 }
 
@@ -855,7 +1004,16 @@ async function resetForProject() {
   state.selectedFilePath = '';
   state.files = [];
   state.patch = '';
+  resetDiffSelection();
   await loadHistory();
+}
+
+function resetDiffSelection() {
+  state.selectedFiles = [];
+  state.selectedHunksByFile = {};
+  state.hunksByFile = {};
+  state.hunksError = '';
+  state.hunksLoading = false;
 }
 
 watch(() => props.currentProject.path, () => {

@@ -4,50 +4,6 @@ Remaining work on glib-code. Sessions 1 and 6 are done. Grounded in actual codeb
 
 ---
 
-## Session 2 — Diff workbench + hunk selection + file tree
-
-Frontend-heavy. The data model for hunks/multi-file already exists end-to-end. Only the producer UI is missing. May split into 2a/2b.
-
-### 2a. Widen DiffWorkbench emit + multi-file selection
-
-- `DiffWorkbench.vue:330` emits `{ source; ref?; file? }`. Widen to include `files?: string[]` and `hunks?`.
-- File picker dropdown (DiffWorkbench.vue:109-176) only single-select. Add checkboxes, `selectedFiles` state.
-- `emitStartSessionFromDiff()` (DiffWorkbench.vue:838-845) sends `files` array.
-
-### 2b. Hunk selection UI
-
-- `DiffView.vue` (shared, 139 lines) is purely presentational. Add `@hunk-toggle` emit on `@@` header click.
-- `DiffWorkbench.vue` tracks `selectedHunksByFile`.
-- Selected hunks highlighted, unselected dimmed.
-- Same pattern in promote dialog (`App.vue:334-456`). Currently file-level checkboxes only. Add hunk-level via `MultiDiffView` or new `SelectableMultiDiffView`.
-
-### 2c. sessionDiff.focusFile to pierre file navigation
-
-`SessionDiffOverlay.vue:149-159` only sets `selectedIndex`. Add DOM-level scroll to file header (`diff --git a/<file>`) via `scrollIntoView()`.
-
-### 2d. SessionDiffOverlay file list sidebar
-
-Split/unified toggle exists (lines 59-68). Missing: persistent file list sidebar. Add left sidebar listing `filePatches` with click-to-select.
-
-### 2e. File tree click-to-open-diff
-
-`FileTreeView.vue` has no click handlers, no emits. Add DOM-level click listener on `containerRef` mapping rows to paths. New `@path-click` emit. Wire in `Timeline.vue:114-121`.
-
-Risk: `@pierre/trees` may not expose row DOM with path attributes. Inspect rendered HTML structure first.
-
-### 2f. Extract detailsDiffToUnifiedPatch to shared/
-
-Server: `agent-runtime.ts:274-324`. Web: `App.vue:1255-1311`. Create `shared/src/diff/detailsToPatch.ts`. Align the `|| "file"` fallback divergence.
-
-### Verification
-- `bun run check && bun run build`
-- Manual: select hunks then start session then confirm chips
-- Manual: select hunks in promote then promote then confirm scoped
-- Manual: `-N +N` badge scrolls overlay to file
-- Manual: file tree click opens diff
-
----
-
 ## Session 3 — Project scope model fix
 
 Architectural. The server's `currentProjectId` is a module-level singleton (`project-store.ts:33-37`). Highest leverage, highest risk.
@@ -118,7 +74,7 @@ Add timing to `GET /api/sessions` + `scope=all`. Log route, scope, project count
 
 ### 4g. Extract detailsDiffToUnifiedPatch to shared/
 
-If not done in Session 2f, do here.
+Done in Session 2 — `shared/src/diff/detailsToPatch.ts` now backs both server and web. Nothing left here.
 
 ### Verification
 - `bun run check && bun run build && bun test`
@@ -173,21 +129,17 @@ Only free-text checkout input exists (DiffWorkbench.vue:226-237). `GET /git/bran
 ## Dependencies
 
 ```
-Session 2 (no deps, benefits from shared/ extract in 2f)
-   |
-   ├──► Session 4 (4g = 2f; 4f same area)
-   |
-   ├──► Session 5 (5a uses index prune from session 1, already done)
-   |
-   └──► Session 3 (independent, can run any time)
+Session 3 (independent, can run any time)
+Session 4 (4g done in Session 2; 4f shares the classifyToolResult area)
+Session 5 (5a uses index prune from session 1, already done)
 ```
 
-- Session 2 should run next (no deps).
-- Session 3 is independent, can run in parallel with 2.
-- Session 4 should follow 2 and 3.
-- Session 5 should follow 2 (uses shared patterns).
+- Session 3 is independent and can run next.
+- Session 4 follows 3.
+- Session 5 reuses the shared diff patterns from Session 2.
 
 ## Done
 - Session 1: session list polish, API contracts, path/fs tests, session-index prune
+- Session 2: diff workbench multi-file + per-file hunk selection (FileList checkboxes, HunkList, SelectionTray wired); widened startSessionFromDiff payload; SessionDiffOverlay file-list sidebar + focusFile refocus; FileTreeView path-click to open diff (via @pierre/trees onSelectionChange); extracted detailsDiffToUnifiedPatch to shared/src/diff/detailsToPatch.ts (server + web)
 - Session 6: agent file tree wiring (classifyToolResult tree branch + export parity)
 - Onboarding tier 1+2+3: interactive signin cards, focus trap, readiness warnings, post-onboarding hint, corrupted flag file handling, update prompt z-index, docs update

@@ -1,4 +1,5 @@
 import type { AgentEvent, TokenUsage } from "@glib-code/shared/events/agent";
+import { detailsDiffToUnifiedPatch } from "@glib-code/shared/diff/detailsToPatch";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import { getPiCore, validateProviderAuth } from "./pi-core";
 import { attachPiRpc } from "./pi-rpc";
@@ -269,58 +270,6 @@ function extractContentText(result: unknown): string {
     return content.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\n");
   }
   return "";
-}
-
-function detailsDiffToUnifiedPatch(diff: string, filePath: string): string {
-  const lines = diff.split("\n");
-  const hunks: string[] = [];
-  let oldLine = 1;
-  let newLine = 1;
-  let hunkOldStart = -1;
-  let hunkNewStart = -1;
-  const hunkLines: string[] = [];
-
-  function flushHunk() {
-    if (!hunkLines.length) return;
-    const addCount = hunkLines.filter((l) => l.startsWith("+")).length;
-    const delCount = hunkLines.filter((l) => l.startsWith("-")).length;
-    const ctxCount = hunkLines.filter((l) => l.startsWith(" ")).length;
-    hunks.push(`@@ -${hunkOldStart},${ctxCount + delCount} +${hunkNewStart},${ctxCount + addCount} @@`);
-    hunks.push(...hunkLines);
-    hunkLines.length = 0;
-    hunkOldStart = -1;
-    hunkNewStart = -1;
-  }
-
-  for (const rawLine of lines) {
-    if (/^\s*\.\.\./.test(rawLine)) continue;
-    const addMatch = rawLine.match(/^\+\s*(\d+) (.*)$/);
-    const delMatch = rawLine.match(/^-\s*(\d+) (.*)$/);
-    const ctxMatch = rawLine.match(/^\s{2}(\d+) (.*)$/);
-    if (addMatch) {
-      const lineNum = Number(addMatch[1]);
-      if (hunkOldStart < 0) { hunkOldStart = oldLine; hunkNewStart = lineNum; }
-      hunkLines.push(`+${addMatch[2]}`);
-      newLine = lineNum + 1;
-    } else if (delMatch) {
-      const lineNum = Number(delMatch[1]);
-      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = newLine; }
-      hunkLines.push(`-${delMatch[2]}`);
-      oldLine = lineNum + 1;
-    } else if (ctxMatch) {
-      const lineNum = Number(ctxMatch[1]);
-      if (hunkLines.length && lineNum > oldLine + 1 && lineNum > newLine + 1) flushHunk();
-      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = lineNum; }
-      hunkLines.push(` ${ctxMatch[2]}`);
-      oldLine = lineNum + 1;
-      newLine = lineNum + 1;
-    }
-  }
-  flushHunk();
-
-  if (!hunks.length) return "";
-  const fname = (filePath || "file").replace(/\\/g, "/");
-  return `diff --git a/${fname} b/${fname}\n--- a/${fname}\n+++ b/${fname}\n${hunks.join("\n")}`;
 }
 
 function classifyToolResult(result: unknown, isError: boolean) {

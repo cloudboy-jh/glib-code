@@ -68,11 +68,33 @@
           </div>
         </div>
       </template>
-      <div class="min-h-0 flex-1 overflow-hidden p-3">
-        <div v-if="loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
-        <div v-else-if="error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">{{ error }}</div>
-        <div v-else-if="!diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
-        <DiffView v-else-if="filePatches.length > 0" :patch="filePatches[selectedIndex]?.patch ?? ''" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
+      <div class="flex min-h-0 flex-1 overflow-hidden">
+        <aside
+          v-if="!loading && !error && filePatches.length > 0"
+          class="hidden w-[240px] shrink-0 flex-col overflow-hidden border-r border-border/70 bg-background/35 md:flex"
+        >
+          <div class="shrink-0 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Files</div>
+          <div class="min-h-0 flex-1 overflow-auto px-2 pb-2">
+            <button
+              v-for="(entry, idx) in filePatches"
+              :key="entry.file"
+              :class="[
+                'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] transition-colors',
+                idx === selectedIndex ? 'bg-primary/18 text-primary' : 'text-foreground/90 hover:bg-muted/60'
+              ]"
+              :title="entry.file"
+              @click="selectFile(idx)"
+            >
+              <span class="min-w-0 flex-1 truncate font-mono">{{ entry.file }}</span>
+            </button>
+          </div>
+        </aside>
+        <div class="min-h-0 flex-1 overflow-hidden p-3">
+          <div v-if="loading" class="grid h-full place-items-center text-sm text-muted-foreground">Loading diff…</div>
+          <div v-else-if="error" class="grid h-full place-items-center rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center text-sm text-red-100">{{ error }}</div>
+          <div v-else-if="!diff.trim()" class="grid h-full place-items-center rounded-lg border border-border/70 text-sm text-muted-foreground">No session changes.</div>
+          <DiffView v-else-if="filePatches.length > 0" :patch="filePatches[selectedIndex]?.patch ?? ''" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
+        </div>
       </div>
     </div>
   </div>
@@ -146,16 +168,25 @@ function selectFile(index: number) {
   selectedIndex.value = Math.max(0, Math.min(index, filePatches.value.length - 1));
 }
 
+function focusSelectedFile() {
+  if (props.focusFile && filePatches.value.length) {
+    const idx = filePatches.value.findIndex((f) => f.file === props.focusFile);
+    selectedIndex.value = idx >= 0 ? idx : 0;
+  } else {
+    selectedIndex.value = 0;
+  }
+}
+
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
-    if (props.focusFile && filePatches.value.length) {
-      const idx = filePatches.value.findIndex((f) => f.file === props.focusFile);
-      selectedIndex.value = idx >= 0 ? idx : 0;
-    } else {
-      selectedIndex.value = 0;
-    }
+    focusSelectedFile();
     fileMenuOpen.value = false;
   }
+});
+
+// Refocus when the requested file changes while the overlay is already open.
+watch(() => props.focusFile, () => {
+  if (props.open) focusSelectedFile();
 });
 
 watch(filePatches, () => {

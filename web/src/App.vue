@@ -530,6 +530,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch, onBeforeUnmount } from 'vue';
 import type { AgentEvent } from '@glib-code/shared/events/agent';
+import { detailsDiffToUnifiedPatch } from '@glib-code/shared/diff/detailsToPatch';
 import CommandPalette from './components/app/CommandPalette.vue';
 import FirstLaunchOverlay from './components/app/FirstLaunchOverlay.vue';
 import UpdatePrompt from './components/app/UpdatePrompt.vue';
@@ -1277,69 +1278,6 @@ function stripMarkdownArtifacts(value: string) {
     .replace(/^\s*[-*+]\s+/gm, '')
     .replace(/^\s*\d+\.\s+/gm, '')
     .trim();
-}
-
-// Convert the server's line-number diff format to unified patch format for pierre.
-// Input lines look like:
-//   "  1 context line"   → context
-//   "+ 3 added line"     → addition
-//   "- 3 removed line"   → deletion
-function detailsDiffToUnifiedPatch(diff: string, filePath: string): string {
-  const lines = diff.split('\n');
-  const hunks: string[] = [];
-  let oldLine = 1;
-  let newLine = 1;
-  let hunkOldStart = -1;
-  let hunkNewStart = -1;
-  const hunkLines: string[] = [];
-
-  function flushHunk() {
-    if (!hunkLines.length) return;
-    const addCount = hunkLines.filter((l) => l.startsWith('+')).length;
-    const delCount = hunkLines.filter((l) => l.startsWith('-')).length;
-    const ctxCount = hunkLines.filter((l) => l.startsWith(' ')).length;
-    hunks.push(`@@ -${hunkOldStart},${ctxCount + delCount} +${hunkNewStart},${ctxCount + addCount} @@`);
-    hunks.push(...hunkLines);
-    hunkLines.length = 0;
-    hunkOldStart = -1;
-    hunkNewStart = -1;
-  }
-
-  for (const raw of lines) {
-    // skip trailing ellipsis lines
-    if (/^\s*\.\.\./.test(raw)) continue;
-
-    const addMatch = raw.match(/^\+\s*(\d+) (.*)$/);
-    const delMatch = raw.match(/^-\s*(\d+) (.*)$/);
-    const ctxMatch = raw.match(/^\s{2}(\d+) (.*)$/);
-
-    if (addMatch) {
-      const lineNum = Number(addMatch[1]);
-      if (hunkOldStart < 0) { hunkOldStart = oldLine; hunkNewStart = lineNum; }
-      hunkLines.push(`+${addMatch[2]}`);
-      newLine = lineNum + 1;
-    } else if (delMatch) {
-      const lineNum = Number(delMatch[1]);
-      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = newLine; }
-      hunkLines.push(`-${delMatch[2]}`);
-      oldLine = lineNum + 1;
-    } else if (ctxMatch) {
-      const lineNum = Number(ctxMatch[1]);
-      // gap in context = flush previous hunk and start fresh
-      if (hunkLines.length && lineNum > oldLine + 1 && lineNum > newLine + 1) {
-        flushHunk();
-      }
-      if (hunkOldStart < 0) { hunkOldStart = lineNum; hunkNewStart = lineNum; }
-      hunkLines.push(` ${ctxMatch[2]}`);
-      oldLine = lineNum + 1;
-      newLine = lineNum + 1;
-    }
-  }
-  flushHunk();
-
-  if (!hunks.length) return '';
-  const fname = filePath.replace(/\\/g, '/');
-  return `diff --git a/${fname} b/${fname}\n--- a/${fname}\n+++ b/${fname}\n${hunks.join('\n')}`;
 }
 
 function parseDetailsDiff(rawOutput: string, filePath: string): string {

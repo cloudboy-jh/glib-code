@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./diff/detailsToPatch": "./src/diff/detailsToPatch.ts",
     "./events/agent": "./src/events/agent.ts",
     "./schemas/readiness": "./src/schemas/readiness.ts",
     "./theme/presets": "./src/theme/presets.ts"

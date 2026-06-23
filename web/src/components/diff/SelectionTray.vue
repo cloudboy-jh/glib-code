@@ -6,8 +6,8 @@
         <div class="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           <span>{{ fileCount }} files</span>
           <span>{{ hunkCount }} hunks</span>
-          <span>{{ additions }} additions</span>
-          <span>{{ deletions }} deletions</span>
+          <span v-if="additions">{{ additions }} additions</span>
+          <span v-if="deletions">{{ deletions }} deletions</span>
           <span v-if="truncationCount">{{ truncationCount }} truncated lines</span>
         </div>
       </div>
@@ -35,8 +35,8 @@
 defineProps<{
   fileCount: number;
   hunkCount: number;
-  additions: number;
-  deletions: number;
+  additions?: number;
+  deletions?: number;
   truncationCount?: number;
 }>();
 

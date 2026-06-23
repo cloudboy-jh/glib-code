@@ -23,6 +23,8 @@ const props = withDefaults(
   }
 );
 
+const emit = defineEmits<{ 'path-click': [path: string] }>();
+
 const containerRef = ref<HTMLElement | null>(null);
 let instance: FileTree | null = null;
 let lastPaths: string[] = [];
@@ -112,15 +114,23 @@ const treeCssVars = computed<Record<string, string>>(() => {
 });
 
 function createInstance(): FileTree {
-  return new FileTree({
+  const tree = new FileTree({
     paths: props.paths,
     gitStatus: gitStatusEntries(),
     density: 'compact',
     icons: { set: 'complete', colored: true },
     search: false,
     flattenEmptyDirectories: true,
-    initialExpansion: 'closed'
+    initialExpansion: 'closed',
+    onSelectionChange: (selectedPaths) => {
+      const path = selectedPaths[selectedPaths.length - 1];
+      if (!path) return;
+      // Only emit for files; selecting a directory just toggles expansion.
+      if (tree.getItem(path)?.isDirectory()) return;
+      emit('path-click', path);
+    }
   });
+  return tree;
 }
 
 async function mountOrRender() {

@@ -117,7 +117,7 @@
             :key="`tree-${tool.groupId}`"
             class="mt-1.5"
           >
-            <FileTreeView :paths="tool.treePaths!" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" :theme-type="themeType" />
+            <FileTreeView :paths="tool.treePaths!" :git-status="tool.treeGitStatus ?? {}" :theme-preset="themePreset" :theme-type="themeType" @path-click="$emit('openFileDiff', $event)" />
           </div>
         </div>
       </article>
