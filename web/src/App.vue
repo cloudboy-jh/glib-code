@@ -582,7 +582,7 @@ const RIGHT_RAIL_COLLAPSED_WIDTH = 64;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_MAX_WIDTH = 380;
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
-const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient();
+const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient(() => currentProject.value?.path ?? null);
 const demoMode = new URLSearchParams(window.location.search).get('demo');
 const isThemeCycleDemo = demoMode === 'theme-cycle';
 const isOnboardingDemo = demoMode === 'onboarding';

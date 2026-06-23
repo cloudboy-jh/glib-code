@@ -8,29 +8,38 @@ Remaining work on glib-code. Sessions 1 and 6 are done. Grounded in actual codeb
 
 Architectural. The server's `currentProjectId` is a module-level singleton (`project-store.ts:33-37`). Highest leverage, highest risk.
 
-### 3a. Eliminate silent global fallbacks
+### 3a. Eliminate silent global fallbacks — staged, not big-bang
 
-Make `projectPath` required on all routes that currently fall back to the global:
+Strategy: frontend always sends `projectPath` first (low risk), then backend honors it,
+then backend goes strict. Each step is its own commit + green check/build/test.
 
-- `routes/fs.ts:102,113,119` — `activeProjectPath()` to require `?projectPath=`
-- `routes/open.ts:115` — same
-- `routes/agent.ts:80` (`mustProject`) — require `projectPath` in body
-- `routes/sessions.ts:31` (`mustProject`) — require `?projectPath=`
-- `services/git.ts:7` (`activeRepo`) — require `projectPath` arg
-- `services/diff.ts:8` (`repoPath`) — require `projectPath` arg
-- `services/session-resolver.ts:15` (`currentProject()`) — require `projectPath` arg
+Step 1 — Frontend central injection (low risk):
+- `useApiClient`: inject `projectPath` into GET/DELETE query + POST/PATCH body when a
+  project context is present. Provide `currentProject.value?.path` to the client.
+- Ship while backend is still lenient; verify nothing breaks.
 
-Keep `setCurrentProject` for desktop single-client convenience. Routes without `projectPath` return 400.
+Step 2 — Backend honors `projectPath` first, global fallback retained (medium risk):
+- `services/git.ts` `activeRepo()`/`getGit()` — accept `projectPath?`, prefer arg.
+  Thread through every exported git fn (backs all `git-routes.ts`).
+- `services/diff.ts` `repoPath(projectPath?)` — already has fallback; verify callers pass it.
+- `routes/fs.ts` + `routes/open.ts` `activeProjectPath()` — read `?projectPath=` first.
+- `routes/sessions.ts` + `routes/agent.ts` `mustProject()` — accept `projectPath` first.
+- `services/session-resolver.ts` `currentProject()` — keep; callers prefer explicit path.
 
-Frontend: update all API calls to include `projectPath` from `currentProject.value?.path`.
+Step 3 — Flip to strict (highest risk):
+- Routes return 400 `PROJECT_PATH_REQUIRED` when `projectPath` absent AND no global set.
+  Keep global fallback only for desktop single-client path.
+- Update tests that rely on the global: `fs.test`, `session-routes.test`,
+  `git-routes.test`, `session-resolver.test` — pass `projectPath` explicitly.
 
 ### 3d. Project browsing beyond single-global
 
-With 3a done, frontend browses multiple projects without server tracking a global. Remove remaining single-project UI assumptions.
+Audit App.vue single-project assumptions (the `id || normalizedPath` fallback in
+`openProject`, session-list logic that ignores `projectPath`). Verify two-tab scenario.
 
 ### Verification
-- `bun run check && bun run build && bun test`
-- Manual: two browser tabs, different projects, no cross-contamination
+- `bun run check && bun run build && bun test` (server: `bun test server/src`; web: vitest)
+- Manual: two browser tabs, different projects, run agent + diff in each, no cross-contamination
 
 Note: 3b (persist overrides) and 3c (override UX) are done — see Done section. Only 3a/3d remain.
 
