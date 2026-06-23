@@ -2,14 +2,12 @@ import { Hono } from "hono";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve, dirname, basename } from "node:path";
 import { homedir } from "node:os";
-import { getCurrentProjectId, getProjectById } from "../services/project-store";
+import { fallbackProjectPath } from "../services/project-store";
 import { inRepo } from "../lib/paths";
 
 async function activeProjectPath(projectPath?: string) {
   if (projectPath && projectPath.trim()) return projectPath.trim();
-  const current = getCurrentProjectId();
-  if (!current) return null;
-  return getProjectById(current)?.path ?? null;
+  return fallbackProjectPath();
 }
 
 async function tree(path: string): Promise<any> {

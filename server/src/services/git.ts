@@ -1,15 +1,11 @@
 import { simpleGit } from "simple-git";
-import { getCurrentProjectId, getProjectById } from "./project-store";
+import { fallbackProjectPath } from "./project-store";
 
 const PROTECTED_PREFIX = ".glib/";
 
 function activeRepo(projectPath?: string) {
   if (projectPath && projectPath.trim()) return projectPath.trim();
-  const current = getCurrentProjectId();
-  if (!current) return null;
-  const project = getProjectById(current);
-  if (!project) return null;
-  return project.path;
+  return fallbackProjectPath();
 }
 
 function getGit(projectPath?: string) {

@@ -1,13 +1,11 @@
 import { simpleGit } from "simple-git";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getCurrentProjectId, getProjectById } from "./project-store";
+import { fallbackProjectPath } from "./project-store";
 
 function repoPath(projectPath?: string) {
-  if (projectPath) return projectPath;
-  const id = getCurrentProjectId();
-  if (!id) return null;
-  return getProjectById(id)?.path ?? null;
+  if (projectPath && projectPath.trim()) return projectPath.trim();
+  return fallbackProjectPath();
 }
 
 async function gitRaw(args: string[], projectPath?: string) {

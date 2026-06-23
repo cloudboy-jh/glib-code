@@ -72,13 +72,22 @@ async function makeGitTrixSession() {
 }
 
 describe("session routes projectPath resolution", () => {
-  test("GET /api/sessions defaults to current project scope", async () => {
+  test("GET /api/sessions scopes to the requested projectPath", async () => {
     await makeSession();
     const sessionB = await makeSessionB();
-    const res = await app.request("/api/sessions");
+    const res = await app.request(`/api/sessions?projectPath=${encodeURIComponent(repoB)}`);
     expect(res.status).toBe(200);
     const rows = await res.json() as Array<{ id: string }>;
     expect(rows.map((row) => row.id)).toEqual([sessionB.id]);
+  });
+
+  test("GET /api/sessions returns empty when project scope is ambiguous", async () => {
+    // Two projects registered, no projectPath => ambiguous, refuse to guess.
+    await makeSession();
+    await makeSessionB();
+    const res = await app.request("/api/sessions");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
   });
 
   test("GET /api/sessions?scope=all returns sessions across projects", async () => {

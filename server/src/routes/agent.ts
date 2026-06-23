@@ -3,7 +3,7 @@ import type { AgentEvent, TokenUsage } from "@glib-code/shared/events/agent";
 import { abortRunningTurn, broadcast, disposeRuntimeSession, getRunningTurn, onSessionInfoChanged, runTurn, subscribe } from "../services/agent-runtime";
 import { appendEvents, createSession, deleteSession, getSession, patchSessionMeta } from "../services/session-store";
 import { getProvidersState, getSettings } from "../services/settings-store";
-import { getCurrentProjectId, getProjectById, getProjectByPath, getProjectOverride } from "../services/project-store";
+import { fallbackProjectPath, getProjectById, getProjectByPath, getProjectOverride } from "../services/project-store";
 import { projectIdFromPath } from "../services/projects";
 import { requiredProjectPath, resolveAgentCwd, resolveSession } from "../services/session-resolver";
 import { getPiCapabilities } from "../services/pi-capabilities";
@@ -77,18 +77,18 @@ onSessionInfoChanged(async (sessionId, name) => {
   }
 });
 
+function projectForPath(path: string) {
+  const registered = getProjectByPath(path);
+  if (registered) return registered;
+  // Not registered (e.g. multi-tab opened elsewhere): synthesize a stable
+  // project so id-keyed lookups (overrides) and gittrix branch still work.
+  return { id: projectIdFromPath(path), name: path.split(/[\\/]/).pop() || path, path, branch: "main", isGitRepo: true as const };
+}
+
 function mustProject(projectPath?: string) {
-  if (projectPath && projectPath.trim()) {
-    const path = projectPath.trim();
-    const registered = getProjectByPath(path);
-    if (registered) return registered;
-    // Not registered (e.g. multi-tab opened elsewhere): synthesize a stable
-    // project so id-keyed lookups (overrides) and gittrix branch still work.
-    return { id: projectIdFromPath(path), name: path.split(/[\\/]/).pop() || path, path, branch: "main", isGitRepo: true as const };
-  }
-  const projectId = getCurrentProjectId();
-  if (!projectId) return null;
-  return getProjectById(projectId);
+  if (projectPath && projectPath.trim()) return projectForPath(projectPath.trim());
+  const fallback = fallbackProjectPath();
+  return fallback ? projectForPath(fallback) : null;
 }
 
 function sseEncode(event: AgentEvent) {

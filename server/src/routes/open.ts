@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { getSettings } from "../services/settings-store";
-import { getCurrentProjectId, getProjectById } from "../services/project-store";
+import { fallbackProjectPath } from "../services/project-store";
 import { getSessionById } from "../services/session-store";
 import { inRepo } from "../lib/paths";
 
@@ -21,9 +21,7 @@ type EditorId = typeof VALID_EDITORS[number];
 
 async function activeProjectPath(projectPath?: string) {
   if (projectPath && projectPath.trim()) return projectPath.trim();
-  const current = getCurrentProjectId();
-  if (!current) return null;
-  return getProjectById(current)?.path ?? null;
+  return fallbackProjectPath();
 }
 
 async function resolveOpenPath(

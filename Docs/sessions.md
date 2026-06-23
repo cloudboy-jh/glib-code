@@ -4,47 +4,6 @@ Remaining work on glib-code. Sessions 1 and 6 are done. Grounded in actual codeb
 
 ---
 
-## Session 3 — Project scope model fix
-
-Architectural. The server's `currentProjectId` is a module-level singleton (`project-store.ts:33-37`). Highest leverage, highest risk.
-
-### 3a. Eliminate silent global fallbacks — staged, not big-bang
-
-Strategy: frontend always sends `projectPath` first (low risk), then backend honors it,
-then backend goes strict. Each step is its own commit + green check/build/test.
-
-Step 1 — Frontend central injection (low risk):
-- `useApiClient`: inject `projectPath` into GET/DELETE query + POST/PATCH body when a
-  project context is present. Provide `currentProject.value?.path` to the client.
-- Ship while backend is still lenient; verify nothing breaks.
-
-Step 2 — Backend honors `projectPath` first, global fallback retained (medium risk):
-- `services/git.ts` `activeRepo()`/`getGit()` — accept `projectPath?`, prefer arg.
-  Thread through every exported git fn (backs all `git-routes.ts`).
-- `services/diff.ts` `repoPath(projectPath?)` — already has fallback; verify callers pass it.
-- `routes/fs.ts` + `routes/open.ts` `activeProjectPath()` — read `?projectPath=` first.
-- `routes/sessions.ts` + `routes/agent.ts` `mustProject()` — accept `projectPath` first.
-- `services/session-resolver.ts` `currentProject()` — keep; callers prefer explicit path.
-
-Step 3 — Flip to strict (highest risk):
-- Routes return 400 `PROJECT_PATH_REQUIRED` when `projectPath` absent AND no global set.
-  Keep global fallback only for desktop single-client path.
-- Update tests that rely on the global: `fs.test`, `session-routes.test`,
-  `git-routes.test`, `session-resolver.test` — pass `projectPath` explicitly.
-
-### 3d. Project browsing beyond single-global
-
-Audit App.vue single-project assumptions (the `id || normalizedPath` fallback in
-`openProject`, session-list logic that ignores `projectPath`). Verify two-tab scenario.
-
-### Verification
-- `bun run check && bun run build && bun test` (server: `bun test server/src`; web: vitest)
-- Manual: two browser tabs, different projects, run agent + diff in each, no cross-contamination
-
-Note: 3b (persist overrides) and 3c (override UX) are done — see Done section. Only 3a/3d remain.
-
----
-
 ## Session 4 — Capability gating + runtime hygiene
 
 Mixed frontend/backend. No architectural changes.
@@ -130,18 +89,19 @@ Only free-text checkout input exists (DiffWorkbench.vue:226-237). `GET /git/bran
 ## Dependencies
 
 ```
-Session 3 (independent, can run any time)
 Session 4 (4g done in Session 2; 4f shares the classifyToolResult area)
 Session 5 (5a uses index prune from session 1, already done)
 ```
 
-- Session 3 is independent and can run next.
-- Session 4 follows 3.
+- Session 4 can run next.
 - Session 5 reuses the shared diff patterns from Session 2.
 
 ## Done
 - Session 1: session list polish, API contracts, path/fs tests, session-index prune
 - Session 2: diff workbench multi-file + per-file hunk selection (FileList checkboxes, HunkList, SelectionTray wired); widened startSessionFromDiff payload; SessionDiffOverlay file-list sidebar + focusFile refocus; FileTreeView path-click to open diff (via @pierre/trees onSelectionChange); extracted detailsDiffToUnifiedPatch to shared/src/diff/detailsToPatch.ts (server + web)
-- Session 3 (partial — 3b + 3c): persist per-project provider/model overrides to `<configDir>/project-overrides.json` with patch/clear semantics + boot load (`loadProjectOverrides`); `GET /api/projects/:id/provider` returns override/defaults/effective; Settings → Models "Project override" section (effective label, active badge, pin-current-default, clear); project-store persistence tests. 3a (eliminate global fallbacks) + 3d still pending.
+- Session 3 — project scope model fix (complete):
+  - 3a (staged, 3 commits): (1) frontend `useApiClient` always injects `projectPath` into scoped requests (idempotent, skips self-resolving routes), with injection unit tests; (2) backend `git.ts`/`diff.ts`/`fs.ts`/`open.ts`/`sessions.ts`/`agent.ts` honor `projectPath` first; (3) strict flip via `fallbackProjectPath()` — explicit `projectPath` always wins, global fallback only when exactly one project is registered (single-client/desktop), so 2+ projects without `projectPath` refuse to guess. Eliminates cross-tab contamination. Tests updated for explicit scoping.
+  - 3b + 3c: persist per-project provider/model overrides to `<configDir>/project-overrides.json` with patch/clear semantics + boot load; `GET /api/projects/:id/provider` returns override/defaults/effective; Settings → Models "Project override" section; project-store persistence tests.
+  - 3d: scoping is by `path` (always correct); client `activeSessionIdByProject` id-map is internally consistent; override UX degrades gracefully when a project lacks a server id.
 - Session 6: agent file tree wiring (classifyToolResult tree branch + export parity)
 - Onboarding tier 1+2+3: interactive signin cards, focus trap, readiness warnings, post-onboarding hint, corrupted flag file handling, update prompt z-index, docs update

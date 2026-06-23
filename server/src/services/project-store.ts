@@ -85,6 +85,24 @@ export function getCurrentProjectId() {
   return store.currentProjectId;
 }
 
+// Resolve the project path to use when a request did not pass projectPath.
+// Single-client (desktop / one project open) keeps working via the global.
+// With 2+ registered projects the global is ambiguous, so we refuse to guess
+// and return null — the caller turns that into a 400. This is the actual
+// cross-contamination fix: explicit projectPath always wins, implicit only
+// when there's exactly one project to mean.
+export function fallbackProjectPath(): string | null {
+  const current = store.currentProjectId;
+  if (current) {
+    const project = store.projectsById.get(current);
+    if (project && store.projectsById.size <= 1) return project.path;
+  }
+  if (store.projectsById.size === 1) {
+    return [...store.projectsById.values()][0]?.path ?? null;
+  }
+  return null;
+}
+
 export function registerProject(project: RegisteredProject) {
   store.projectsById.set(project.id, project);
 }

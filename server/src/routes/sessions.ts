@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { appendEvents, deleteSession, forkSession, getSession, listSessions, patchSessionMeta } from "../services/session-store";
-import { getCurrentProjectId, getProjectById, getRecents, listRegisteredProjects } from "../services/project-store";
+import { fallbackProjectPath, getProjectById, getRecents, listRegisteredProjects } from "../services/project-store";
 import * as gittrixService from "../services/gittrix-service";
 import { requiredProjectPath, resolveSession } from "../services/session-resolver";
 import { logError } from "../lib/log";
@@ -29,9 +29,8 @@ async function emitBoundary(meta: SessionMeta, projectPath: string) {
 
 function mustProject(projectPath?: string) {
   if (projectPath && projectPath.trim()) return { path: projectPath.trim() };
-  const projectId = getCurrentProjectId();
-  if (!projectId) return null;
-  return getProjectById(projectId);
+  const fallback = fallbackProjectPath();
+  return fallback ? { path: fallback } : null;
 }
 
 async function listSessionsAcrossProjects() {
