@@ -9,11 +9,11 @@
         @back-to-diffs="$emit('backToDiffs')"
       />
       <div v-if="activeSessionNotice" class="mx-auto mt-2 w-full max-w-5xl px-3 sm:px-5">
-        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
           <span class="font-medium">{{ activeSessionNotice }}</span>
           <span class="ml-auto" />
-          <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="$emit('reloadActiveSessions')">Reload sessions</button>
-          <button class="rounded border border-amber-300/30 px-2 py-1 hover:bg-amber-400/10" @click="$emit('createReplacementSession')">New replacement</button>
+          <button class="rounded border border-border/60 px-2 py-1 text-foreground/80 hover:bg-muted/60" @click="$emit('reloadActiveSessions')">Reload sessions</button>
+          <button class="rounded border border-border/60 px-2 py-1 text-foreground/80 hover:bg-muted/60" @click="$emit('createReplacementSession')">New replacement</button>
         </div>
       </div>
 

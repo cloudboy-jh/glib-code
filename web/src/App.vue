@@ -474,7 +474,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button class="rounded-md border border-border/70 px-3 py-1.5 text-xs" @click="state.promoteDialogOpen = false">{{ promote.error ? 'Close' : 'Cancel' }}</button>
-            <button v-if="!promote.error" class="rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promoteCommitDisabled" @click="confirmPromote">{{ promoteCommitLabel }}</button>
+            <button v-if="!promote.error" class="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-primary/90 px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45" :disabled="promoteCommitDisabled" @click="confirmPromote"><CloudUpload class="h-3 w-3" />{{ promoteCommitLabel }}</button>
           </div>
         </div>
 
@@ -570,7 +570,7 @@ import { useSessionStreaming } from './composables/useSessionStreaming';
 import { applyTheme } from './lib/theme';
 import { THEME_PRESETS, THEME_PRESET_IDS } from '@glib-code/shared/theme/presets';
 import type { ThemePreset } from '@glib-code/shared/theme/presets';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, CloudUpload } from 'lucide-vue-next';
 import logoIcon from '../../assets/glibcode-iconlogo.png';
 import logoWordmark from '../../assets/glibcode-wordmark.png';
 
@@ -1153,8 +1153,7 @@ const promoteCommitLabel = computed(() => {
   if (promote.pushing) return 'Pushing…';
   if (promote.submitting) return 'Committing…';
   if (promote.result) return promote.pushResult ? 'Committed and pushed' : 'Committed';
-  if (!promoteHasExplicitFiles.value || promote.selectedFiles.length === promote.files.length) return 'Commit all';
-  return 'Commit selected';
+  return promoteShouldPush.value ? 'Commit + Push' : 'Commit';
 });
 const promoteShouldPush = computed(() => settings.durableProvider === 'github' || (settings.durableProvider === 'local' && gitState.canPush));
 const promoteFlowLabel = computed(() => {
