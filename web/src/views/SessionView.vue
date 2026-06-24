@@ -1,6 +1,6 @@
 <template>
-  <template v-if="activeSession">
-    <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+  <div class="h-full min-h-0 min-w-0">
+    <div v-if="activeSession" class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <SessionContextCapsule
         v-if="activeContextSummary"
         :summary="activeContextSummary"
@@ -45,10 +45,8 @@
         @view-text-attachment="$emit('viewTextAttachment', $event)"
       />
     </div>
-  </template>
 
-  <template v-else>
-    <div class="grid h-full place-items-center p-6">
+    <div v-else class="grid h-full place-items-center p-6">
       <div class="w-full max-w-3xl rounded-xl border border-border/80 bg-card/55 p-6">
         <h2 class="mb-2 text-lg font-semibold">Session workspace</h2>
         <p class="mb-4 text-sm text-muted-foreground">Choose continue or start new.</p>
@@ -81,7 +79,7 @@
           </button>
         </div>
         <div v-if="sessionContinueOpen" class="mb-4 rounded-lg border border-border/70 bg-background/40 p-3">
-          <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/80">Recent sessions</div>
+          <div class="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/80">Recent sessions</div>
           <div v-if="recentProjectSessions.length" class="space-y-2 text-left">
             <button
               v-for="session in recentProjectSessions"
@@ -112,7 +110,7 @@
         </div>
       </div>
     </div>
-  </template>
+  </div>
 </template>
 
 <script setup lang="ts">

@@ -3,7 +3,7 @@
     <button
       v-if="preferredEditor"
       type="button"
-      class="inline-flex items-center gap-1.5 rounded border border-border/70 bg-background/70 px-2 py-1 text-[11px] text-foreground hover:bg-muted/60 transition-colors"
+      class="inline-flex items-center gap-1.5 rounded border border-border/70 bg-background/70 px-2 py-1 text-[0.6875rem] text-foreground hover:bg-muted/60 transition-colors"
       :title="`Open in ${editorDisplayName}`"
       @click="openTarget()"
     >
@@ -14,7 +14,7 @@
     <button
       v-else
       type="button"
-      class="inline-flex items-center gap-1.5 rounded border border-border/70 bg-background/70 px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+      class="inline-flex items-center gap-1.5 rounded border border-border/70 bg-background/70 px-2 py-1 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
       title="Set preferred editor in settings"
       @click="openSettings"
     >
@@ -25,7 +25,7 @@
     <button
       v-if="showObsidian && isMarkdown && preferredEditor !== 'obsidian'"
       type="button"
-      class="inline-flex items-center gap-1.5 rounded border border-purple-500/30 bg-purple-500/10 px-2 py-1 text-[11px] text-purple-300 hover:bg-purple-500/20 transition-colors"
+      class="inline-flex items-center gap-1.5 rounded border border-purple-500/30 bg-purple-500/10 px-2 py-1 text-[0.6875rem] text-purple-300 hover:bg-purple-500/20 transition-colors"
       title="Open in Obsidian"
       @click="openInObsidian"
     >

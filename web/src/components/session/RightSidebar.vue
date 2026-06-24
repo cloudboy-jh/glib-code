@@ -19,17 +19,17 @@
 
         <!-- ── Session info ── -->
         <div class="mb-4">
-          <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Session</div>
+          <div class="mb-1.5 px-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Session</div>
           <div class="space-y-1 px-1">
-            <div class="flex items-center gap-2 text-[11px]">
+            <div class="flex items-center gap-2 text-[0.6875rem]">
               <GitBranch class="h-3 w-3 shrink-0 text-muted-foreground/50" />
               <span class="truncate text-muted-foreground/80">{{ branch || 'unknown' }}</span>
             </div>
-            <div class="flex items-center gap-2 text-[11px]">
+            <div class="flex items-center gap-2 text-[0.6875rem]">
               <span class="h-2 w-2 shrink-0 rounded-full" :class="sessionStateDotClass" />
               <span class="text-muted-foreground/80">{{ sessionStateLabel }}</span>
             </div>
-            <div v-if="boundary.baselineSha" class="flex items-center gap-2 text-[11px]">
+            <div v-if="boundary.baselineSha" class="flex items-center gap-2 text-[0.6875rem]">
               <GitCommit class="h-3 w-3 shrink-0 text-muted-foreground/50" />
               <span class="font-mono text-muted-foreground/60">{{ boundary.baselineSha.slice(0, 7) }}</span>
             </div>
@@ -40,22 +40,22 @@
 
         <!-- ── Empty state: session hasn't started ── -->
         <div v-if="boundary.state === 'no_workspace'" class="mb-4 px-1">
-          <p class="text-[11px] leading-relaxed text-muted-foreground/70">
+          <p class="text-[0.6875rem] leading-relaxed text-muted-foreground/70">
             The agent works in an isolated workspace. Changes appear here for review before you promote them to your repo.
           </p>
         </div>
 
         <!-- ── Changes / boundary ── -->
         <div class="space-y-0">
-          <div class="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Changes</div>
+          <div class="mb-1.5 px-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Changes</div>
 
           <!-- Ephemeral zone -->
           <div :class="['rounded-md border px-2.5 py-2 transition-all duration-250', ephemeralZoneClass]">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-1.5">
                 <span :class="['h-1.5 w-1.5 rounded-full', ephemeralDotClass]" />
-                <span class="text-[10px] font-semibold uppercase tracking-[0.08em]" :class="ephemeralLabelClass">Ephemeral</span>
-                <span v-if="boundary.state === 'pending' && (boundary.additions > 0 || boundary.deletions > 0)" class="flex items-center gap-0.5 font-mono text-[9px]">
+                <span class="text-[0.625rem] font-semibold uppercase tracking-[0.08em]" :class="ephemeralLabelClass">Ephemeral</span>
+                <span v-if="boundary.state === 'pending' && (boundary.additions > 0 || boundary.deletions > 0)" class="flex items-center gap-0.5 font-mono text-[0.5625rem]">
                   <span class="text-emerald-400/80">+{{ boundary.additions }}</span>
                   <span class="text-red-400/70">-{{ boundary.deletions }}</span>
                 </span>
@@ -63,7 +63,7 @@
               <button
                 v-if="boundary.state === 'pending' && !isPromoting"
                 type="button"
-                class="rounded px-1.5 py-0.5 text-[9px] text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive/80 disabled:opacity-50"
+                class="rounded px-1.5 py-0.5 text-[0.5625rem] text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive/80 disabled:opacity-50"
                 :disabled="discarding"
                 @click="$emit('discard')"
               >{{ discarding ? 'Discarding…' : 'Discard' }}</button>
@@ -78,23 +78,23 @@
                 :class="isPromoting ? 'opacity-30' : ''"
               >
                 <FileCode class="h-2.5 w-2.5 shrink-0 text-muted-foreground/50" />
-                <span class="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground/70" :title="file">{{ file }}</span>
+                <span class="min-w-0 flex-1 truncate font-mono text-[0.5625rem] text-muted-foreground/70" :title="file">{{ file }}</span>
               </div>
               <button
                 v-if="boundary.touchedFiles.length > FILE_LIMIT"
                 type="button"
-                class="mt-0.5 w-full text-center text-[9px] text-muted-foreground/50 hover:text-muted-foreground/70"
+                class="mt-0.5 w-full text-center text-[0.5625rem] text-muted-foreground/50 hover:text-muted-foreground/70"
                 @click="showAllFiles = !showAllFiles"
               >{{ showAllFiles ? 'Show less' : `+${boundary.touchedFiles.length - FILE_LIMIT} more` }}</button>
             </div>
-            <div v-else-if="isPromoting" class="mt-1 text-[9px] italic text-muted-foreground/50">Moving to durable…</div>
-            <div v-else class="mt-1 text-[10px] italic text-muted-foreground/55">No pending changes</div>
+            <div v-else-if="isPromoting" class="mt-1 text-[0.5625rem] italic text-muted-foreground/50">Moving to durable…</div>
+            <div v-else class="mt-1 text-[0.625rem] italic text-muted-foreground/55">No pending changes</div>
           </div>
 
           <!-- Promote connector (visual only — action lives in the footer) -->
           <div class="flex flex-col items-center py-1.5">
             <div :class="['h-3 w-px', arrowLineClass]" />
-            <div :class="['inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold', promoteIndicatorClass]">
+            <div :class="['inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.625rem] font-semibold', promoteIndicatorClass]">
               <ArrowDown class="h-2.5 w-2.5" />
               {{ promoteLabel }}
             </div>
@@ -105,21 +105,21 @@
           <div :class="['rounded-md border px-2.5 py-2 transition-all duration-250', durableZoneClass]">
             <div class="flex items-center gap-1.5">
               <span :class="['h-1.5 w-1.5 rounded-full', durableDotClass]" />
-              <span class="text-[10px] font-semibold uppercase tracking-[0.08em]" :class="durableLabelClass">Durable</span>
-              <span v-if="boundary.baselineSha" class="ml-auto font-mono text-[9px] text-muted-foreground/40">{{ boundary.baselineSha.slice(0, 7) }}</span>
+              <span class="text-[0.625rem] font-semibold uppercase tracking-[0.08em]" :class="durableLabelClass">Durable</span>
+              <span v-if="boundary.baselineSha" class="ml-auto font-mono text-[0.5625rem] text-muted-foreground/40">{{ boundary.baselineSha.slice(0, 7) }}</span>
             </div>
-            <div v-if="boundary.state === 'promoted'" class="mt-1 text-[9px] text-emerald-400/80">Changes committed ✓</div>
-            <div v-else class="mt-1 text-[10px] italic text-muted-foreground/55">{{ boundary.baselineSha ? 'Current baseline' : 'No baseline yet' }}</div>
+            <div v-if="boundary.state === 'promoted'" class="mt-1 text-[0.5625rem] text-emerald-400/80">Changes committed ✓</div>
+            <div v-else class="mt-1 text-[0.625rem] italic text-muted-foreground/55">{{ boundary.baselineSha ? 'Current baseline' : 'No baseline yet' }}</div>
           </div>
 
           <!-- Promote history -->
           <div v-if="boundary.promoteHistory.length" class="mt-3">
-            <div class="mb-1 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60">Promote history</div>
+            <div class="mb-1 px-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60">Promote history</div>
             <div class="space-y-1 px-1">
               <div
                 v-for="(entry, i) in boundary.promoteHistory"
                 :key="`${entry.at}-${i}`"
-                class="flex items-center gap-2 rounded px-1.5 py-1 text-[9px] text-muted-foreground/70"
+                class="flex items-center gap-2 rounded px-1.5 py-1 text-[0.5625rem] text-muted-foreground/70"
               >
                 <span class="h-1 w-1 shrink-0 rounded-full bg-emerald-400/60" />
                 <span class="font-mono text-muted-foreground/50">{{ entry.toSha ? entry.toSha.slice(0, 7) : '—' }}</span>
@@ -139,7 +139,7 @@
           <div ref="diffMenuRef" class="relative">
             <button
               type="button"
-              class="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border/70 bg-background/40 px-2 text-[11px] text-muted-foreground/75 transition-all hover:border-border hover:bg-accent/60 hover:text-foreground"
+              class="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border/70 bg-background/40 px-2 text-[0.6875rem] text-muted-foreground/75 transition-all hover:border-border hover:bg-accent/60 hover:text-foreground"
               @click="diffMenuOpen = !diffMenuOpen"
             >
               <GitCompare class="h-3 w-3" />
@@ -164,7 +164,7 @@
 
           <button
             type="button"
-            class="flex h-8 items-center justify-center gap-1.5 rounded-md border border-primary/50 bg-primary/15 px-2 text-[11px] font-medium text-primary transition-all hover:border-primary/70 hover:bg-primary/25"
+            class="flex h-8 items-center justify-center gap-1.5 rounded-md border border-primary/50 bg-primary/15 px-2 text-[0.6875rem] font-medium text-primary transition-all hover:border-primary/70 hover:bg-primary/25"
             @click="$emit('promote')"
           >
             <CloudUpload class="h-3 w-3" />
@@ -288,8 +288,8 @@ const durableLabelClass = computed(() =>
 
 <style scoped>
 .rail-icon {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   stroke-width: 2.2;
 }
 
@@ -297,9 +297,9 @@ const durableLabelClass = computed(() =>
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  font-size: 11px;
+  gap: 0.4375rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.6875rem;
   color: hsl(var(--foreground));
   background: transparent;
   border: 0;

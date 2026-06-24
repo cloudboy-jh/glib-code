@@ -2,7 +2,7 @@
   <div class="border-b border-border/70 bg-card/65 px-4 py-2.5 sm:px-5">
     <div class="mx-auto flex w-full max-w-5xl items-center gap-2.5">
       <div class="min-w-0 flex-1">
-        <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">Session context</div>
+        <div class="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">Session context</div>
         <div class="truncate text-xs text-foreground/95">{{ summary }}</div>
       </div>
 
@@ -21,14 +21,14 @@ defineEmits<{ view: []; remove: []; backToDiffs: [] }>();
 <style scoped>
 .ctx-btn {
   display: inline-flex;
-  height: 28px;
+  height: 1.75rem;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   border: 1px solid hsl(var(--border) / 0.75);
   background: hsl(var(--background) / 0.55);
-  padding: 0 10px;
-  font-size: 11px;
+  padding: 0 0.625rem;
+  font-size: 0.6875rem;
   color: hsl(var(--muted-foreground));
 }
 
@@ -40,14 +40,14 @@ defineEmits<{ view: []; remove: []; backToDiffs: [] }>();
 
 .ctx-btn-danger {
   display: inline-flex;
-  height: 28px;
+  height: 1.75rem;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   border: 1px solid hsl(0 60% 45% / 0.45);
   background: hsl(0 55% 23% / 0.2);
-  padding: 0 10px;
-  font-size: 11px;
+  padding: 0 0.625rem;
+  font-size: 0.6875rem;
   color: hsl(0 72% 77%);
 }
 

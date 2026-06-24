@@ -22,6 +22,15 @@
   --bg-sunken: 224 17% 10%;
 }
 
+/* Proportional scaling: the whole UI is rem-based, so scaling the root font
+   scales every component with the window. clamp() keys the root size to the
+   viewport width with hard min/max guards so tiny windows stay legible and huge
+   windows don't blow up.
+   ~600px → 13px, ~1280px → 16px (historical default), ≥2240px → 19px. */
+:root {
+  font-size: clamp(13px, 11px + 0.39vw, 19px);
+}
+
 html,
 body,
 #app {
@@ -212,6 +221,41 @@ samp,
 
 @keyframes promote-countdown {
   to { stroke-dashoffset: 151; }
+}
+
+/* ── Page/view transitions ───────────────────────────
+   Subtle fade + slight upward slide between the Picker / Session / Diff views.
+   mode="out-in" so the leaving view finishes before the next enters — no
+   overlap, so no absolute positioning needed. */
+.view-fade-enter-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.view-fade-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.view-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.view-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+/* Views own full height; keep them filling during the swap. */
+.view-fade-enter-active,
+.view-fade-leave-active {
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-fade-enter-active,
+  .view-fade-leave-active {
+    transition: opacity 0.12s ease;
+  }
+  .view-fade-enter-from,
+  .view-fade-leave-to {
+    transform: none;
+  }
 }
 
 /* Post-onboarding hint banner */

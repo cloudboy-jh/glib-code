@@ -8,8 +8,8 @@
     </div>
     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <div v-if="inHouseThemes.length" class="col-span-full flex items-center gap-2 pt-1">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">In-House Glib Themes</span>
-        <span class="rounded border border-border/60 px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Curated</span>
+        <span class="text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">In-House Glib Themes</span>
+        <span class="rounded border border-border/60 px-1 py-px text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Curated</span>
       </div>
       <button
         v-for="theme in inHouseThemes"
@@ -78,8 +78,8 @@ function pretty(value: string) {
 <style scoped>
 .theme-dot {
   display: inline-block;
-  height: 12px;
-  width: 12px;
+  height: 0.75rem;
+  width: 0.75rem;
   border-radius: 999px;
   border: 1px solid hsl(var(--border) / 0.75);
 }

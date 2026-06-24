@@ -1,4 +1,5 @@
 import { hasUsableProviderAuth, refreshPiModels } from "./pi-core";
+import { getOpenRouterCatalog } from "./openrouter-catalog";
 
 type Cached<T> = { at: number; value: T };
 
@@ -29,6 +30,20 @@ async function discoverFresh(): Promise<PiCapabilities> {
       const set = byProvider.get(provider) ?? new Set<string>();
       set.add(id);
       byProvider.set(provider, set);
+    }
+
+    // pi-ai ships a static OpenRouter snapshot. Union the live catalog in so the
+    // picker reflects newly-released models. Fully fallback-guarded: on failure
+    // getOpenRouterCatalog() returns [] and we keep the baked list as-is.
+    try {
+      const live = await getOpenRouterCatalog();
+      if (live.length > 0) {
+        const set = byProvider.get("openrouter") ?? new Set<string>();
+        for (const model of live) set.add(model.id);
+        byProvider.set("openrouter", set);
+      }
+    } catch {
+      // never let catalog freshness break provider discovery
     }
 
     const providers: ProviderCapability[] = (await Promise.all([...byProvider.entries()]

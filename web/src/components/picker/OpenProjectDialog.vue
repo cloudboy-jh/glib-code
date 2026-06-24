@@ -23,7 +23,7 @@
       </div>
 
       <div class="rounded-lg border border-border/70 bg-background/35 p-2">
-        <div class="mb-2 flex items-center justify-between px-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        <div class="mb-2 flex items-center justify-between px-1 text-[0.6875rem] uppercase tracking-[0.12em] text-muted-foreground">
           <span>Project picker</span>
           <span>{{ candidates.length ? 'zoxide' : 'manual path' }}</span>
         </div>
@@ -38,9 +38,9 @@
           >
             <span class="min-w-0">
               <span class="block truncate text-foreground">{{ candidate.name }}</span>
-              <span class="block truncate text-[11px] text-muted-foreground">{{ candidate.path }}</span>
+              <span class="block truncate text-[0.6875rem] text-muted-foreground">{{ candidate.path }}</span>
             </span>
-            <span class="shrink-0 rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{{ candidate.source }}</span>
+            <span class="shrink-0 rounded border border-border/60 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">{{ candidate.source }}</span>
           </button>
           <div v-if="!filteredCandidates.length" class="px-2 py-5 text-center text-xs text-muted-foreground">No zoxide matches. Paste a path above.</div>
         </div>

@@ -85,9 +85,9 @@ const markStyle = computed(() => ({
 }));
 
 const sizeClass = computed(() => {
-  if (props.size === 'sm') return 'h-6 w-6 text-[9px]';
-  if (props.size === 'lg') return 'h-10 w-10 text-[12px]';
-  return 'h-8 w-8 text-[10px]';
+  if (props.size === 'sm') return 'h-6 w-6 text-[0.5625rem]';
+  if (props.size === 'lg') return 'h-10 w-10 text-[0.75rem]';
+  return 'h-8 w-8 text-[0.625rem]';
 });
 
 function hashHue(value: string) {

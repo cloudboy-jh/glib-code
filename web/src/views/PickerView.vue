@@ -33,7 +33,7 @@ const emit = defineEmits<{
   openProject: [];
   openClone: [];
   openPalette: [];
-  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings'];
+  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance'];
   openRecent: [payload: { name: string; path: string; mode: 'diff' | 'session' }];
   openRecentDiff: [payload: { name: string; path: string; source: 'uncommitted' | 'commit'; commitRef?: string }];
   continueRecentSession: [payload: { name: string; path: string; sessionId: string }];

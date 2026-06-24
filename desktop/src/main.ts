@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } from "electron";
 import { type UpdateInfo, type ProgressInfo, type UpdateDownloadedEvent } from "electron-updater";
 // electron-updater is a pure CJS module — require directly to avoid TypeScript's
 // __importDefault wrapper mangling the named exports.
@@ -16,6 +16,11 @@ import { join, resolve } from "node:path";
 // process.resourcesPath points to Resources/
 
 let serverProc: ReturnType<typeof spawn> | null = null;
+let tray: Tray | null = null;
+let mainWindow: BrowserWindow | null = null;
+// Distinguishes a real quit (tray menu / app.quit) from a window "close" that
+// should merely hide the window to the tray.
+let isQuitting = false;
 const isDev = process.env.GLIB_DESKTOP_DEV === "1";
 const apiPort = 4273;
 const devWebUrl = "http://127.0.0.1:5173";
@@ -30,6 +35,16 @@ function getRepoRoot() {
 
 function getPreloadPath() {
   return join(app.getAppPath(), "dist", "preload.js");
+}
+
+function getTrayIconPath() {
+  // Dev: app.getAppPath() is the desktop/ package root, so assets/ is relative.
+  // Packaged: the tray PNG is shipped via extraResources into Resources/assets/.
+  const fileName = process.platform === "win32" ? "tray.ico" : "tray.png";
+  if (isDev) {
+    return join(app.getAppPath(), "assets", fileName);
+  }
+  return join(process.resourcesPath, "assets", fileName);
 }
 
 function getBunCommand() {
@@ -194,6 +209,77 @@ function registerIpcHandlers() {
   });
 }
 
+// ── Tray ──────────────────────────────────────────────────────────────────
+
+function showMainWindow() {
+  if (!mainWindow) {
+    void createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function buildTrayMenu() {
+  const visible = Boolean(mainWindow?.isVisible());
+  return Menu.buildFromTemplate([
+    {
+      label: visible ? "Hide glib-code" : "Show glib-code",
+      click: () => {
+        if (mainWindow?.isVisible()) {
+          mainWindow.hide();
+        } else {
+          showMainWindow();
+        }
+      },
+    },
+    {
+      label: "Check for Updates",
+      enabled: !isDev && process.env.GLIB_ENABLE_UPDATER === "1",
+      click: () => {
+        autoUpdater.checkForUpdates().catch(() => {
+          // network might be offline — silent fail
+        });
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Quit glib-code",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
+function refreshTrayMenu() {
+  tray?.setContextMenu(buildTrayMenu());
+}
+
+function setupTray() {
+  if (tray) return;
+
+  const image = nativeImage.createFromPath(getTrayIconPath());
+  // Fall back to an empty image rather than crashing if the asset is missing;
+  // the tray still works, just without an icon.
+  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
+  tray.setToolTip("glib-code");
+  tray.setContextMenu(buildTrayMenu());
+
+  // Left-click toggles window visibility (Windows/Linux). On macOS the click
+  // also opens the context menu by default, which is the expected behavior.
+  tray.on("click", () => {
+    if (mainWindow?.isVisible() && !mainWindow.isMinimized()) {
+      mainWindow.hide();
+    } else {
+      showMainWindow();
+    }
+    refreshTrayMenu();
+  });
+}
+
 // ── Window creation ───────────────────────────────────────────────────────
 
 async function createWindow() {
@@ -217,8 +303,28 @@ async function createWindow() {
     console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
   });
 
+  mainWindow = win;
+
   win.once("ready-to-show", () => {
     win.show();
+  });
+
+  // Close-to-tray: hide the window instead of quitting. The app keeps running
+  // (server stays alive) and is reachable from the tray. A real quit sets
+  // isQuitting first (tray menu / before-quit).
+  win.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      win.hide();
+      refreshTrayMenu();
+    }
+  });
+
+  win.on("show", refreshTrayMenu);
+  win.on("hide", refreshTrayMenu);
+
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
   });
 
   // Open devtools in dev OR when GLIB_DEVTOOLS is set (for debugging packaged builds)
@@ -258,30 +364,53 @@ async function createWindow() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────
 
-app.whenReady().then(async () => {
-  registerIpcHandlers();
+// Single-instance lock: a second launch (e.g. from the tray-installed shortcut)
+// focuses the existing window instead of spawning a duplicate server/process.
+const gotInstanceLock = app.requestSingleInstanceLock();
+if (!gotInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    showMainWindow();
+  });
 
-  if (!isDev) {
-    const serverDir = join(getRepoRoot(), "server");
-    serverProc = spawn(getBunCommand(), ["run", join(serverDir, "server.js"), `--port=${apiPort}`], {
-      cwd: serverDir,
-      stdio: "inherit",
-    });
+  app.whenReady().then(async () => {
+    registerIpcHandlers();
 
-    await waitForUrl(healthUrl);
-  }
+    if (!isDev) {
+      const serverDir = join(getRepoRoot(), "server");
+      serverProc = spawn(getBunCommand(), ["run", join(serverDir, "server.js"), `--port=${apiPort}`], {
+        cwd: serverDir,
+        stdio: "inherit",
+      });
 
-  await createWindow();
-});
+      await waitForUrl(healthUrl);
+    }
+
+    setupTray();
+    await createWindow();
+  });
+}
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+  else showMainWindow();
 });
 
+// Close-to-tray means the window can be hidden ("closed") without quitting, so
+// we no longer quit here — the app lives in the tray until explicitly quit.
+// macOS already keeps the app alive on window close by convention.
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // intentionally no-op: quit happens via the tray menu / before-quit
+});
+
+// Mark a real quit so the window's close handler stops hiding-to-tray.
+app.on("before-quit", () => {
+  isQuitting = true;
 });
 
 app.on("quit", () => {
   serverProc?.kill("SIGTERM");
+  tray?.destroy();
+  tray = null;
 });

@@ -1,9 +1,9 @@
 <template>
-  <div class="mx-auto w-full max-w-5xl px-6" tabindex="0" @keydown="onPickerKeydown">
+  <div ref="pickerRoot" class="mx-auto w-full max-w-5xl px-6 outline-none" tabindex="0" @keydown="onPickerKeydown">
     <div class="mb-9 text-center">
       <div
         v-if="logoSrc"
-        class="logo-wordmark mx-auto h-16 w-full max-w-[380px]"
+        class="logo-wordmark mx-auto h-16 w-full max-w-[23.75rem]"
         :style="{ '--logo-url': `url(${logoSrc})` }"
         role="img"
         aria-label="glib-code"
@@ -18,17 +18,14 @@
       </div>
 
       <div class="space-y-1">
-        <button :class="['picker-row', pickerIndex === 0 ? 'picker-row-active' : '']" @click="emit('openProject')">
+        <button :class="['picker-row', pickerIndex === 0 ? 'picker-row-active' : '']" @click="emit('openProject')" @mouseenter="pickerIndex = 0">
           <span class="picker-row-left"><FolderOpen class="h-4 w-4" /><span>Open Project</span></span>
-          <span class="picker-kbd">Ctrl+O</span>
         </button>
-        <button :class="['picker-row', pickerIndex === 1 ? 'picker-row-active' : '']" @click="emit('openClone')">
+        <button :class="['picker-row', pickerIndex === 1 ? 'picker-row-active' : '']" @click="emit('openClone')" @mouseenter="pickerIndex = 1">
           <span class="picker-row-left"><GitBranch class="h-4 w-4" /><span>Clone Repository</span></span>
-          <span class="picker-kbd">Ctrl+Shift+O</span>
         </button>
-        <button :class="['picker-row', pickerIndex === 2 ? 'picker-row-active' : '']" @click="emit('openPalette')">
+        <button :class="['picker-row', pickerIndex === 2 ? 'picker-row-active' : '']" @click="emit('openPalette')" @mouseenter="pickerIndex = 2">
           <span class="picker-row-left"><Command class="h-4 w-4" /><span>Open Command Palette</span></span>
-          <span class="picker-kbd">Ctrl+K</span>
         </button>
       </div>
     </section>
@@ -82,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Bot, Code2, Command, FolderOpen, GitBranch, Palette, Settings, SlidersHorizontal } from 'lucide-vue-next';
 import RecentList from './RecentList.vue';
 
@@ -101,16 +98,23 @@ const emit = defineEmits<{
   continueRecentSession: [payload: { name: string; path: string; sessionId: string }];
   startNewRecentSession: [payload: { name: string; path: string }];
   forgetRecent: [id: string];
-  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings'];
+  openSettings: [tab?: 'Models' | 'Git' | 'Integrations' | 'Appearance'];
   fetchCommits: [path: string];
 }>();
 
+const pickerRoot = ref<HTMLElement | null>(null);
 const pickerIndex = ref(0);
 const totalPickerRows = computed(() => 3 + props.recents.length);
 const lastPickerIndex = computed(() => Math.max(totalPickerRows.value - 1, 0));
 
 watch(totalPickerRows, (count) => {
   if (pickerIndex.value >= count) pickerIndex.value = Math.max(count - 1, 0);
+});
+
+onMounted(() => {
+  // Focus the container so keyboard navigation works without a click first.
+  // Picker has no text inputs, so claiming focus here is safe.
+  pickerRoot.value?.focus();
 });
 
 function runPickerSelection(index: number) {
@@ -166,17 +170,33 @@ function onPickerKeydown(event: KeyboardEvent) {
 }
 
 .picker-row {
+  position: relative;
   display: flex;
-  height: 42px;
+  height: 2.625rem;
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   border: 1px solid transparent;
   background: hsl(var(--background) / 0.25);
-  padding: 0 12px;
+  padding: 0 0.75rem;
   color: hsl(var(--foreground));
   transition: transform 0.18s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.18s ease;
+}
+
+/* Leading accent bar — collapsed by default, expands on hover/selection. */
+.picker-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 0;
+  width: 0.1875rem;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  transform: translateY(-50%);
+  transition: height 0.16s ease, opacity 0.16s ease;
+  opacity: 0;
 }
 
 .picker-row:hover {
@@ -192,19 +212,20 @@ function onPickerKeydown(event: KeyboardEvent) {
 }
 
 .picker-row-active {
-  border-color: hsl(var(--border));
-  background: hsl(var(--muted) / 0.7);
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--primary) / 0.08);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.18);
+}
+
+.picker-row-active::before {
+  height: 1.25rem;
+  opacity: 1;
 }
 
 .picker-row-left {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 18px;
-}
-
-.picker-kbd {
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
+  gap: 0.625rem;
+  font-size: 1.125rem;
 }
 </style>

@@ -9,7 +9,7 @@
         :title="connectionLabel"
       />
       <strong class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground" title="Runs shell commands in the active project. Not an interactive shell.">Command runner</strong>
-      <span v-if="projectLabel" class="terminal truncate text-[11px] text-muted-foreground/70">{{ projectLabel }}</span>
+      <span v-if="projectLabel" class="terminal truncate text-[0.6875rem] text-muted-foreground/70">{{ projectLabel }}</span>
       <span class="ml-auto" />
       <button
         class="h-7 rounded-md border border-border/80 bg-background/55 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
@@ -29,45 +29,45 @@
     <!-- Transcript -->
     <div
       ref="transcriptRef"
-      class="terminal min-h-0 flex-1 overflow-y-auto px-4 py-1 text-[12px]"
+      class="terminal min-h-0 flex-1 overflow-y-auto px-4 py-1 text-[0.75rem]"
       role="log"
       aria-live="polite"
       aria-label="Command output"
       @scroll="onTranscriptScroll"
     >
-      <div v-if="entries.length === 0" class="py-6 text-center text-[12px] text-muted-foreground/50">
+      <div v-if="entries.length === 0" class="py-6 text-center text-[0.75rem] text-muted-foreground/50">
         No commands run yet.
       </div>
       <div v-for="entry in entries" :key="entry.id" class="term-entry mb-3">
         <div class="flex items-center gap-1.5">
           <span class="shrink-0 text-muted-foreground/60">$</span>
           <span class="break-all text-foreground/90">{{ entry.command }}</span>
-          <span class="ml-auto inline-flex shrink-0 items-center gap-1 text-[10px] font-medium" :class="entryChipClass(entry)">
+          <span class="ml-auto inline-flex shrink-0 items-center gap-1 text-[0.625rem] font-medium" :class="entryChipClass(entry)">
             <span v-if="entry.status === 'running'" class="term-dot-pulse inline-block h-1 w-1 rounded-full bg-amber-400" />
             {{ entryChipLabel(entry) }}
           </span>
         </div>
-        <div v-if="entry.chunks.length > 0" class="mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-[1.5]">
+        <div v-if="entry.chunks.length > 0" class="mt-0.5 whitespace-pre-wrap break-words text-[0.75rem] leading-[1.5]">
           <span v-for="(chunk, i) in entry.chunks" :key="i" :class="chunk.stream === 'stderr' ? 'text-red-300/90' : 'text-foreground/95'">{{ chunk.text }}</span>
         </div>
       </div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="shrink-0 px-4 py-1 text-[11px] text-red-300/90">
+    <div v-if="error" class="shrink-0 px-4 py-1 text-[0.6875rem] text-red-300/90">
       {{ error }}
     </div>
 
     <!-- Composer -->
     <div class="shrink-0 px-4 pb-3 pt-1.5">
       <div class="flex items-start gap-2">
-        <span class="terminal pt-[5px] text-[12px] text-muted-foreground/50">$</span>
+        <span class="terminal pt-[0.3125rem] text-[0.75rem] text-muted-foreground/50">$</span>
         <textarea
           ref="textareaRef"
           :value="input"
           rows="1"
           :disabled="composerDisabled"
-          class="terminal min-h-[28px] w-full resize-none rounded-md border border-input/80 bg-[hsl(var(--bg-sunken))]/80 px-2 py-1 text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+          class="terminal min-h-[1.75rem] w-full resize-none rounded-md border border-input/80 bg-[hsl(var(--bg-sunken))]/80 px-2 py-1 text-[0.75rem] text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           :placeholder="placeholder"
           aria-label="Command input"
           @input="emit('update:input', ($event.target as HTMLTextAreaElement).value)"

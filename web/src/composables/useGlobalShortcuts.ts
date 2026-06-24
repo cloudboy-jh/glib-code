@@ -2,17 +2,13 @@ import type { Ref } from 'vue';
 
 type PaletteCommand = { id: string; label: string };
 
-// Returns true if the event target is a text input — used to scope shortcuts
-// so Cmd+B doesn't fire while the user is typing in the composer.
-function isTextInput(event: KeyboardEvent) {
-  const el = event.target as HTMLElement | null;
-  if (!el) return false;
-  const tag = el.tagName.toLowerCase();
-  if (tag === 'input' || tag === 'textarea') return true;
-  if (el.isContentEditable) return true;
-  return false;
-}
-
+// Minimal global key handling. We intentionally do NOT bind modifier combos
+// (Cmd/Ctrl+K/J/B etc.) — on the web they collide with browser/OS shortcuts,
+// and on desktop they were never wired to OS-correct accelerators. Everything
+// those toggled (palette, terminal, rails) is reachable via on-screen controls.
+//
+// What remains is non-conflicting and expected: Escape closes the topmost
+// overlay, and while the command palette is open, Up/Down/Enter drive it.
 export function useGlobalShortcuts(options: {
   state: {
     paletteOpen: boolean;
@@ -23,47 +19,11 @@ export function useGlobalShortcuts(options: {
     cloneDialogOpen: boolean;
     openProjectDialogOpen: boolean;
   };
-  forms: { palette: string };
   filteredPaletteCommands: Ref<PaletteCommand[]>;
   runPalette: (id: string) => void;
   closeOnEscape?: Array<() => boolean>;
-  toggleLeftRail?: () => void;
-  toggleRightRail?: () => void;
 }) {
   function onGlobalKeydown(event: KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      options.state.paletteOpen = !options.state.paletteOpen;
-      if (options.state.paletteOpen) {
-        options.forms.palette = '';
-        options.state.paletteIndex = 0;
-      }
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
-      event.preventDefault();
-      options.state.terminalOpen = !options.state.terminalOpen;
-      return;
-    }
-
-    // Left rail: Cmd+B (Mac) / Ctrl+B (Win/Linux)
-    // Scoped: skip when a text field has focus — don't hijack bold in the composer.
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'b') {
-      if (isTextInput(event)) return;
-      event.preventDefault();
-      options.toggleLeftRail?.();
-      return;
-    }
-
-    // Right rail: Cmd+Opt+B (Mac) / Ctrl+Alt+B (Win/Linux)
-    if ((event.metaKey || event.ctrlKey) && event.altKey && event.key.toLowerCase() === 'b') {
-      if (isTextInput(event)) return;
-      event.preventDefault();
-      options.toggleRightRail?.();
-      return;
-    }
-
     if (event.key === 'Escape') {
       for (const close of options.closeOnEscape ?? []) {
         if (close()) return;

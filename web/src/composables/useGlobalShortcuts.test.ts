@@ -2,24 +2,35 @@ import { ref } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 
+function makeState(overrides: Partial<Record<string, boolean | number>> = {}) {
+  return {
+    paletteOpen: false,
+    paletteIndex: 0,
+    terminalOpen: false,
+    settingsOpen: false,
+    themeDialogOpen: false,
+    cloneDialogOpen: false,
+    openProjectDialogOpen: false,
+    ...overrides
+  } as {
+    paletteOpen: boolean;
+    paletteIndex: number;
+    terminalOpen: boolean;
+    settingsOpen: boolean;
+    themeDialogOpen: boolean;
+    cloneDialogOpen: boolean;
+    openProjectDialogOpen: boolean;
+  };
+}
+
 describe('useGlobalShortcuts', () => {
   it('closes top-most overlay first on Escape', () => {
-    const state = {
-      paletteOpen: true,
-      paletteIndex: 0,
-      terminalOpen: false,
-      settingsOpen: false,
-      themeDialogOpen: false,
-      cloneDialogOpen: false,
-      openProjectDialogOpen: false
-    };
-    const forms = { palette: '' };
+    const state = makeState({ paletteOpen: true });
     const filteredPaletteCommands = ref([{ id: 'settings.open', label: 'Open settings' }]);
     const calls: string[] = [];
 
     const shortcuts = useGlobalShortcuts({
       state,
-      forms,
       filteredPaletteCommands,
       runPalette: (id) => calls.push(id),
       closeOnEscape: [
@@ -31,8 +42,6 @@ describe('useGlobalShortcuts', () => {
       ]
     });
 
-    const event = new KeyboardEvent('keydown', { key: 'Escape' });
-    window.dispatchEvent(event);
     shortcuts.bind();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     shortcuts.unbind();
@@ -41,26 +50,38 @@ describe('useGlobalShortcuts', () => {
     expect(state.paletteOpen).toBe(true);
   });
 
-  it('toggles palette with Ctrl/Cmd+K', () => {
-    const state = {
-      paletteOpen: false,
-      paletteIndex: 3,
-      terminalOpen: false,
-      settingsOpen: false,
-      themeDialogOpen: false,
-      cloneDialogOpen: false,
-      openProjectDialogOpen: false
-    };
-    const forms = { palette: 'abc' };
+  it('does not bind modifier-combo globals (Ctrl+K is a no-op)', () => {
+    const state = makeState();
     const filteredPaletteCommands = ref([{ id: 'settings.open', label: 'Open settings' }]);
 
-    const shortcuts = useGlobalShortcuts({ state, forms, filteredPaletteCommands, runPalette: () => undefined });
+    const shortcuts = useGlobalShortcuts({ state, filteredPaletteCommands, runPalette: () => undefined });
     shortcuts.bind();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
     shortcuts.unbind();
 
-    expect(state.paletteOpen).toBe(true);
-    expect(state.paletteIndex).toBe(0);
-    expect(forms.palette).toBe('');
+    expect(state.paletteOpen).toBe(false);
+  });
+
+  it('drives palette selection with arrows + Enter while open', () => {
+    const state = makeState({ paletteOpen: true, paletteIndex: 0 });
+    const filteredPaletteCommands = ref([
+      { id: 'a', label: 'A' },
+      { id: 'b', label: 'B' }
+    ]);
+    const calls: string[] = [];
+
+    const shortcuts = useGlobalShortcuts({
+      state,
+      filteredPaletteCommands,
+      runPalette: (id) => calls.push(id)
+    });
+
+    shortcuts.bind();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(state.paletteIndex).toBe(1);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    shortcuts.unbind();
+
+    expect(calls).toEqual(['b']);
   });
 });

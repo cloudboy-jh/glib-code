@@ -12,10 +12,10 @@
       >
 
         <div class="mb-1.5 flex items-center justify-between gap-3">
-          <span :class="['text-[10px] font-semibold uppercase tracking-[0.12em]', e.id === activeAssistantId ? 'timeline-shimmer' : 'text-muted-foreground/90']">
+          <span :class="['text-[0.625rem] font-semibold uppercase tracking-[0.12em]', e.id === activeAssistantId ? 'timeline-shimmer' : 'text-muted-foreground/90']">
             {{ e.kind }}
           </span>
-          <span class="shrink-0 text-[11px] tabular-nums text-muted-foreground/65">
+          <span class="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground/65">
             <template v-if="e.id === activeAssistantId && elapsedLabel">{{ elapsedLabel }}</template>
             <template v-else>{{ e.time }}</template>
           </span>
@@ -32,10 +32,10 @@
               v-html="renderMarkdown(block.value)"
             />
             <div v-else-if="block.kind === 'diff'" class="space-y-1">
-              <div class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
+              <div class="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">Diff</div>
               <DiffView :patch="block.value" diff-style="unified" :theme-preset="themePreset" :theme-type="themeType" />
             </div>
-            <pre v-else class="max-h-64 overflow-auto rounded-md bg-black/20 p-2 text-[11px] leading-5 text-muted-foreground">{{ block.value }}</pre>
+            <pre v-else class="max-h-64 overflow-auto rounded-md bg-black/20 p-2 text-[0.6875rem] leading-5 text-muted-foreground">{{ block.value }}</pre>
           </template>
           <span v-if="e.id === activeAssistantId" class="timeline-cursor" aria-hidden="true" />
         </div>
@@ -48,7 +48,7 @@
             :href="`${API_BASE}/attachments/${encodeURIComponent(attach.id)}`"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[11px] text-muted-foreground/80 hover:border-border hover:text-foreground/90 transition-colors"
+            class="inline-flex max-w-[15rem] items-center gap-1.5 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[0.6875rem] text-muted-foreground/80 hover:border-border hover:text-foreground/90 transition-colors"
           >
             <Paperclip class="h-3 w-3 shrink-0 opacity-60" />
             <span class="truncate">{{ attach.name }}</span>
@@ -71,12 +71,12 @@
             </span>
             <div
               v-if="!expandedTurns.has(e.id) && totalDiffStats(e.toolCalls).total > 0"
-              class="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 font-mono text-[11px] font-medium"
+              class="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 font-mono text-[0.6875rem] font-medium"
             >
               <span class="text-red-400">-{{ totalDiffStats(e.toolCalls).del }}</span>
               <span class="text-emerald-400">+{{ totalDiffStats(e.toolCalls).add }}</span>
             </div>
-            <span class="shrink-0 text-[10px] text-muted-foreground/40">
+            <span class="shrink-0 text-[0.625rem] text-muted-foreground/40">
               {{ expandedTurns.has(e.id) ? 'collapse' : 'expand' }}
             </span>
           </button>
@@ -91,11 +91,11 @@
               <div :class="['flex items-center gap-2 rounded-md px-2 py-1.5 text-xs', tool.status === 'running' ? 'animate-pulse' : '']">
                 <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', tool.status === 'failed' ? 'bg-red-400' : tool.status === 'done' ? 'bg-emerald-400' : 'bg-amber-300']" />
                 <span class="min-w-0 flex-1 truncate text-muted-foreground/80">{{ tool.title }}</span>
-                <span v-if="tool.count > 1" class="shrink-0 text-[10px] text-muted-foreground/50">×{{ tool.count }}</span>
+                <span v-if="tool.count > 1" class="shrink-0 text-[0.625rem] text-muted-foreground/50">×{{ tool.count }}</span>
                 <!-- -N +N diff badge -->
                 <button
                   v-if="tool.renderKind === 'diff' && tool.diff && diffStats(tool.diff).total > 0"
-                  class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium hover:bg-muted/50"
+                  class="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[0.6875rem] font-medium hover:bg-muted/50"
                   @click="$emit('openFileDiff', tool.fileTarget)"
                 >
                   <span class="text-red-400">-{{ diffStats(tool.diff).del }}</span>
@@ -106,7 +106,7 @@
               <!-- Error output only -->
               <pre
                 v-if="tool.status === 'failed' && tool.preview"
-                class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[11px] leading-5 text-red-200/90"
+                class="mx-2 mb-1 max-h-32 overflow-auto rounded-md bg-red-950/20 p-2 text-[0.6875rem] leading-5 text-red-200/90"
               >{{ tool.preview }}</pre>
             </div>
           </div>
@@ -139,14 +139,14 @@
 }
 .timeline-entry-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(0.5rem);
 }
 .timeline-entry-leave-active {
   transition: opacity 150ms ease, transform 150ms ease;
 }
 .timeline-entry-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-0.25rem);
 }
 
 .timeline-shimmer {
@@ -173,7 +173,7 @@
 .timeline-cursor {
   display: inline-block;
   width: 2px;
-  height: 14px;
+  height: 0.875rem;
   vertical-align: text-bottom;
   margin-left: 2px;
   background: hsl(var(--foreground) / 0.85);

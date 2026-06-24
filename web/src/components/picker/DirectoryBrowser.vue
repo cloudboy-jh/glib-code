@@ -13,7 +13,7 @@
         <ChevronUp class="h-4 w-4" />
       </button>
       <div class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{{ current.path || '…' }}</div>
-      <span v-if="loading" class="shrink-0 text-[10px] uppercase tracking-[0.1em] text-muted-foreground/70">Loading…</span>
+      <span v-if="loading" class="shrink-0 text-[0.625rem] uppercase tracking-[0.1em] text-muted-foreground/70">Loading…</span>
     </div>
 
     <!-- Folder list -->
@@ -40,7 +40,7 @@
 
     <!-- New folder (optional) -->
     <div v-if="allowCreate" class="flex items-center gap-2 border-t border-border/60 px-3 py-2">
-      <span class="shrink-0 text-[11px] text-muted-foreground">New folder:</span>
+      <span class="shrink-0 text-[0.6875rem] text-muted-foreground">New folder:</span>
       <input
         v-model="newFolder"
         class="h-7 min-w-0 flex-1 rounded-md border border-input/70 bg-background/70 px-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -51,7 +51,7 @@
 
     <!-- Selected footer -->
     <div class="flex items-center gap-2 border-t border-border/60 px-3 py-2">
-      <span class="shrink-0 text-[11px] text-muted-foreground">Selected:</span>
+      <span class="shrink-0 text-[0.6875rem] text-muted-foreground">Selected:</span>
       <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ effectivePath }}</span>
     </div>
   </div>

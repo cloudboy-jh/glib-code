@@ -1,5 +1,5 @@
 <template>
-  <UiDialog dialog-class="max-w-[720px]" @close="$emit('close')">
+  <UiDialog dialog-class="max-w-[45rem]" @close="$emit('close')">
     <div class="flex flex-col gap-2 p-6 pb-3">
       <h3 class="text-xl font-semibold leading-none">Theme</h3>
       <p class="text-sm text-muted-foreground">Switch the app theme and preview the active token palette.</p>
@@ -12,11 +12,11 @@
         placeholder="Search themes"
       />
 
-      <div class="max-h-[420px] space-y-1 overflow-auto pr-1">
+      <div class="max-h-[26.25rem] space-y-1 overflow-auto pr-1">
         <div v-if="inHouseThemes.length" class="space-y-1">
           <div class="flex items-center gap-2 px-1 pb-0.5 pt-1">
-            <span class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">In-House Glib Themes</span>
-            <span class="rounded border border-border/60 px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Curated</span>
+            <span class="text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">In-House Glib Themes</span>
+            <span class="rounded border border-border/60 px-1 py-px text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Curated</span>
           </div>
           <button
             v-for="themeId in inHouseThemes"
@@ -100,8 +100,8 @@ function formatName(value: string) {
 <style scoped>
 .theme-dot {
   display: inline-block;
-  height: 12px;
-  width: 12px;
+  height: 0.75rem;
+  width: 0.75rem;
   border-radius: 999px;
   border: 1px solid hsl(var(--border));
 }

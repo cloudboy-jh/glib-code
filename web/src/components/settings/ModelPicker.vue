@@ -4,7 +4,7 @@
       <div class="flex items-center justify-between border-b border-border/70 px-4 py-3">
         <div>
           <div class="text-sm font-semibold">Select model</div>
-          <div class="mt-0.5 text-[11px] text-muted-foreground">{{ modelRows.length }} models · {{ authenticatedRows.length }} usable</div>
+          <div class="mt-0.5 text-[0.6875rem] text-muted-foreground">{{ modelRows.length }} models · {{ authenticatedRows.length }} usable</div>
         </div>
         <button class="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="$emit('close')">Close</button>
       </div>
@@ -30,17 +30,17 @@
               <div class="border-b border-border/70 p-2">
                 <button v-for="item in primaryFilters" :key="item.id" :class="menuFilterClass(filter === item.id)" @click.stop="selectFilter(item.id)">
                   <span>{{ item.label }}</span>
-                  <span class="shrink-0 text-[11px] text-muted-foreground">{{ item.count }}</span>
+                  <span class="shrink-0 text-[0.6875rem] text-muted-foreground">{{ item.count }}</span>
                 </button>
               </div>
               <div class="max-h-72 overflow-auto p-2">
-                <p class="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Providers</p>
+                <p class="mb-1 px-2 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Providers</p>
                 <button v-for="provider in providerFilters" :key="provider.id" :class="menuFilterClass(filter === provider.id)" @click.stop="selectFilter(provider.id)">
                   <span class="flex min-w-0 items-center gap-2">
-                    <ModelIcon :provider="provider.id" :size="18" theme="dark" />
+                    <ModelIcon :provider="provider.id" :size="18" />
                     <span class="truncate">{{ provider.id }}</span>
                   </span>
-                  <span class="shrink-0 text-[11px] text-muted-foreground">{{ provider.modelIds.length }}</span>
+                  <span class="shrink-0 text-[0.6875rem] text-muted-foreground">{{ provider.modelIds.length }}</span>
                 </button>
               </div>
             </div>
@@ -63,7 +63,7 @@
           @click="onSelect(row)"
         >
           <div class="flex min-w-0 items-center gap-3">
-            <ModelIcon :provider="row.providerId" :size="24" theme="dark" />
+            <ModelIcon :provider="row.providerId" :size="24" />
             <div class="min-w-0">
               <div class="truncate text-sm font-medium text-foreground">{{ row.modelId }}</div>
               <div class="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">

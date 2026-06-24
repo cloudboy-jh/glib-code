@@ -28,7 +28,7 @@
         />
 
         <button
-          v-if="currentProject && leftRailOpen"
+          v-if="currentProject && leftRailOpen && !leftRailForceHidden"
           type="button"
           class="absolute inset-y-0 -right-2 z-10 hidden w-4 cursor-col-resize bg-transparent transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-border md:block"
           aria-label="Resize sidebar"
@@ -36,7 +36,7 @@
         />
       </div>
 
-      <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[44px_1fr]' : 'grid-rows-[1fr]']">
+      <section :class="['grid h-full min-h-0 min-w-0', currentProject && state.mode === 'session' ? 'grid-rows-[2.75rem_1fr]' : 'grid-rows-[1fr]']">
           <SessionHeader
             v-if="currentProject && state.mode === 'session'"
           :title="activeSession?.title ?? 'No active session'"
@@ -70,8 +70,10 @@
             </div>
           </Transition>
 
+          <Transition name="view-fade" mode="out-in">
           <PickerView
             v-if="!currentProject"
+            key="picker"
             :recents="recents"
             :sessions-by-path="pickerSessionsByPath"
             :commits-by-path="pickerCommitsByPath"
@@ -90,6 +92,7 @@
 
           <SessionView
             v-else-if="state.mode === 'session'"
+            key="session"
             :active-session="activeSession"
             :active-context-summary="activeContextSummary"
             :active-session-notice="activeSessionNotice"
@@ -143,6 +146,7 @@
 
           <DiffView
             v-else
+            key="diff"
             :current-project="currentProject"
             :diff-style="state.diffStyle"
             :open-request="state.diffOpenRequest"
@@ -155,6 +159,7 @@
             @start-session-from-diff="startSessionFromDiff"
             @open-settings="openSettings('Integrations')"
           />
+          </Transition>
         </main>
       </section>
 
@@ -191,7 +196,6 @@
     <SettingsModal
       v-if="state.settingsOpen"
       :settings="settings"
-      :keybindings="keybindings"
       :providers="providerCapabilities.providers"
       :github-connected="authState.githubConnected"
       :github-account="authState.githubAccount"
@@ -210,7 +214,6 @@
       @update:theme="updateTheme"
       @update:provider="updateDefaultProvider"
       @update:model="selectModel(settings.defaultProvider, $event)"
-      @update:keybinding="updateKeybinding"
       @update:open-mode="settings.defaultOpenMode = $event"
       @update:gittrix-provider="updateGitTrixProvider"
       @update:preferred-editor="updatePreferredEditor"
@@ -364,23 +367,23 @@
         <div v-if="!promote.result && !promote.alreadyPromoted" class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
           <div>
             <div class="text-sm font-medium">Session diff and commit</div>
-            <div class="mt-0.5 text-[11px] text-muted-foreground">{{ promoteSelectionLabel }} · {{ promoteFlowLabel }}</div>
+            <div class="mt-0.5 text-[0.6875rem] text-muted-foreground">{{ promoteSelectionLabel }} · {{ promoteFlowLabel }}</div>
           </div>
           <div class="flex items-center gap-2">
             <div v-if="promote.files.length > 1" ref="promoteFileMenuRef" class="relative">
-              <button type="button" class="inline-flex h-8 w-[260px] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[11px] hover:bg-muted/50" @click="promote.fileMenuOpen = !promote.fileMenuOpen">
+              <button type="button" class="inline-flex h-8 w-[16.25rem] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[0.6875rem] hover:bg-muted/50" @click="promote.fileMenuOpen = !promote.fileMenuOpen">
                 <span class="min-w-0 flex-1 truncate text-left">{{ promoteSelectionButtonLabel }}</span>
                 <ChevronDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </button>
               <div v-if="promote.fileMenuOpen" class="fixed inset-0 z-[60] grid place-items-center bg-black/25 p-4" @click.self="promote.fileMenuOpen = false">
-                <div class="flex max-h-[min(72vh,560px)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+                <div class="flex max-h-[min(72vh,560px)] w-[40rem] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
                   <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
                     <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select files</div>
-                    <button class="rounded border border-border/70 px-2 py-1 text-[11px] hover:bg-muted/60" @click="selectAllPromoteFiles">All</button>
+                    <button class="rounded border border-border/70 px-2 py-1 text-[0.6875rem] hover:bg-muted/60" @click="selectAllPromoteFiles">All</button>
                   </div>
                   <div class="min-h-0 overflow-auto p-1">
-                    <button v-for="file in promote.files" :key="file" type="button" class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] text-foreground hover:bg-muted/70" :title="file" @click="togglePromoteFile(file)">
-                      <span class="inline-grid h-4 w-4 place-items-center rounded border border-border/80 text-[10px] text-primary">{{ promote.selectedFiles.includes(file) ? '✓' : '' }}</span>
+                    <button v-for="file in promote.files" :key="file" type="button" class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[0.6875rem] text-foreground hover:bg-muted/70" :title="file" @click="togglePromoteFile(file)">
+                      <span class="inline-grid h-4 w-4 place-items-center rounded border border-border/80 text-[0.625rem] text-primary">{{ promote.selectedFiles.includes(file) ? '✓' : '' }}</span>
                       <span class="min-w-0 flex-1 truncate">{{ file }}</span>
                     </button>
                   </div>
@@ -405,8 +408,8 @@
               </div>
               <div>
                 <div class="text-base font-semibold text-foreground/95">Already committed</div>
-                <div class="mt-1.5 text-[12px] text-muted-foreground/70">This session was already promoted.</div>
-                <div v-if="promote.promotedSha" class="mt-1 font-mono text-[11px] text-muted-foreground/50">{{ promote.promotedSha.slice(0, 7) }}</div>
+                <div class="mt-1.5 text-[0.75rem] text-muted-foreground/70">This session was already promoted.</div>
+                <div v-if="promote.promotedSha" class="mt-1 font-mono text-[0.6875rem] text-muted-foreground/50">{{ promote.promotedSha.slice(0, 7) }}</div>
               </div>
               <button class="rounded-md border border-border/70 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Close</button>
             </div>
@@ -430,9 +433,9 @@
               </div>
               <div>
                 <div class="text-base font-semibold text-foreground/95">{{ promoteResultTitle }}</div>
-                <div class="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground/70">
-                  <span>{{ promote.result.branch }} <span class="font-mono text-[11px]">{{ promote.result.sha.slice(0, 7) }}</span></span>
-                  <span v-if="promote.pushResult">· pushed {{ promote.pushResult.upstream }} <span class="font-mono text-[11px]">{{ promote.pushResult.sha.slice(0, 7) }}</span></span>
+                <div class="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.75rem] text-muted-foreground/70">
+                  <span>{{ promote.result.branch }} <span class="font-mono text-[0.6875rem]">{{ promote.result.sha.slice(0, 7) }}</span></span>
+                  <span v-if="promote.pushResult">· pushed {{ promote.pushResult.upstream }} <span class="font-mono text-[0.6875rem]">{{ promote.pushResult.sha.slice(0, 7) }}</span></span>
                 </div>
               </div>
               <button class="rounded-md border border-border/70 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground" @click="state.promoteDialogOpen = false">Done</button>
@@ -446,7 +449,7 @@
                 <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" /></svg>
               </div>
               <div class="text-sm text-foreground/90">{{ promote.error }}</div>
-              <div v-if="promote.dirtyFiles.length" class="mt-3 max-h-40 overflow-auto rounded border border-red-200/20 bg-black/15 p-2 text-left font-mono text-[11px] text-red-50/85">
+              <div v-if="promote.dirtyFiles.length" class="mt-3 max-h-40 overflow-auto rounded border border-red-200/20 bg-black/15 p-2 text-left font-mono text-[0.6875rem] text-red-50/85">
                 <div v-for="file in promote.dirtyFiles" :key="file" class="truncate">{{ file }}</div>
               </div>
               <button v-if="promote.dirtyFiles.length" class="mt-4 rounded-md border border-red-200/30 bg-red-100/10 px-3 py-1.5 text-xs font-semibold text-red-50 hover:bg-red-100/15 disabled:cursor-not-allowed disabled:opacity-50" :disabled="promote.stashing" @click="stashAndRetryPromote">
@@ -578,16 +581,24 @@ const logoIconSrc = logoIcon;
 const logoWordmarkSrc = logoWordmark;
 const SharedDiffView = defineAsyncComponent(() => import('./components/shared/DiffView.vue'));
 const MultiDiffView = defineAsyncComponent(() => import('./components/shared/MultiDiffView.vue'));
-const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width';
+// -rem suffix: sidebar width is now stored in rem (was px). Bumping the key
+// drops legacy px values so users fall back to the sane default once.
+const SIDEBAR_WIDTH_KEY = 'glib-sidebar-width-rem';
 
 // ── Rail visibility — reads localStorage synchronously before first paint ──
 const { leftRailOpen, rightRailOpen, toggleLeft: toggleLeftRail, toggleRight: toggleRightRail } = useRailVisibility();
-const SIDEBAR_EXPANDED_WIDTH = 288;
-const SIDEBAR_COLLAPSED_WIDTH = 64;
-const RIGHT_RAIL_EXPANDED_WIDTH = 288;
-const RIGHT_RAIL_COLLAPSED_WIDTH = 64;
-const SIDEBAR_MIN_WIDTH = 240;
-const SIDEBAR_MAX_WIDTH = 380;
+// Rail sizes are expressed in rem so they ride the clamp()-scaled root font and
+// grow/shrink proportionally with the window. Values are the historical px
+// design sizes ÷ 16 (the base root font). Stored sidebar width is also rem.
+const SIDEBAR_EXPANDED_WIDTH = 18; // 288px @16
+const RIGHT_RAIL_EXPANDED_WIDTH = 18; // 288px @16
+const SIDEBAR_MIN_WIDTH = 15; // 240px @16
+const SIDEBAR_MAX_WIDTH = 23.75; // 380px @16
+
+// Live root font size in px — used to convert mouse-drag px deltas into rem.
+function rootFontPx() {
+  return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+}
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:4273/api';
 const { apiGet, apiPost, apiPatch, apiDelete, apiBlob } = useApiClient(() => currentProject.value?.path ?? null);
 const demoMode = new URLSearchParams(window.location.search).get('demo');
@@ -762,13 +773,6 @@ const readiness = reactive<{ gitOk: boolean; piOk: boolean; loaded: boolean }>({
   loaded: false
 });
 
-const keybindings = reactive([
-  { command: 'palette.toggle', key: 'Ctrl+K' },
-  { command: 'terminal.toggle', key: 'Ctrl+J' },
-  { command: 'mode.diff', key: 'D' },
-  { command: 'mode.session', key: 'S' }
-]);
-
 const state = reactive({
   mode: 'diff' as 'session' | 'diff',
   activeSessionId: '',
@@ -778,7 +782,7 @@ const state = reactive({
   paletteIndex: 0,
   settingsOpen: false,
   modelPickerOpen: false,
-  settingsTab: 'Models' as 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings',
+  settingsTab: 'Models' as 'Models' | 'Git' | 'Integrations' | 'Appearance',
   terminalOpen: false,
   openProjectDialogOpen: false,
   themeDialogOpen: false,
@@ -1065,14 +1069,25 @@ const filteredPaletteCommands = computed<PaletteCommand[]>(() => {
   return options.filter((c) => c.label.toLowerCase().includes(q) || c.id.includes(q));
 });
 
-const sidebarWidth = computed(() => (leftRailOpen.value ? state.sidebarWidth : 0));
-const rightRailWidth = computed(() => (rightRailOpen.value ? RIGHT_RAIL_EXPANDED_WIDTH : 0));
+// Auto-collapse rails on narrow windows so the center pane is never crushed.
+// This gates *display* only — the persisted open/closed preference is untouched,
+// so rails reappear automatically when the window widens again.
+// Thresholds in px: hide the right rail first, then the left.
+const RIGHT_RAIL_HIDE_BELOW = 760;
+const LEFT_RAIL_HIDE_BELOW = 600;
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
+const leftRailForceHidden = computed(() => viewportWidth.value < LEFT_RAIL_HIDE_BELOW);
+const rightRailForceHidden = computed(() => viewportWidth.value < RIGHT_RAIL_HIDE_BELOW);
+
+const sidebarWidth = computed(() => (leftRailOpen.value && !leftRailForceHidden.value ? state.sidebarWidth : 0));
+const rightRailWidth = computed(() => (rightRailOpen.value && !rightRailForceHidden.value ? RIGHT_RAIL_EXPANDED_WIDTH : 0));
 const showRightRail = computed(() => Boolean(currentProject.value && state.mode === 'session' && state.activeSessionId));
 const gridTemplateColumns = computed(() => {
   if (!currentProject.value) return '1fr';
-  const left = `${sidebarWidth.value}px`;
+  // rem units so rails scale with the clamp()-driven root font.
+  const left = `${sidebarWidth.value}rem`;
   const center = 'minmax(0, 1fr)';
-  const right = showRightRail.value ? `${rightRailWidth.value}px` : null;
+  const right = showRightRail.value ? `${rightRailWidth.value}rem` : null;
   return [left, center, ...(right ? [right] : [])].join(' ');
 });
 const streamsBySessionId = new Map<string, EventSource>();
@@ -1603,13 +1618,13 @@ async function hydrateSessions() {
   return hydratingSessionsPromise;
 }
 
-function openSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings' = 'Models') {
+function openSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' = 'Models') {
   state.settingsTab = tab;
   state.settingsOpen = true;
   void loadProjectProvider();
 }
 
-async function handleOnboardingOpenSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance' | 'Keybindings') {
+async function handleOnboardingOpenSettings(tab: 'Models' | 'Git' | 'Integrations' | 'Appearance') {
   await completeFirstLaunch();
   openSettings(tab);
 }
@@ -1901,9 +1916,11 @@ function startSidebarResize(event: MouseEvent) {
 
   const startX = event.clientX;
   const startWidth = state.sidebarWidth;
+  const fontPx = rootFontPx();
 
   const onMouseMove = (moveEvent: MouseEvent) => {
-    state.sidebarWidth = clampSidebarWidth(startWidth + (moveEvent.clientX - startX));
+    // Convert the px drag delta to rem against the live root font size.
+    state.sidebarWidth = clampSidebarWidth(startWidth + (moveEvent.clientX - startX) / fontPx);
   };
 
   const onMouseUp = () => {
@@ -2874,11 +2891,6 @@ function updatePaletteQuery(value: string) {
   state.paletteIndex = 0;
 }
 
-function updateKeybinding(command: string, key: string) {
-  const row = keybindings.find((k) => k.command === command);
-  if (row) row.key = key;
-}
-
 async function updateDefaultProvider(providerId: string) {
   const provider = providerCapabilities.providers.find((item) => item.id === providerId);
   if (!provider || !provider.hasAuth) return;
@@ -3164,11 +3176,8 @@ function runComposerCommand(command: string, args?: string) {  if (command === '
 
 const shortcuts = useGlobalShortcuts({
   state,
-  forms,
   filteredPaletteCommands,
   runPalette,
-  toggleLeftRail,
-  toggleRightRail,
   closeOnEscape: [
     () => {
       if (promote.fileMenuOpen) {
@@ -3236,9 +3245,16 @@ const shortcuts = useGlobalShortcuts({
   ]
 });
 
+function handleViewportResize() {
+  viewportWidth.value = window.innerWidth;
+}
+
 onMounted(() => {
   // Always re-classify tool calls on fresh load (classification logic may have changed)
   hydratedVersionBySessionId.clear();
+
+  viewportWidth.value = window.innerWidth;
+  window.addEventListener('resize', handleViewportResize);
 
   const storedSidebarWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
   if (storedSidebarWidth) {
@@ -3333,6 +3349,7 @@ watch(
 onUnmounted(() => {
   stopThemeCycleDemo();
   stopSidebarResize?.();
+  window.removeEventListener('resize', handleViewportResize);
   closeTerminalSocket();
   for (const id of [...streamsBySessionId.keys()]) disconnectSessionStream(id);
   shortcuts.unbind();

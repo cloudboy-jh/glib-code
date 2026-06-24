@@ -10,7 +10,7 @@
         />
       </div>
 
-      <div class="max-h-[420px] overflow-auto p-2">
+      <div class="max-h-[26.25rem] overflow-auto p-2">
         <component
           :is="c.disabled ? 'div' : 'button'"
           v-for="(c, i) in commands"
@@ -28,9 +28,9 @@
         >
           <span class="flex flex-col gap-0.5">
             <span>{{ c.label }}</span>
-            <span v-if="c.disabled && c.disabledReason" class="text-[11px] text-muted-foreground/80">{{ c.disabledReason }}</span>
+            <span v-if="c.disabled && c.disabledReason" class="text-[0.6875rem] text-muted-foreground/80">{{ c.disabledReason }}</span>
           </span>
-          <span class="text-[11px] text-muted-foreground">{{ c.id }}</span>
+          <span class="text-[0.6875rem] text-muted-foreground">{{ c.id }}</span>
         </component>
 
         <div v-if="commands.length === 0" class="px-3 py-8 text-center text-sm text-muted-foreground">No matching commands</div>

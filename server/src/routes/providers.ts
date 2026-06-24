@@ -2,10 +2,23 @@ import { Hono } from "hono";
 import { getProvidersState, patchProviderDefaults } from "../services/settings-store";
 import { getPiCapabilities } from "../services/pi-capabilities";
 import { refreshPiModels, getPiCore } from "../services/pi-core";
+import { refreshOpenRouterCatalog } from "../services/openrouter-catalog";
 
 export const providersRoutes = new Hono()
   .get("/", async (c) => {
     const [capabilities, selections] = await Promise.all([getPiCapabilities(), getProvidersState()]);
+    return c.json({
+      ok: capabilities.ok,
+      error: capabilities.error,
+      defaultProvider: selections.defaultProvider,
+      defaultModel: selections.defaultModel,
+      providers: capabilities.providers
+    });
+  })
+  .post("/refresh", async (c) => {
+    // Force-refresh the live OpenRouter catalog, then rebuild capabilities.
+    await refreshOpenRouterCatalog();
+    const [capabilities, selections] = await Promise.all([getPiCapabilities(true), getProvidersState()]);
     return c.json({
       ok: capabilities.ok,
       error: capabilities.error,

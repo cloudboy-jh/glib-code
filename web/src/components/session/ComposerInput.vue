@@ -7,8 +7,8 @@
       :rows="expanded ? 10 : 5"
       :placeholder="placeholderText"
       :class="[
-        'w-full resize-none border-0 bg-transparent px-3 pb-2 pt-3 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-60',
-        expanded ? 'min-h-[240px]' : 'min-h-[132px]'
+        'w-full resize-none border-0 bg-transparent px-3 pb-2 pt-3 text-[0.9375rem] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-60',
+        expanded ? 'min-h-[15rem]' : 'min-h-[8.25rem]'
       ]"
       @input="onInput"
       @keydown="onKeydown"
@@ -17,7 +17,7 @@
 
     <button
       type="button"
-      class="absolute right-2 top-2 inline-flex h-8 items-center gap-1 rounded-md border border-border/70 bg-background/70 px-2 text-[11px] text-muted-foreground transition-colors hover:border-border hover:bg-muted/70 hover:text-foreground"
+      class="absolute right-2 top-2 inline-flex h-8 items-center gap-1 rounded-md border border-border/70 bg-background/70 px-2 text-[0.6875rem] text-muted-foreground transition-colors hover:border-border hover:bg-muted/70 hover:text-foreground"
       @click="expanded = !expanded"
     >
       <component :is="expanded ? Minimize2 : Maximize2" class="h-3.5 w-3.5" />

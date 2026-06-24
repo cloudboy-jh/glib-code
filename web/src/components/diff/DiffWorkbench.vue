@@ -2,21 +2,21 @@
   <section class="h-full overflow-auto p-5">
     <template v-if="state.phase === 'history'">
       <div class="grid h-full place-items-center">
-        <div class="w-full max-w-[720px]">
+        <div class="w-full max-w-[45rem]">
           <div class="mb-6 flex justify-center">
-            <div class="diff-wordmark h-24 w-[340px]" :style="{ '--diff-wordmark-url': `url(${diffsWordmarkSrc})` }" role="img" aria-label="Diffs" />
+            <div class="diff-wordmark h-24 w-[21.25rem]" :style="{ '--diff-wordmark-url': `url(${diffsWordmarkSrc})` }" role="img" aria-label="Diffs" />
           </div>
 
           <div class="rounded-xl border border-primary/60 bg-card/80 p-3">
             <div class="mb-2 flex items-center justify-between">
               <button
-                class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[11px] font-medium text-primary hover:bg-primary/18"
+                class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[0.6875rem] font-medium text-primary hover:bg-primary/18"
                 @click="$emit('openProjects')"
               >
                 <CornerDownLeft class="h-3.5 w-3.5" />
                 <span>Projects</span>
               </button>
-              <div class="text-[11px] text-muted-foreground">{{ currentProject.name }}</div>
+              <div class="text-[0.6875rem] text-muted-foreground">{{ currentProject.name }}</div>
             </div>
             <div class="mb-2 flex items-center gap-2 text-primary">
               <GitCommitHorizontal class="h-4 w-4" />
@@ -25,7 +25,7 @@
             <div class="mb-3 text-sm text-muted-foreground">{{ state.items.length }} commits</div>
             <div v-if="state.historyError" class="mb-2 rounded border border-red-500/35 bg-red-500/10 px-2 py-1 text-xs text-red-200">{{ state.historyError }}</div>
 
-            <div class="space-y-1 rounded-md bg-background/35 p-1 text-[16px]">
+            <div class="space-y-1 rounded-md bg-background/35 p-1 text-[1rem]">
               <button
                 v-for="(item, idx) in visibleItems"
                 :key="item.id"
@@ -39,7 +39,7 @@
                 <span class="w-4 text-muted-foreground">
                   {{ visibleStart + idx === visibleStart && visibleStart > 0 ? '^' : visibleStart + idx === Math.min(visibleStart + visibleItems.length - 1, state.items.length - 1) && visibleStart + visibleItems.length < state.items.length ? 'v' : visibleStart + idx === state.cursor ? '>' : '' }}
                 </span>
-                <span class="w-[74px] shrink-0 text-primary/85">{{ item.shortRef }}</span>
+                <span class="w-[4.625rem] shrink-0 text-primary/85">{{ item.shortRef }}</span>
                 <span class="min-w-0 flex-1 truncate">{{ item.title }}</span>
               </button>
             </div>
@@ -48,7 +48,7 @@
               <span class="text-xs text-muted-foreground">Select a commit to open its diff.</span>
               <button
                 v-if="state.selectedCommitRef"
-                class="h-6 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                class="h-6 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 @click="toggleInlineDetail"
               >
                 {{ state.inlineDetailOpen ? 'Hide' : 'Detail' }}
@@ -61,13 +61,13 @@
                 <div class="mb-1 flex items-center gap-2">
                   <span class="font-mono text-primary/85">{{ state.inlineDetail.sha.slice(0, 10) }}</span>
                   <span class="text-muted-foreground">{{ state.inlineDetail.authorName }} · {{ state.inlineDetail.date }}</span>
-                  <button class="ml-auto rounded border border-border/70 px-1.5 py-0.5 text-[10px] hover:bg-muted/60" @click="loadCommitDetail">Full detail</button>
+                  <button class="ml-auto rounded border border-border/70 px-1.5 py-0.5 text-[0.625rem] hover:bg-muted/60" @click="loadCommitDetail">Full detail</button>
                 </div>
                 <div class="mb-2 font-medium">{{ state.inlineDetail.subject }}</div>
                 <div class="flex flex-wrap gap-x-4 gap-y-0.5">
                   <span v-for="file in state.inlineDetail.files" :key="`${file.status}-${file.path}`" class="flex items-center gap-1">
-                    <span class="inline-block w-5 rounded border border-border/70 px-0.5 text-center text-[10px]">{{ file.status }}</span>
-                    <span class="truncate max-w-[200px]">{{ file.path }}</span>
+                    <span class="inline-block w-5 rounded border border-border/70 px-0.5 text-center text-[0.625rem]">{{ file.status }}</span>
+                    <span class="truncate max-w-[12.5rem]">{{ file.path }}</span>
                   </span>
                 </div>
               </template>
@@ -81,28 +81,28 @@
       <section>
         <div class="sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-md border border-border/80 bg-card/95 p-3 backdrop-blur-sm">
           <button
-            class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[11px] font-medium text-primary hover:bg-primary/18"
+            class="inline-flex h-8 items-center gap-1.5 rounded border border-primary/55 bg-primary/12 px-2.5 text-[0.6875rem] font-medium text-primary hover:bg-primary/18"
             @click="state.phase = 'history'"
           >
             <CornerDownLeft class="h-3.5 w-3.5" />
             <span>Repo History</span>
-            <span v-if="state.openSource === 'commit' && state.selectedCommitRef" class="rounded border border-primary/40 px-1.5 py-[1px] font-mono text-[10px] text-primary/90">
+            <span v-if="state.openSource === 'commit' && state.selectedCommitRef" class="rounded border border-primary/40 px-1.5 py-[1px] font-mono text-[0.625rem] text-primary/90">
               {{ state.selectedCommitRef.slice(0, 7) }}
             </span>
-            <span v-else-if="state.openSource === 'uncommitted'" class="rounded border border-primary/35 px-1.5 py-[1px] text-[10px] text-primary/85">
+            <span v-else-if="state.openSource === 'uncommitted'" class="rounded border border-primary/35 px-1.5 py-[1px] text-[0.625rem] text-primary/85">
               Working
             </span>
           </button>
           <div class="text-xs text-muted-foreground">{{ currentProject.name }}</div>
           <div class="ml-2 rounded-md border border-border/80 bg-background/55 p-0.5">
             <button
-              :class="['h-7 rounded px-2 text-[11px]', state.openSource === 'commit' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', state.openSource === 'commit' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="openSelectedCommit()"
             >
               Repo History
             </button>
             <button
-              :class="['h-7 rounded px-2 text-[11px]', state.openSource === 'uncommitted' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', state.openSource === 'uncommitted' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="openWorkingTree()"
             >
               Session Diff
@@ -120,7 +120,7 @@
           />
           
           <button
-            class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[11px] font-medium text-primary hover:bg-primary/18 disabled:opacity-40"
+            class="h-7 rounded border border-primary/55 bg-primary/12 px-2 text-[0.6875rem] font-medium text-primary hover:bg-primary/18 disabled:opacity-40"
             :disabled="!state.files.length"
             :title="hasDiffSelection ? `Start session scoped to ${selectionFileCount} file${selectionFileCount === 1 ? '' : 's'}` : 'Start session from current file'"
             @click="emitStartSessionFromDiff"
@@ -128,7 +128,7 @@
             Start session from diff{{ hasDiffSelection ? ` (${selectionFileCount})` : '' }}
           </button>
           <button
-            class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+            class="h-7 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="currentFileIndex <= 0"
             @click="selectPreviousFile"
           >
@@ -137,7 +137,7 @@
           <div ref="fileMenuRef" class="relative">
             <button
               type="button"
-              class="inline-flex h-7 w-[260px] max-w-[420px] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[11px] text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="inline-flex h-7 w-[16.25rem] max-w-[26.25rem] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[0.6875rem] text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               :title="state.selectedFilePath || 'No file selected'"
               @click="fileMenuOpen = !fileMenuOpen"
             >
@@ -146,14 +146,14 @@
             </button>
 
             <div v-if="fileMenuOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-4" @click.self="fileMenuOpen = false">
-              <div class="flex max-h-[min(72vh,560px)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+              <div class="flex max-h-[min(72vh,560px)] w-[40rem] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
                 <div class="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2">
                   <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select files</div>
-                  <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div class="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
                     <span>{{ state.selectedFiles.length }} of {{ state.files.length }} scoped</span>
                     <button
                       type="button"
-                      class="h-6 rounded border border-border/70 px-2 text-[10px] hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+                      class="h-6 rounded border border-border/70 px-2 text-[0.625rem] hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
                       :disabled="!state.files.length"
                       @click="toggleAllFiles"
                     >
@@ -172,7 +172,7 @@
                   >
                     <button
                       type="button"
-                      class="inline-grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px]"
+                      class="inline-grid h-4 w-4 shrink-0 place-items-center rounded border text-[0.625rem]"
                       :class="state.selectedFiles.includes(file.path) ? 'border-primary/70 bg-primary/20 text-primary' : 'border-border/80 text-transparent'"
                       :title="state.selectedFiles.includes(file.path) ? 'Remove from session scope' : 'Add to session scope'"
                       @click.stop="toggleFileSelection(file.path)"
@@ -182,34 +182,34 @@
                     <button
                       type="button"
                       :class="[
-                        'min-w-0 flex-1 truncate text-left text-[11px]',
+                        'min-w-0 flex-1 truncate text-left text-[0.6875rem]',
                         file.path === state.selectedFilePath ? 'text-primary' : 'text-foreground'
                       ]"
                       :title="file.path"
                       @click="selectFileFromMenu(file.path)"
                     >
-                      <span class="w-7 inline-block shrink-0 rounded border border-border/70 px-1 text-center text-[10px] text-muted-foreground">{{ file.status }}</span>
+                      <span class="w-7 inline-block shrink-0 rounded border border-border/70 px-1 text-center text-[0.625rem] text-muted-foreground">{{ file.status }}</span>
                       <span class="ml-2">{{ file.path }}</span>
                     </button>
                     
                     <div class="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         v-if="file.path.toLowerCase().endsWith('.md') || file.path.toLowerCase().endsWith('.markdown') || file.path.toLowerCase().endsWith('.mdx')"
-                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[0.625rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                         title="Open in Obsidian"
                         @click="openFileInEditor(file.path, 'obsidian')"
                       >
                         O
                       </button>
                       <button
-                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[0.625rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                         title="Open in VS Code"
                         @click="openFileInEditor(file.path, 'vscode')"
                       >
                         V
                       </button>
                       <button
-                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        class="h-5 w-5 rounded border border-border/70 bg-background/70 p-0.5 text-[0.625rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                         title="Open in Cursor"
                         @click="openFileInEditor(file.path, 'cursor')"
                       >
@@ -222,7 +222,7 @@
             </div>
           </div>
           <button
-            class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+            class="h-7 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="currentFileIndex < 0 || currentFileIndex >= state.files.length - 1"
             @click="selectNextFile"
           >
@@ -230,13 +230,13 @@
           </button>
           <div class="rounded-md border border-border/80 bg-background/55 p-0.5">
             <button
-              :class="['h-7 rounded px-2 text-[11px]', diffStyle === 'split' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', diffStyle === 'split' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="$emit('update:diffStyle', 'split')"
             >
               Split
             </button>
             <button
-              :class="['h-7 rounded px-2 text-[11px]', diffStyle === 'unified' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', diffStyle === 'unified' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="$emit('update:diffStyle', 'unified')"
             >
               Unified
@@ -251,7 +251,7 @@
                 <span>File actions</span>
                 <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-              <div v-if="menuOpen === 'changes'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[170px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+              <div v-if="menuOpen === 'changes'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[10.625rem] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
                 <button class="menu-item" @click="menuStageSelected">Stage file</button>
                 <button class="menu-item" @click="menuUnstageSelected">Unstage file</button>
                 <button class="menu-item menu-item-danger" @click="menuDiscardSelected">Discard file</button>
@@ -263,7 +263,7 @@
                 <span>All changes</span>
                 <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-              <div v-if="menuOpen === 'bulk'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[170px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+              <div v-if="menuOpen === 'bulk'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[10.625rem] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
                 <button class="menu-item" @click="menuStageAll">Stage all listed</button>
                 <button class="menu-item" @click="menuUnstageAll">Unstage all listed</button>
                 <button class="menu-item menu-item-danger" @click="menuDiscardAll">Discard all listed</button>
@@ -273,11 +273,11 @@
             <div ref="branchMenuRef" class="relative">
               <button class="inline-flex h-7 items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 hover:bg-muted/60 disabled:opacity-40" :disabled="isBusy" @click="toggleMenu('branch')">
                 <span>Branch</span>
-                <span v-if="branchState.current" class="rounded border border-border/50 px-1 py-0 text-[10px] text-primary/80">{{ branchState.current }}</span>
+                <span v-if="branchState.current" class="rounded border border-border/50 px-1 py-0 text-[0.625rem] text-primary/80">{{ branchState.current }}</span>
                 <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-              <div v-if="menuOpen === 'branch'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[230px] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
-                <div v-if="branchState.loading" class="px-2 py-1 text-[11px] text-muted-foreground">Loading branches…</div>
+              <div v-if="menuOpen === 'branch'" class="absolute left-0 top-[calc(100%+6px)] z-30 min-w-[14.375rem] rounded-md border border-border/80 bg-card/95 p-1 shadow-2xl shadow-black/40">
+                <div v-if="branchState.loading" class="px-2 py-1 text-[0.6875rem] text-muted-foreground">Loading branches…</div>
                 <template v-else>
                   <div v-if="branchState.all.length" class="max-h-40 overflow-auto border-b border-border/60 py-1">
                     <button
@@ -299,8 +299,8 @@
             </div>
 
             <div class="ml-auto flex items-center gap-1.5 rounded border border-border/70 bg-background/40 p-1">
-              <span class="px-1.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Commit</span>
-              <input v-model="state.commitMessage" class="h-7 min-w-[240px] rounded border border-border/70 bg-background/70 px-2" placeholder="commit message" :disabled="isBusy" />
+              <span class="px-1.5 text-[0.625rem] uppercase tracking-[0.1em] text-muted-foreground">Commit</span>
+              <input v-model="state.commitMessage" class="h-7 min-w-[15rem] rounded border border-border/70 bg-background/70 px-2" placeholder="commit message" :disabled="isBusy" />
               <button class="h-7 rounded border border-primary/60 px-2 text-primary hover:bg-primary/10 disabled:opacity-40" :disabled="!canCommit || isBusy" @click="commitChanges">Commit</button>
             </div>
           </div>
@@ -326,7 +326,7 @@
         <DiffView :patch="state.patch" :diff-style="diffStyle" :theme-type="themeType" :theme-preset="themePreset" />
 
         <div v-if="isCommitView && state.selectedCommitRef" class="mt-3">
-          <button class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground" @click="loadCommitDetail">View commit detail</button>
+          <button class="h-7 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground" @click="loadCommitDetail">View commit detail</button>
         </div>
 
         <SelectionTray
@@ -343,7 +343,7 @@
       <div class="w-full max-w-3xl rounded-xl border border-border/80 bg-card/95 p-4 shadow-2xl shadow-black/40">
         <div class="mb-2 flex items-center justify-between">
           <div class="text-sm font-semibold">Commit {{ state.commitDetail.sha.slice(0, 10) }}</div>
-          <button class="rounded border border-border/70 px-2 py-1 text-[11px]" @click="state.commitDetailOpen = false">Close</button>
+          <button class="rounded border border-border/70 px-2 py-1 text-[0.6875rem]" @click="state.commitDetailOpen = false">Close</button>
         </div>
         <div class="mb-2 text-xs text-muted-foreground">{{ state.commitDetail.authorName }} · {{ state.commitDetail.authorEmail }} · {{ state.commitDetail.date }}</div>
         <div class="mb-1 text-sm font-medium">{{ state.commitDetail.subject }}</div>

@@ -4,7 +4,7 @@
       <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
         <div>
           <div class="text-sm font-medium">Session diff</div>
-          <div class="mt-0.5 text-[11px] text-muted-foreground">
+          <div class="mt-0.5 text-[0.6875rem] text-muted-foreground">
             <span v-if="loading">Loading…</span>
             <span v-else-if="error" class="text-red-300">{{ error }}</span>
             <span v-else-if="!diff.trim()">No changes</span>
@@ -16,14 +16,14 @@
       <template v-if="!loading && !error && diff.trim() && filePatches.length > 0">
         <div class="flex shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2">
           <button
-            class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+            class="h-7 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="selectedIndex <= 0"
             @click="selectFile(selectedIndex - 1)"
           >Prev</button>
           <div class="relative">
             <button
               type="button"
-              class="inline-flex h-7 w-[260px] max-w-[420px] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[11px] text-foreground hover:bg-muted/50"
+              class="inline-flex h-7 w-[16.25rem] max-w-[26.25rem] items-center gap-2 rounded border border-border/70 bg-background/70 px-2 text-[0.6875rem] text-foreground hover:bg-muted/50"
               :title="filePatches[selectedIndex]?.file || 'No file selected'"
               @click="fileMenuOpen = !fileMenuOpen"
             >
@@ -31,17 +31,17 @@
               <ChevronDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
             <div v-if="fileMenuOpen" class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-4" @click.self="fileMenuOpen = false">
-              <div class="flex max-h-[min(72vh,560px)] w-[640px] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
+              <div class="flex max-h-[min(72vh,560px)] w-[40rem] max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-2xl shadow-black/40">
                 <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
                   <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Select file</div>
-                  <div class="text-[11px] text-muted-foreground">{{ filePatches.length }} files</div>
+                  <div class="text-[0.6875rem] text-muted-foreground">{{ filePatches.length }} files</div>
                 </div>
                 <div class="min-h-0 overflow-auto p-1">
                   <button
                     v-for="(entry, idx) in filePatches"
                     :key="entry.file"
                     :class="[
-                      'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] hover:bg-muted/70',
+                      'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[0.6875rem] hover:bg-muted/70',
                       idx === selectedIndex ? 'bg-primary/20 text-primary' : 'text-foreground'
                     ]"
                     @click="selectFile(idx); fileMenuOpen = false"
@@ -51,18 +51,18 @@
             </div>
           </div>
           <button
-            class="h-7 rounded border border-border/70 px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
+            class="h-7 rounded border border-border/70 px-2 text-[0.6875rem] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
             :disabled="selectedIndex >= filePatches.length - 1"
             @click="selectFile(selectedIndex + 1)"
           >Next</button>
-          <span class="ml-auto text-[11px] text-muted-foreground">{{ selectedIndex + 1 }} / {{ filePatches.length }}</span>
+          <span class="ml-auto text-[0.6875rem] text-muted-foreground">{{ selectedIndex + 1 }} / {{ filePatches.length }}</span>
           <div class="rounded-md border border-border/80 bg-background/55 p-0.5">
             <button
-              :class="['h-7 rounded px-2 text-[11px]', diffStyle === 'split' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', diffStyle === 'split' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="$emit('update:diffStyle', 'split')"
             >Split</button>
             <button
-              :class="['h-7 rounded px-2 text-[11px]', diffStyle === 'unified' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
+              :class="['h-7 rounded px-2 text-[0.6875rem]', diffStyle === 'unified' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground']"
               @click="$emit('update:diffStyle', 'unified')"
             >Unified</button>
           </div>

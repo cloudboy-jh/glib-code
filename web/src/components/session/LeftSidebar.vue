@@ -8,7 +8,7 @@
           <div class="flex min-w-0 items-center justify-center rounded-lg px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground">
             <div
               v-if="logoWordmarkSrc"
-              class="logo-wordmark h-5 w-[146px] shrink-0"
+              class="logo-wordmark h-5 w-[9.125rem] shrink-0"
               :style="{ '--logo-url': `url(${logoWordmarkSrc})` }"
               role="img"
               aria-label="glib-code"
@@ -35,7 +35,6 @@
       >
         <Search class="sidebar-icon" />
         <span class="flex-1">Search sessions</span>
-        <span class="rounded-md border border-border/70 bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">⌘K</span>
       </button>
 
       <!-- Session list -->
@@ -53,8 +52,8 @@
             >
               <button type="button" :disabled="disabled" class="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50" @click="$emit('select', s.id)">
                 <span v-if="statusDotClass(s.status)" class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(s.status)" />
-                <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
-                <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
+                <span class="min-w-0 flex-1 truncate text-[0.8125rem] leading-none">{{ s.title }}</span>
+                <span class="shrink-0 text-[0.6875rem] text-muted-foreground/70">{{ s.time }}</span>
               </button>
               <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Rename session" @click.stop="$emit('rename', s.id)">
@@ -71,7 +70,7 @@
             <button
               v-if="currentProjectSessions.length > expandedGroupSessionLimit"
               type="button"
-              class="ml-2 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+              class="ml-2 rounded px-2 py-1 text-[0.6875rem] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
               @click="showAllCurrentProject = !showAllCurrentProject"
             >
               {{ showAllCurrentProject ? 'Show less' : `Show ${currentProjectSessions.length - expandedGroupSessionLimit} more` }}
@@ -79,15 +78,15 @@
           </div>
 
           <div v-if="otherProjectGroups.length" class="space-y-1">
-            <div class="px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/65">Other projects</div>
+            <div class="px-2 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/65">Other projects</div>
             <div v-for="group in otherProjectGroups" :key="group.key" class="rounded-md border border-border/60 bg-background/15">
               <button
                 type="button"
-                class="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                class="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[0.6875rem] text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                 @click="toggleExpandedGroup(group.key)"
               >
                 <span class="truncate">{{ group.project }}</span>
-                <span class="ml-2 shrink-0 text-[10px] text-muted-foreground/80">{{ expandedOpenGroups.has(group.key) ? 'Hide' : `${group.sessions.length}` }}</span>
+                <span class="ml-2 shrink-0 text-[0.625rem] text-muted-foreground/80">{{ expandedOpenGroups.has(group.key) ? 'Hide' : `${group.sessions.length}` }}</span>
               </button>
               <div v-if="expandedOpenGroups.has(group.key)" class="space-y-1 px-1.5 pb-1.5">
                 <div
@@ -100,8 +99,8 @@
                 >
                   <button type="button" :disabled="disabled" class="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50" @click="$emit('select', s.id)">
                     <span v-if="statusDotClass(s.status)" class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(s.status)" />
-                    <span class="min-w-0 flex-1 truncate text-[13px] leading-none">{{ s.title }}</span>
-                    <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ s.time }}</span>
+                    <span class="min-w-0 flex-1 truncate text-[0.8125rem] leading-none">{{ s.title }}</span>
+                    <span class="shrink-0 text-[0.6875rem] text-muted-foreground/70">{{ s.time }}</span>
                   </button>
                   <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                     <button type="button" :disabled="disabled" class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50" title="Rename session" @click.stop="$emit('rename', s.id)">
@@ -118,7 +117,7 @@
                 <button
                   v-if="group.sessions.length > expandedGroupSessionLimit"
                   type="button"
-                  class="ml-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  class="ml-1 rounded px-2 py-1 text-[0.6875rem] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   @click="toggleShowAllOtherGroup(group.key)"
                 >
                   {{ showAllOtherGroupKeys.has(group.key) ? 'Show less' : `Show ${group.sessions.length - expandedGroupSessionLimit} more` }}
@@ -298,8 +297,8 @@ function toEpoch(value?: string) {
 }
 
 .sidebar-icon {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   stroke-width: 2.2;
 }
 </style>

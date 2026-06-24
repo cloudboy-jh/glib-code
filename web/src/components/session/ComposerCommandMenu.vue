@@ -1,7 +1,7 @@
 <template>
-  <div v-if="open && items.length" class="absolute bottom-full left-0 z-20 mb-2 w-[340px] max-h-[400px] overflow-y-auto rounded-2xl border border-border/80 bg-card/95 shadow-lg shadow-black/20">
+  <div v-if="open && items.length" class="absolute bottom-full left-0 z-20 mb-2 w-[21.25rem] max-h-[25rem] overflow-y-auto rounded-2xl border border-border/80 bg-card/95 shadow-lg shadow-black/20">
     <template v-for="group in groupedItems" :key="group.category">
-      <div class="border-b border-border/70 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{{ group.label }}</div>
+      <div class="border-b border-border/70 px-3 py-2 text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">{{ group.label }}</div>
       <div class="p-1.5">
         <button
           v-for="item in group.items"
@@ -14,11 +14,11 @@
           @mousedown.prevent
           @click="$emit('select', item)"
         >
-          <span class="mt-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-background/70 px-2 font-mono text-[11px] text-primary">/{{ item.value }}</span>
+          <span class="mt-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-background/70 px-2 font-mono text-[0.6875rem] text-primary">/{{ item.value }}</span>
           <span class="min-w-0 flex-1">
             <span class="block text-sm font-medium">{{ item.label }}</span>
             <span class="block text-xs text-muted-foreground">{{ item.description }}</span>
-            <span v-if="item.inlineArgs && item.argHint" class="mt-0.5 block text-[11px] text-muted-foreground/60">{{ item.argHint }}</span>
+            <span v-if="item.inlineArgs && item.argHint" class="mt-0.5 block text-[0.6875rem] text-muted-foreground/60">{{ item.argHint }}</span>
           </span>
         </button>
       </div>

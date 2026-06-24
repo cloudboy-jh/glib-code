@@ -22,7 +22,7 @@
     <div class="min-w-0">
       <div class="text-sm font-medium text-foreground">{{ title }}</div>
       <div class="mt-0.5 text-xs leading-relaxed text-muted-foreground">{{ rationale }}</div>
-      <div v-if="when" class="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground/80">
+      <div v-if="when" class="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[0.625rem] text-muted-foreground/80">
         <svg class="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>

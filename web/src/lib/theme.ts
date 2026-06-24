@@ -15,6 +15,14 @@ export function applyTheme(theme: ThemePreset) {
   const root = document.documentElement;
 
   root.dataset.theme = theme;
+
+  // Light vs dark, inferred from background lightness (matches diffThemeType).
+  // Drives provider-icon inversion so the lobehub (dark-on-transparent) SVGs
+  // stay legible on light presets like minimal-paper instead of forcing white.
+  const lightness = Number(tokens.background.split(" ")[2]?.replace("%", "") ?? "0");
+  const isLight = lightness > 50;
+  root.style.setProperty("--icon-invert", isLight ? "0" : "1");
+
   root.style.setProperty("--background", tokens.background);
   root.style.setProperty("--foreground", tokens.foreground);
   root.style.setProperty("--card", tokens.card);

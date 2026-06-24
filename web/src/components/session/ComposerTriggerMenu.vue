@@ -13,5 +13,5 @@ defineEmits<{ trigger: [k: '/' | '@' | '#'] }>();
 </script>
 
 <style scoped>
-.row{display:flex;gap:8px;align-items:center}.ghost{background:transparent;border:1px solid #33415b;color:#d6dbeb;padding:6px 8px}.muted{color:#8e99b2}
+.row{display:flex;gap:0.5rem;align-items:center}.ghost{background:transparent;border:1px solid #33415b;color:#d6dbeb;padding:0.375rem 0.5rem}.muted{color:#8e99b2}
 </style>

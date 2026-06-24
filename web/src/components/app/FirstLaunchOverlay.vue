@@ -14,8 +14,8 @@
 
       <!-- Ambient glow, purely decorative -->
       <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div class="absolute -top-40 left-1/2 h-[600px] w-[900px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
-        <div class="absolute bottom-0 right-0 h-[400px] w-[600px] translate-x-1/4 translate-y-1/4 rounded-full bg-primary/3 blur-3xl" />
+        <div class="absolute -top-40 left-1/2 h-[37.5rem] w-[56.25rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
+        <div class="absolute bottom-0 right-0 h-[25rem] w-[37.5rem] translate-x-1/4 translate-y-1/4 rounded-full bg-primary/3 blur-3xl" />
       </div>
 
       <!-- Dismiss (close X) -->
@@ -211,7 +211,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import type { FirstLaunchStep } from "../../composables/useFirstLaunch";
 import PermissionCard from "./PermissionCard.vue";
 
-type SettingsTab = "Models" | "Git" | "Integrations" | "Appearance" | "Keybindings";
+type SettingsTab = "Models" | "Git" | "Integrations" | "Appearance";
 
 const props = defineProps<{
   show: boolean;
@@ -398,10 +398,10 @@ function onKeydown(event: KeyboardEvent) {
 }
 .fl-slide-enter-from {
   opacity: 0;
-  transform: translateX(24px);
+  transform: translateX(1.5rem);
 }
 .fl-slide-leave-to {
   opacity: 0;
-  transform: translateX(-24px);
+  transform: translateX(-1.5rem);
 }
 </style>

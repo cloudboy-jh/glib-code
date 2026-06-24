@@ -40,8 +40,8 @@ const containerClass = computed(() => {
 });
 
 const maxWidthClass = computed(() => {
-  if (props.size === 'xl') return 'max-w-[760px]';
-  if (props.size === 'lg') return 'max-w-[680px]';
+  if (props.size === 'xl') return 'max-w-[47.5rem]';
+  if (props.size === 'lg') return 'max-w-[42.5rem]';
   return 'max-w-lg';
 });
 </script>

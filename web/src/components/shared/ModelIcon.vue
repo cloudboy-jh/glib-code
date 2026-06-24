@@ -23,11 +23,9 @@ const props = withDefaults(
   defineProps<{
     provider: string;
     size?: number;
-    theme?: 'light' | 'dark';
   }>(),
   {
-    size: 20,
-    theme: 'light'
+    size: 20
   }
 );
 
@@ -69,24 +67,19 @@ const wrapperStyle = computed(() => ({
 }));
 
 const imageStyle = computed(() => ({
-  filter: props.theme === 'dark' ? 'invert(1)' : 'none',
+  // Inversion follows the active theme via --icon-invert (set in applyTheme):
+  // 1 on dark presets (lobehub SVGs are dark-on-transparent → invert to light),
+  // 0 on light presets like minimal-paper. Defaults to 1 if the var is unset.
+  filter: 'invert(var(--icon-invert, 1))',
   height: `${Math.round(props.size * 0.82)}px`,
   width: `${Math.round(props.size * 0.82)}px`
 }));
 
-const fallbackStyle = computed(() => {
-  const hue = hashProvider(normalizedProvider.value);
-  const isDark = props.theme === 'dark';
-
-  return {
-    width: `${props.size}px`,
-    height: `${props.size}px`,
-    fontSize: `${Math.max(10, Math.round(props.size * 0.52))}px`,
-    backgroundColor: isDark ? `hsl(${hue} 36% 18% / 0.72)` : `hsl(${hue} 60% 94%)`,
-    borderColor: isDark ? `hsl(${hue} 45% 36% / 0.7)` : `hsl(${hue} 48% 80%)`,
-    color: isDark ? `hsl(${hue} 58% 76%)` : `hsl(${hue} 58% 30%)`
-  };
-});
+const fallbackStyle = computed(() => ({
+  width: `${props.size}px`,
+  height: `${props.size}px`,
+  fontSize: `${Math.max(10, Math.round(props.size * 0.52))}px`
+}));
 
 watch(
   () => normalizedProvider.value,
@@ -94,16 +87,6 @@ watch(
     hasError.value = false;
   }
 );
-
-function hashProvider(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) % 360;
-  }
-
-  return hash;
-}
 </script>
 
 <style scoped>
@@ -128,8 +111,10 @@ function hashProvider(value: string): number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid;
+  border: 1px solid hsl(var(--border));
   border-radius: 999px;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
   font-weight: 700;
   line-height: 1;
   user-select: none;

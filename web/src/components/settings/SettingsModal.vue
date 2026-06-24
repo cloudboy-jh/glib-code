@@ -1,9 +1,9 @@
 <template>
-  <UiDialog size="xl" dialog-class="h-[min(760px,calc(100vh-40px))] max-w-[980px] overflow-hidden" :show-close-button="false" @close="$emit('close')">
+  <UiDialog size="xl" dialog-class="h-[min(760px,calc(100vh-40px))] max-w-[61.25rem] overflow-hidden" :show-close-button="false" @close="$emit('close')">
     <div class="flex h-14 shrink-0 items-center border-b border-border/80 bg-card/70 px-5">
       <div>
         <h3 class="text-base font-semibold tracking-tight">Settings</h3>
-        <p class="text-[11px] text-muted-foreground">{{ activeTabDescription }}</p>
+        <p class="text-[0.6875rem] text-muted-foreground">{{ activeTabDescription }}</p>
       </div>
       <UiButton variant="outline" size="sm" class="ml-auto" @click="$emit('close')">Close</UiButton>
     </div>
@@ -22,17 +22,17 @@
           @click="tab = t"
         >
           <span>{{ t }}</span>
-          <span v-if="t === 'Models'" class="rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{{ authenticatedProviderCount }}</span>
+          <span v-if="t === 'Models'" class="rounded-full border border-border/60 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">{{ authenticatedProviderCount }}</span>
         </button>
       </nav>
 
       <section class="min-h-0 overflow-auto bg-background/10 px-6 py-6 sm:px-7" aria-live="polite">
-        <div :class="['min-h-full w-full', tab === 'Editor' || tab === 'Appearance' || tab === 'Keybindings' ? 'flex flex-col' : 'space-y-5']">
+        <div :class="['min-h-full w-full', tab === 'Editor' || tab === 'Appearance' ? 'flex flex-col' : 'space-y-5']">
           <template v-if="tab === 'Models'">
             <SectionShell title="Active model" aria-label="Active model">
               <div class="settings-row">
                 <div class="flex min-w-0 items-center gap-3">
-                  <ModelIcon :provider="settings.defaultProvider" :size="30" theme="dark" />
+                  <ModelIcon :provider="settings.defaultProvider" :size="30" />
                   <div class="min-w-0">
                     <p class="text-sm font-medium">Active model</p>
                     <p class="truncate text-sm text-muted-foreground">{{ settings.defaultProvider }}/{{ settings.defaultModel }}</p>
@@ -54,7 +54,7 @@
                   <p class="mt-0.5 truncate text-sm text-muted-foreground">
                     Effective: {{ projectProvider.effective.provider }}/{{ projectProvider.effective.model }}
                   </p>
-                  <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  <p class="mt-0.5 text-[0.6875rem] text-muted-foreground">
                     <span v-if="projectOverrideActive" class="text-primary">Pinned for this project</span>
                     <span v-else>Inherits app default ({{ projectProvider.defaults.provider }}/{{ projectProvider.defaults.model }})</span>
                   </p>
@@ -160,12 +160,6 @@
               <ThemePicker :model-value="settings.themePreset" @update:model-value="$emit('update:theme', $event)" />
             </section>
           </template>
-
-          <template v-else>
-            <section class="settings-section settings-section--fill p-4" aria-label="Keybindings">
-              <KeybindingsEditor :model-value="keybindings" @change="$emit('update:keybinding', $event.command, $event.key)" />
-            </section>
-          </template>
         </div>
       </section>
     </div>
@@ -180,15 +174,13 @@ import UiButton from '../ui/button.vue';
 import UiDialog from '../ui/dialog.vue';
 import ModelIcon from '../shared/ModelIcon.vue';
 import EditorIcon from '../shared/EditorIcon.vue';
-import KeybindingsEditor from './KeybindingsEditor.vue';
 import ThemePicker from './ThemePicker.vue';
 
 type Provider = { id: string; hasAuth: boolean; modelIds: string[] };
-type SettingsTab = 'Models' | 'GitTrix' | 'Editor' | 'Appearance' | 'Keybindings';
+type SettingsTab = 'Models' | 'GitTrix' | 'Editor' | 'Appearance';
 
 const props = defineProps<{
   settings: { themePreset: string; defaultProvider: string; defaultModel: string; durableProvider: string; ephemeralProvider: string; promoteStrategy: string; preferredEditor: string | null };
-  keybindings: Array<{ command: string; key: string }>;
   providers: Provider[];
   githubConnected: boolean;
   githubAccount?: string;
@@ -198,7 +190,7 @@ const props = defineProps<{
   githubVerificationUri?: string;
   githubError?: string;
   defaultOpenMode: 'diff' | 'session';
-  initialTab?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance' | 'Keybindings';
+  initialTab?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance';
   currentProjectName?: string;
   projectProvider?: {
     override: { provider?: string; model?: string };
@@ -212,7 +204,6 @@ const emit = defineEmits<{
   'update:theme': [value: ThemePreset];
   'update:provider': [value: string];
   'update:model': [value: string];
-  'update:keybinding': [command: string, key: string];
   'update:open-mode': [value: 'diff' | 'session'];
   'update:gittrix-provider': [key: 'durableProvider' | 'ephemeralProvider' | 'promoteStrategy', value: string];
   'update:preferred-editor': [value: string | null];
@@ -230,7 +221,7 @@ const projectOverrideActive = computed(() =>
   Boolean(props.projectProvider?.override.provider || props.projectProvider?.override.model)
 );
 
-const tabs = ['Models', 'GitTrix', 'Editor', 'Appearance', 'Keybindings'] as const;
+const tabs = ['Models', 'GitTrix', 'Editor', 'Appearance'] as const;
 const tab = ref<SettingsTab>(mapInitialTab(props.initialTab));
 const authDraftProviderId = ref('');
 const authDraftApiKey = ref('');
@@ -241,11 +232,10 @@ const tabMeta: Record<SettingsTab, { description: string }> = {
   Models: { description: 'Choose the active model and manage provider keys.' },
   GitTrix: { description: 'Configure storage and promotion behavior.' },
   Editor: { description: 'Choose your default editor for project and file opens.' },
-  Appearance: { description: 'Pick the app color theme.' },
-  Keybindings: { description: 'Customize shortcuts for common actions.' }
+  Appearance: { description: 'Pick the app color theme.' }
 };
 
-function mapInitialTab(value?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance' | 'Keybindings'): SettingsTab {
+function mapInitialTab(value?: 'Models' | 'Git' | 'Integrations' | 'Editor' | 'Appearance'): SettingsTab {
   if (value === 'Git') return 'GitTrix';
   if (value === 'Integrations') return 'Editor';
   return value ?? 'Models';
@@ -342,11 +332,11 @@ const ProviderRow = defineComponent({
   setup(rowProps, { emit: rowEmit }) {
     return () => h('div', { class: 'settings-row border-t border-border/60 first:border-t-0' }, [
       h('button', { type: 'button', class: 'flex min-w-0 flex-1 items-center gap-3 rounded-md px-1 text-left transition-colors hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring', disabled: !rowProps.provider.hasAuth, onClick: () => rowProps.provider.hasAuth && rowEmit('select') }, [
-        h(ModelIcon, { provider: rowProps.provider.id, size: 28, theme: 'dark' }),
+        h(ModelIcon, { provider: rowProps.provider.id, size: 28 }),
         h('div', { class: 'min-w-0' }, [
           h('div', { class: 'flex items-center gap-2' }, [
             h('span', { class: ['truncate text-sm font-medium', rowProps.provider.hasAuth ? 'text-foreground' : 'text-muted-foreground'] }, rowProps.provider.id),
-            rowProps.active ? h('span', { class: 'rounded-full border border-primary/35 px-1.5 py-0.5 text-[10px] text-primary' }, 'Default') : null
+            rowProps.active ? h('span', { class: 'rounded-full border border-primary/35 px-1.5 py-0.5 text-[0.625rem] text-primary' }, 'Default') : null
           ]),
           h('p', { class: 'text-xs text-muted-foreground' }, `${rowProps.provider.modelIds.length} models · ${rowProps.provider.hasAuth ? 'connected' : 'needs key'}`)
         ])
@@ -382,7 +372,7 @@ function saveProviderKey(providerId: string) {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   border: 1px solid hsl(var(--border) / 0.72);
   background: hsl(var(--background) / 0.32);
 }
@@ -397,18 +387,18 @@ function saveProviderKey(providerId: string) {
 
 .settings-row {
   display: flex;
-  min-height: 58px;
+  min-height: 3.625rem;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 10px 16px;
+  gap: 0.875rem;
+  padding: 0.625rem 1rem;
 }
 
 @media (max-width: 920px) {
   .settings-row {
-    min-height: 54px;
-    gap: 12px;
-    padding: 10px 14px;
+    min-height: 3.375rem;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
   }
 }
 </style>

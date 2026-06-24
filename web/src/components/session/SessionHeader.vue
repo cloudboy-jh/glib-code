@@ -1,5 +1,5 @@
 <template>
-  <header class="flex h-[44px] items-center gap-2.5 border-b border-border/80 px-3 sm:px-4">
+  <header class="flex h-[2.75rem] items-center gap-2.5 border-b border-border/80 px-3 sm:px-4">
     <!-- Left sidebar re-open -->
     <button
       v-if="!leftSidebarOpen"
@@ -17,7 +17,7 @@
         <span v-if="projectName" class="shrink-0 text-muted-foreground/40">/</span>
         <span class="truncate font-medium text-foreground">{{ title }}</span>
       </div>
-      <span :class="['inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]', statusBadgeClass]">
+      <span :class="['inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.625rem]', statusBadgeClass]">
         <span :class="['h-1.5 w-1.5 rounded-full', statusDotClass]" />
         {{ statusLabel }}
       </span>
@@ -111,15 +111,15 @@ const statusBadgeClass = computed(() => {
 <style scoped>
 .header-button {
   display: inline-flex;
-  height: 30px;
+  height: 1.875rem;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  border-radius: 8px;
+  gap: 0.3125rem;
+  border-radius: 0.5rem;
   border: 1px solid hsl(var(--border) / 0.8);
   background: hsl(var(--background) / 0.5);
-  padding: 0 9px;
-  font-size: 12px;
+  padding: 0 0.5625rem;
+  font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -135,8 +135,8 @@ const statusBadgeClass = computed(() => {
 }
 
 .header-icon {
-  width: 15px;
-  height: 15px;
+  width: 0.9375rem;
+  height: 0.9375rem;
   stroke-width: 2.1;
 }
 </style>

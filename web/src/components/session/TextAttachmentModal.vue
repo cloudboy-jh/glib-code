@@ -25,15 +25,15 @@
 
           <!-- Content -->
           <div class="min-h-0 flex-1 overflow-auto p-4">
-            <pre class="whitespace-pre-wrap break-words font-mono text-[13px] leading-6 text-foreground/90">{{ content }}</pre>
+            <pre class="whitespace-pre-wrap break-words font-mono text-[0.8125rem] leading-6 text-foreground/90">{{ content }}</pre>
           </div>
 
           <!-- Footer -->
           <div class="flex shrink-0 items-center justify-between border-t border-border/60 px-4 py-3">
-            <span class="text-[11px] text-muted-foreground/60">{{ wordCount }} words · {{ charCount }} chars</span>
+            <span class="text-[0.6875rem] text-muted-foreground/60">{{ wordCount }} words · {{ charCount }} chars</span>
             <button
               type="button"
-              class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[12px] font-medium text-red-400 hover:bg-destructive/20"
+              class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[0.75rem] font-medium text-red-400 hover:bg-destructive/20"
               @click="$emit('remove'); $emit('close')"
             >
               Remove attachment

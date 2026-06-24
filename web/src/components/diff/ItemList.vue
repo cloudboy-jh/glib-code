@@ -15,6 +15,6 @@ defineEmits<{ select: [item: { id: string; title: string; meta: string }] }>();
 </script>
 
 <style scoped>
-.box{border:1px solid #2a3448;background:#111827;padding:10px}.list{display:grid;gap:4px}.item{display:flex;justify-content:space-between;padding:6px 8px;border:1px solid #36435b;background:#0f1522;color:#d6dbeb}
+.box{border:1px solid #2a3448;background:#111827;padding:0.625rem}.list{display:grid;gap:0.25rem}.item{display:flex;justify-content:space-between;padding:0.375rem 0.5rem;border:1px solid #36435b;background:#0f1522;color:#d6dbeb}
 .selected{border-color:#6f86ff}.muted{color:#8e99b2}
 </style>

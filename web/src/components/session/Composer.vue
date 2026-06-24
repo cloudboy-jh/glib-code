@@ -22,7 +22,7 @@
               v-for="chip in contextChips"
               :key="chip.id"
               type="button"
-              class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] text-primary hover:bg-primary/15"
+              class="inline-flex max-w-[15rem] items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2 py-1 text-[0.6875rem] text-primary hover:bg-primary/15"
               :title="chip.label"
               @click="$emit('removeContextChip', chip.id)"
             >
@@ -37,7 +37,7 @@
               v-for="ta in textAttachments"
               :key="ta.id"
               type="button"
-              class="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-300 hover:bg-amber-500/20"
+              class="inline-flex max-w-[15rem] items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-300 hover:bg-amber-500/20"
               :title="ta.label"
               @click="$emit('viewTextAttachment', ta.id)"
             >
@@ -55,7 +55,7 @@
             <div
               v-for="file in attachments"
               :key="file.localId"
-              class="inline-flex max-w-[320px] items-center gap-1.5 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[11px]"
+              class="inline-flex max-w-[20rem] items-center gap-1.5 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-[0.6875rem]"
             >
               <span class="truncate" :title="file.name">{{ file.name }}</span>
               <span class="text-muted-foreground">{{ file.status }}</span>
@@ -142,7 +142,7 @@ function onSend() {
 .composer-body-enter-from,
 .composer-body-leave-to {
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(0.25rem);
 }
 
 .composer-body-enter-active,

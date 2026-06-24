@@ -78,15 +78,15 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 <style scoped>
 /* Running indicator track */
 .run-track {
-  height: 32px;
-  border-radius: 8px;
+  height: 2rem;
+  border-radius: 0.5rem;
   background: hsl(var(--muted) / 0.18);
   overflow: hidden;
   position: relative;
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  gap: 12px;
+  padding: 0 0.875rem;
+  gap: 0.75rem;
 }
 
 /* Ping-pong bar lives at the bottom edge of the track */
@@ -126,7 +126,7 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 .run-shimmer {
   position: relative;
   z-index: 1;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   pointer-events: none;
   min-width: 0;
@@ -174,7 +174,7 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 .run-elapsed {
   position: relative;
   z-index: 1;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   color: hsl(var(--muted-foreground) / 0.7);
   pointer-events: none;
@@ -184,14 +184,14 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 /* Chips */
 .command-chip {
   display: inline-flex;
-  height: 28px;
+  height: 1.75rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--background) / 0.45);
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -205,15 +205,15 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 /* Stop button */
 .stop-btn {
   display: inline-flex;
-  height: 36px;
+  height: 2.25rem;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 0.375rem;
   border-radius: 999px;
   border: 1px solid hsl(var(--destructive) / 0.5);
   background: hsl(var(--destructive) / 0.12);
-  padding: 0 16px;
-  font-size: 13px;
+  padding: 0 1rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: hsl(0 72% 70%);
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -252,7 +252,7 @@ const { label: elapsedLabel } = useElapsed(toRef(props, 'turnStartedAt'));
 
 .btn-slot {
   display: inline-block;
-  min-width: 72px;
+  min-width: 4.5rem;
   text-align: center;
 }
 

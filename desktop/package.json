@@ -37,6 +37,14 @@
     "files": ["dist/**"],
     "extraResources": [
       {
+        "from": "assets/tray.png",
+        "to": "assets/tray.png"
+      },
+      {
+        "from": "assets/tray.ico",
+        "to": "assets/tray.ico"
+      },
+      {
         "from": "../web/dist",
         "to": "web/dist",
         "filter": ["**/*"]

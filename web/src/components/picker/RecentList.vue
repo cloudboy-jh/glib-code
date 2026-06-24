@@ -62,7 +62,7 @@
               @click="$emit('openDiff', { name: r.name, path: r.path, source: 'uncommitted' })"
             >
               <span class="min-w-0 flex-1 truncate">Working tree</span>
-              <span class="shrink-0 text-[11px] text-muted-foreground/60">uncommitted</span>
+              <span class="shrink-0 text-[0.6875rem] text-muted-foreground/60">uncommitted</span>
             </button>
             <!-- Commits -->
             <template v-if="commitsLoadingForPath === canonicalizePath(r.path)">
@@ -76,7 +76,7 @@
                 class="recent-session-row"
                 @click="$emit('openDiff', { name: r.name, path: r.path, source: 'commit', commitRef: commit.ref })"
               >
-                <span class="shrink-0 font-mono text-[10px] text-primary/80 mr-2">{{ commit.shortRef }}</span>
+                <span class="shrink-0 font-mono text-[0.625rem] text-primary/80 mr-2">{{ commit.shortRef }}</span>
                 <span class="min-w-0 flex-1 truncate">{{ commit.title }}</span>
               </button>
               <div v-if="commitsForPath(r.path).length === 0 && commitsLoadingForPath !== canonicalizePath(r.path)" class="px-2 py-2 text-xs text-muted-foreground">No commits yet.</div>
@@ -124,7 +124,7 @@
             >
               <span v-if="statusDotClass(session.status)" class="h-2 w-2 shrink-0 rounded-full" :class="statusDotClass(session.status)" />
               <span class="min-w-0 flex-1 truncate leading-none">{{ session.title }}</span>
-              <span class="shrink-0 text-[11px] text-muted-foreground/70">{{ session.time }}</span>
+              <span class="shrink-0 text-[0.6875rem] text-muted-foreground/70">{{ session.time }}</span>
             </button>
             <button
               v-if="sessionsForPath(r.path).length > 5"
@@ -244,14 +244,14 @@ function statusDotClass(status?: SessionStatus) {
 <style scoped>
 .recent-row {
   display: flex;
-  height: 42px;
+  height: 2.625rem;
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   border: 1px solid transparent;
   background: hsl(var(--background) / 0.25);
-  padding: 0 12px;
+  padding: 0 0.75rem;
   color: hsl(var(--foreground));
 }
 
@@ -260,7 +260,7 @@ function statusDotClass(status?: SessionStatus) {
   min-width: 0;
   flex: 1;
   align-items: center;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   color: inherit;
 }
 
@@ -278,30 +278,30 @@ function statusDotClass(status?: SessionStatus) {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 0.625rem;
+  font-size: 0.875rem;
 }
 
 .recent-row-status {
   display: block;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: hsl(var(--muted-foreground) / 0.85);
 }
 
 .recent-row-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .recent-row-action {
   display: inline-flex;
-  height: 24px;
+  height: 1.5rem;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  padding: 0 8px;
-  font-size: 11px;
+  border-radius: 0.375rem;
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
   color: hsl(var(--muted-foreground));
 }
 
@@ -313,26 +313,26 @@ function statusDotClass(status?: SessionStatus) {
 .recent-mode-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 6px 0 2px;
-  padding: 0 2px;
+  gap: 0.625rem;
+  margin: 0.375rem 0 0.125rem;
+  padding: 0 0.125rem;
 }
 
 .recent-session-choice {
-  margin: 6px 0 2px;
-  padding: 0 2px;
+  margin: 0.375rem 0 0.125rem;
+  padding: 0 0.125rem;
 }
 
 .recent-back-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  border-radius: 7px;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.4375rem;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--background) / 0.25);
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
   color: hsl(var(--muted-foreground));
 }
 
@@ -342,39 +342,39 @@ function statusDotClass(status?: SessionStatus) {
 }
 
 .recent-session-list {
-  border-radius: 9px;
+  border-radius: 0.5625rem;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--background) / 0.2);
-  padding: 8px;
+  padding: 0.5rem;
 }
 
 .recent-session-row {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 8px;
-  border-radius: 7px;
+  gap: 0.5rem;
+  border-radius: 0.4375rem;
   border: 1px solid hsl(var(--border) / 0.65);
   background: hsl(var(--background) / 0.35);
-  padding: 8px 10px;
+  padding: 0.5rem 0.625rem;
   text-align: left;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: hsl(var(--foreground));
 }
 
 .recent-session-row + .recent-session-row {
-  margin-top: 6px;
+  margin-top: 0.375rem;
 }
 
 .recent-show-more {
-  margin-top: 8px;
+  margin-top: 0.5rem;
   width: 100%;
-  border-radius: 7px;
+  border-radius: 0.4375rem;
   border: 1px solid hsl(var(--border) / 0.65);
   background: hsl(var(--background) / 0.15);
-  padding: 6px 10px;
+  padding: 0.375rem 0.625rem;
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: hsl(var(--muted-foreground));
 }
 
@@ -389,13 +389,13 @@ function statusDotClass(status?: SessionStatus) {
 
 .recent-mode-button {
   display: flex;
-  min-height: 88px;
+  min-height: 5.5rem;
   align-items: flex-start;
-  gap: 12px;
-  border-radius: 9px;
+  gap: 0.75rem;
+  border-radius: 0.5625rem;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--background) / 0.25);
-  padding: 14px;
+  padding: 0.875rem;
   text-align: left;
   color: hsl(var(--foreground));
 }
@@ -408,19 +408,19 @@ function statusDotClass(status?: SessionStatus) {
 
 .recent-mode-icon {
   display: inline-flex;
-  height: 34px;
-  width: 34px;
+  height: 2.125rem;
+  width: 2.125rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: hsl(var(--muted));
   color: hsl(var(--foreground));
 }
 
 .recent-mode-glyph {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
@@ -432,15 +432,15 @@ function statusDotClass(status?: SessionStatus) {
 
 .recent-mode-label {
   display: block;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: hsl(var(--foreground));
 }
 
 .recent-mode-text {
   display: block;
-  margin-top: 2px;
-  font-size: 13px;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
   color: hsl(var(--muted-foreground));
 }
 
