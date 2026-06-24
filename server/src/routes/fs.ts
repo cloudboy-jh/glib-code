@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, resolve, dirname, basename } from "node:path";
+import { join, resolve, dirname, basename, relative, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { fallbackProjectPath } from "../services/project-store";
 import { inRepo } from "../lib/paths";
@@ -114,7 +114,10 @@ function resolveBrowsePath(requested: string | undefined): string {
   const trimmed = requested.trim();
   if (process.platform !== "win32" && /^[a-zA-Z]:[\\/]/.test(trimmed)) return root;
   const full = resolve(trimmed);
-  if (full === root || full.startsWith(`${root}/`)) return full;
+  // Containment check via path.relative so it works with the platform's
+  // separator (backslashes on Windows) instead of assuming forward slashes.
+  const rel = relative(root, full);
+  if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) return full;
   return root;
 }
 

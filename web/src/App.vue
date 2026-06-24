@@ -635,7 +635,6 @@ type ContextBundle = {
   sourceRef?: string;
   selectedFile?: string;
   selectedFiles?: string[];
-  selectedHunks?: Array<{ id: string; file: string; header: string; startLine: number }>;
   payloadByFile?: Record<string, string>;
   fileCount: number;
   charCount: number;
@@ -1003,9 +1002,6 @@ const activeContextChips = computed(() => {
   chips.push({ id: 'source', label: source });
   for (const file of ctx.selectedFiles?.length ? ctx.selectedFiles : ctx.selectedFile ? [ctx.selectedFile] : []) {
     chips.push({ id: `file:${file}`, label: file });
-  }
-  for (const hunk of ctx.selectedHunks ?? []) {
-    chips.push({ id: `hunk:${hunk.id}`, label: `${hunk.file} · ${hunk.header}` });
   }
   if (chips.length === 1) chips.push({ id: 'files', label: `${ctx.fileCount} file${ctx.fileCount === 1 ? '' : 's'}` });
   return chips.slice(0, 12);
@@ -2090,12 +2086,10 @@ async function createSessionInner(options?: { title?: string; context?: string; 
   return mapped;
 }
 
-async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }> }) {
+async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted'; ref?: string; file?: string; files?: string[] }) {
   if (!currentProject.value) return;
   const source = payload.source === 'commit' ? 'commits' : 'uncommitted';
-  const scopedFiles = payload.files?.length ? payload.files : payload.file ? [payload.file] : [];
-  const hunkFiles = [...new Set((payload.hunks ?? []).map((hunk) => hunk.file))];
-  const filesToPack = scopedFiles.length ? scopedFiles : hunkFiles.length ? hunkFiles : [];
+  const filesToPack = payload.files?.length ? payload.files : payload.file ? [payload.file] : [];
   async function packFile(file?: string) {
     const packBody: Record<string, unknown> = { source, projectPath: currentProject.value!.path };
     if (payload.source === 'commit' && payload.ref) packBody.ref = payload.ref;
@@ -2118,14 +2112,13 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
   const context = payload.source === 'commit' && payload.ref
     ? `commit ${payload.ref.slice(0, 7)}`
     : 'working tree changes';
-  const selectedHunkCopy = payload.hunks?.length ? ` · ${payload.hunks.length} hunks` : '';
   const created = await createSession({
     title: `Session from ${context}`,
     context,
     initialEntries: [{
       id: 'e1',
       kind: 'System',
-      text: `Context attached: ${context} · ${filesToPack.length || 'selected'} file scope${selectedHunkCopy}`,
+      text: `Context attached: ${context} · ${filesToPack.length || 'selected'} file scope`,
       time: 'now',
       level: 'info'
     }]
@@ -2142,7 +2135,6 @@ async function startSessionFromDiff(payload: { source: 'commit' | 'uncommitted';
       sourceRef: payload.ref,
       selectedFile: payload.file,
       selectedFiles: filesToPack,
-      selectedHunks: payload.hunks ?? [],
       payloadByFile,
       fileCount: filesToPack.length || Math.max(1, (diff.match(/^diff --git /gm) ?? []).length),
       charCount: diff.length,
@@ -2161,13 +2153,8 @@ function removeContextChip(id: string) {
   if (id.startsWith('file:')) {
     const file = id.slice(5);
     ctx.selectedFiles = (ctx.selectedFiles ?? []).filter((entry) => entry !== file);
-    ctx.selectedHunks = (ctx.selectedHunks ?? []).filter((hunk) => hunk.file !== file);
   }
-  if (id.startsWith('hunk:')) {
-    const hunkId = id.slice(5);
-    ctx.selectedHunks = (ctx.selectedHunks ?? []).filter((hunk) => hunk.id !== hunkId);
-  }
-  const remainingFiles = new Set([...(ctx.selectedFiles ?? []), ...(ctx.selectedHunks ?? []).map((hunk) => hunk.file)]);
+  const remainingFiles = new Set(ctx.selectedFiles ?? []);
   if (!remainingFiles.size) {
     removeActiveContext();
     return;

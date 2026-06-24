@@ -31,7 +31,7 @@ defineProps<{
 defineEmits<{
   'update:diffStyle': [value: 'split' | 'unified'];
   openProjects: [];
-  startSessionFromDiff: [payload: { source: 'uncommitted' | 'commit'; ref?: string; file?: string; files?: string[]; hunks?: Array<{ id: string; file: string; header: string; startLine: number }>; context?: string }];
+  startSessionFromDiff: [payload: { source: 'uncommitted' | 'commit'; ref?: string; file?: string; files?: string[]; context?: string }];
   openSettings: [];
 }>();
 </script>

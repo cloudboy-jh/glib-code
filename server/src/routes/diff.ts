@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { branchCompare, diffFiles, diffHunks, diffItems, packDiff } from "../services/diff";
+import { branchCompare, diffFiles, diffItems, packDiff } from "../services/diff";
 
 export const diffRoutes = new Hono()
   .get("/sources", (c) => c.json([
@@ -21,15 +21,6 @@ export const diffRoutes = new Hono()
     const files = await diffFiles(source, ref, c.req.query("projectPath"));
     if (!files) return c.json({ ok: false, message: "no project open" }, 404);
     return c.json(files);
-  })
-  .get("/hunks", async (c) => {
-    const source = c.req.query("source") ?? "uncommitted";
-    const ref = c.req.query("ref");
-    const file = c.req.query("file");
-    if (!file) return c.json({ ok: false, message: "file required" }, 400);
-    const hunks = await diffHunks(source, file, ref, c.req.query("projectPath"));
-    if (!hunks) return c.json({ ok: false, message: "no project open" }, 404);
-    return c.json(hunks);
   })
   .post("/pack", async (c) => {
     const body = await c.req.json().catch(() => null) as { source?: string; ref?: string; file?: string; projectPath?: string } | null;

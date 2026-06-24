@@ -108,30 +108,6 @@ export async function diffFiles(source: string, ref?: string, projectPath?: stri
   return [];
 }
 
-export async function diffHunks(source: string, file: string, ref?: string, projectPath?: string) {
-  let args: string[];
-  if (source === "commits" && ref) {
-    args = ["show", ref, "--", file];
-  } else if (source === "branches" && ref) {
-    args = ["diff", ref, "--", file];
-  } else {
-    args = ["diff", "HEAD", "--", file];
-  }
-
-  const out = await gitRaw(args, projectPath);
-  if (out == null) return null;
-  const lines = out.split("\n");
-
-  const hunks: Array<{ header: string; startLine: number }> = [];
-  for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].startsWith("@@")) {
-      hunks.push({ header: lines[i], startLine: i + 1 });
-    }
-  }
-
-  return hunks;
-}
-
 export async function packDiff(source: string, ref?: string, file?: string, projectPath?: string) {
   let args: string[];
   if (source === "commits" && ref) {
