@@ -5,6 +5,7 @@ import { getPiCore, validateProviderAuth } from "./pi-core";
 import { attachPiRpc } from "./pi-rpc";
 import type { PiEvent, PiRpcClient } from "./pi-rpc";
 import { createSandboxFactory } from "./sandbox";
+import { getOpenRouterCatalog } from "./openrouter-catalog";
 import type { Sandbox, SandboxProcess, SandboxFactory } from "./sandbox";
 import { log, logError } from "../lib/log";
 
@@ -660,8 +661,25 @@ async function getOrCreateSandboxSession(sessionId: string, cwd: string, provide
 
   const { modelRegistry, authStorage } = await getPiCore();
   const model = provider && modelId ? modelRegistry.find(provider, modelId) : undefined;
-  if (provider && modelId && !model) throw new Error(`Model not found: ${provider}/${modelId}`);
-  if (model) await validateProviderAuth(model.provider);
+
+  // The picker (pi-capabilities) unions the live OpenRouter catalog into the
+  // openrouter provider's model list, so freshly-released models appear there
+  // before pi-ai's baked snapshot knows about them. The static modelRegistry
+  // only contains that baked snapshot, so it would reject models the picker
+  // legitimately offered. Fall back to the live catalog for openrouter before
+  // declaring the model missing. The resolved model is only used to drive
+  // validateProviderAuth() below; the spawn itself takes provider/modelId
+  // verbatim, so resolving the provider alone is sufficient here.
+  let resolvedProvider = model?.provider;
+  if (!model && provider === "openrouter" && modelId) {
+    const catalog = await getOpenRouterCatalog();
+    if (catalog.some((m) => m.id === modelId)) {
+      resolvedProvider = "openrouter";
+    }
+  }
+
+  if (provider && modelId && !resolvedProvider) throw new Error(`Model not found: ${provider}/${modelId}`);
+  if (resolvedProvider) await validateProviderAuth(resolvedProvider);
 
   sandboxFactory ??= createSandboxFactory();
   const sandbox = await sandboxFactory.create({ sessionId, cwd });
