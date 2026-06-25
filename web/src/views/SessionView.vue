@@ -8,14 +8,6 @@
         @remove="$emit('removeActiveContext')"
         @back-to-diffs="$emit('backToDiffs')"
       />
-      <div v-if="activeSessionNotice" class="mx-auto mt-2 w-full max-w-5xl px-3 sm:px-5">
-        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
-          <span class="font-medium">{{ activeSessionNotice }}</span>
-          <span class="ml-auto" />
-          <button class="rounded border border-border/60 px-2 py-1 text-foreground/80 hover:bg-muted/60" @click="$emit('reloadActiveSessions')">Reload sessions</button>
-          <button class="rounded border border-border/60 px-2 py-1 text-foreground/80 hover:bg-muted/60" @click="$emit('createReplacementSession')">New replacement</button>
-        </div>
-      </div>
 
       <Timeline :entries="activeTimeline" :theme-preset="themePreset" :theme-type="themeType" :turn-started-at="turnStartedAt" :is-agent-running="isAgentRunning" @open-file-diff="$emit('openFileDiff', $event)" />
 
@@ -150,7 +142,6 @@ type TimelineEntry = {
 const props = defineProps<{
   activeSession: { id: string } | undefined;
   activeContextSummary: string;
-  activeSessionNotice?: string;
   activeTimeline: TimelineEntry[];
   themePreset: ThemePreset;
   themeType: 'dark' | 'light';
@@ -177,8 +168,6 @@ defineEmits<{
   openContextViewer: [];
   removeActiveContext: [];
   backToDiffs: [];
-  reloadActiveSessions: [];
-  createReplacementSession: [];
   updatePrompt: [value: string];
   sendPrompt: [];
   stopAgent: [];

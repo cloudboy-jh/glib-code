@@ -95,7 +95,6 @@
             key="session"
             :active-session="activeSession"
             :active-context-summary="activeContextSummary"
-            :active-session-notice="activeSessionNotice"
             :active-timeline="activeTimeline"
             :theme-preset="settings.themePreset"
             :theme-type="diffThemeType"
@@ -119,8 +118,6 @@
             @open-context-viewer="state.contextViewerOpen = true"
             @remove-active-context="removeActiveContext"
             @back-to-diffs="state.mode = 'diff'"
-            @reload-active-sessions="reloadActiveSessions"
-            @create-replacement-session="createReplacementSession"
             @update-prompt="setComposerPrompt"
             @send-prompt="sendPrompt"
             @stop-agent="abortTurn"
@@ -174,11 +171,14 @@
           :branch="currentProject?.branch"
           :session-status="activeSession?.status"
           :should-push="promoteShouldPush"
+          :session-notice="activeSessionNotice"
           @toggle-collapse="toggleRightRail"
           @promote="runPromote"
           @discard="discardEphemeral"
           @diff-current="openCurrentSessionDiff()"
           @diff-commits="openCommitsListDiff"
+          @reload-sessions="reloadActiveSessions"
+          @create-replacement="createReplacementSession"
         />
       </div>
     </div>

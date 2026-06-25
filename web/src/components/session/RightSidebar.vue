@@ -33,6 +33,22 @@
               <GitCommit class="h-3 w-3 shrink-0 text-muted-foreground/50" />
               <span class="font-mono text-muted-foreground/60">{{ boundary.baselineSha.slice(0, 7) }}</span>
             </div>
+            <!-- Session-recovery notice + actions (moved here from the in-timeline banner) -->
+            <template v-if="hasNotice">
+              <p class="pt-1 text-[0.6875rem] leading-snug text-muted-foreground/80">{{ sessionNotice }}</p>
+              <div class="grid grid-cols-2 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  class="flex h-8 items-center justify-center gap-1 rounded-md border border-border/70 bg-background/40 px-2 text-[0.6875rem] text-muted-foreground/75 transition-all hover:border-border hover:bg-accent/60 hover:text-foreground"
+                  @click="$emit('reloadSessions')"
+                >Reload</button>
+                <button
+                  type="button"
+                  class="flex h-8 items-center justify-center gap-1 rounded-md border border-border/70 bg-background/40 px-2 text-[0.6875rem] text-muted-foreground/75 transition-all hover:border-border hover:bg-accent/60 hover:text-foreground"
+                  @click="$emit('createReplacement')"
+                >New session</button>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -189,9 +205,10 @@ const props = defineProps<{
   branch?: string;
   sessionStatus?: string;
   shouldPush?: boolean;
+  sessionNotice?: string;
 }>();
 
-defineEmits<{ toggleCollapse: []; promote: []; discard: []; diffCurrent: []; diffCommits: [] }>();
+defineEmits<{ toggleCollapse: []; promote: []; discard: []; diffCurrent: []; diffCommits: []; reloadSessions: []; createReplacement: [] }>();
 
 const showAllFiles = ref(false);
 const diffMenuOpen = ref(false);
@@ -224,6 +241,8 @@ function formatHistoryAt(iso: string): string {
 const isPromoting = computed(() =>
   props.boundary.state === 'promoting' || props.boundary.state === 'promoted'
 );
+
+const hasNotice = computed(() => typeof props.sessionNotice === 'string' && props.sessionNotice.length > 0);
 
 const sessionStateDotClass = computed(() => {
   const s = props.sessionStatus;
