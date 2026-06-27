@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/cloudboy-jh/glib-code/releases/latest">
-    <img src="https://img.shields.io/badge/version-1.0.0-1e293b?style=flat-square" alt="Latest release" />
+    <img src="https://img.shields.io/badge/version-1.0.1-1e293b?style=flat-square" alt="Latest release" />
   </a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-1e293b?style=flat-square" alt="Platforms" />
 </p>
@@ -25,9 +25,23 @@ glib-code is an AI coding agent that lives next to your local repos. Open a proj
 
 | Platform | File |
 |----------|------|
-| Windows | `glib-code-Setup-1.0.0.exe` |
-| Mac | `glib-code-1.0.0-arm64.dmg` |
-| Linux | `glib-code-1.0.0.AppImage` |
+| Windows | `glib-code-Setup-1.0.1.exe` |
+| Mac | `glib-code-1.0.1-arm64.dmg` |
+| Linux | `glib-code-1.0.1.AppImage` |
+
+### macOS: "glib-code is damaged and can't be opened"
+
+glib-code isn't notarized by Apple yet, so macOS quarantines the app after
+download and shows a misleading "damaged" warning. The app is fine — macOS is
+just blocking an app from an unidentified developer. To open it, run this once
+after dragging glib-code to Applications:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/glib-code.app
+```
+
+Then launch it normally. (Alternatively: **System Settings → Privacy &
+Security**, scroll to the bottom, and click **Open Anyway**.)
 
 ## What it does
 

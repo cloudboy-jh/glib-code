@@ -1,6 +1,6 @@
 {
   "name": "@glib-code/desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI coding agent — review diffs, run sessions, ship faster.",
   "homepage": "https://github.com/cloudboy-jh/glib-code",
   "author": {
@@ -34,6 +34,7 @@
     "directories": {
       "output": "dist-app"
     },
+    "afterPack": "scripts/adhoc-sign.js",
     "files": ["dist/**"],
     "extraResources": [
       {
