@@ -4,8 +4,21 @@ import { join } from "node:path";
 
 const ATTACHMENTS_DIR = join(process.cwd(), ".glib-attachments");
 
-type AttachmentMeta = { id: string; name: string; type: string; size: number; path: string };
+export type AttachmentMeta = { id: string; name: string; type: string; size: number; path: string };
 const attachmentById = new Map<string, AttachmentMeta>();
+
+/** Read-only lookup for consumers (e.g. the attachment compiler) that must not
+ *  reach into the private map directly. */
+export function getAttachment(id: string): AttachmentMeta | undefined {
+  return attachmentById.get(id);
+}
+
+/** Test-only seam to seed the store without driving the HTTP upload path.
+ *  Mirrors the __set*ForTests convention used elsewhere in the codebase. */
+export function __setAttachmentForTests(meta: AttachmentMeta) {
+  attachmentById.set(meta.id, meta);
+  return () => attachmentById.delete(meta.id);
+}
 
 async function ensureDir() {
   await mkdir(ATTACHMENTS_DIR, { recursive: true });

@@ -7,6 +7,7 @@ import { fallbackProjectPath, getProjectById, getProjectByPath, getProjectOverri
 import { projectIdFromPath } from "../services/projects";
 import { requiredProjectPath, resolveAgentCwd, resolveSession } from "../services/session-resolver";
 import { getPiCapabilities } from "../services/pi-capabilities";
+import { ATTACHMENT_PREAMBLE, compileAttachments } from "../services/attachment-compiler";
 import * as gittrixService from "../services/gittrix-service";
 import { diffItems, packDiff } from "../services/diff";
 import { clearBoundaryCache, computeBoundary, toBoundaryEvent } from "../services/boundary-service";
@@ -258,7 +259,23 @@ export const agentRoutes = new Hono()
     // the model edit there with absolute paths, bypassing isolation so changes
     // never land in the workspace the diff/promote flow reads.
     const sessionContext = `Workspace rules:\n- Your working directory is: ${agentCwd}\n- Do ALL file reads and edits inside this working directory, using relative paths (or paths under it). Never write to any other absolute path.\n- This is an isolated workspace; your changes are reviewed and promoted to the real repo separately. Do not try to locate or modify the "real" repo yourself.\n- baseline: ${existing.meta.baselineSha || "unknown"}`;
-    const agentPrompt = await buildAgentPrompt(`${sessionContext}\n\n${prompt}`, body?.context, projectPath);
+
+    // Compile attachments to model-legible text before building the prompt. This
+    // is best-effort and never blocks the turn: sidecar failures/timeouts degrade
+    // to fidelity="none" blocks inside compileAttachments.
+    let promptWithAttachments = prompt;
+    const artifacts = await compileAttachments(body?.attachments ?? [], {
+      provider: existing.meta.provider,
+      model: existing.meta.model
+    }).catch((error) => {
+      logError("agent", "attachment compile threw unexpectedly", error, { sessionId: id });
+      return [];
+    });
+    if (artifacts.length > 0) {
+      promptWithAttachments = `${prompt}\n\n${ATTACHMENT_PREAMBLE}\n\n${artifacts.map((a) => a.block).join("\n\n")}`;
+    }
+
+    const agentPrompt = await buildAgentPrompt(`${sessionContext}\n\n${promptWithAttachments}`, body?.context, projectPath);
 
     void runTurn({
       sessionId: id,

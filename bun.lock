@@ -7,7 +7,7 @@
     },
     "desktop": {
       "name": "@glib-code/desktop",
-      "version": "0.1.6",
+      "version": "1.0.1",
       "dependencies": {
         "electron-updater": "^6.8.9",
       },
@@ -20,10 +20,11 @@
     },
     "server": {
       "name": "@glib-code/server",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "dependencies": {
         "@glib-code/shared": "workspace:*",
         "@hono/zod-validator": "^0.4.3",
+        "@mariozechner/pi-ai": "^0.72.1",
         "@mariozechner/pi-coding-agent": "^0.72.1",
         "gittrix": "^0.1.7",
         "hono": "^4.7.7",
@@ -37,7 +38,7 @@
     },
     "shared": {
       "name": "@glib-code/shared",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "dependencies": {
         "zod": "^3.24.3",
       },
@@ -48,7 +49,7 @@
     },
     "web": {
       "name": "@glib-code/web",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "dependencies": {
         "@glib-code/shared": "workspace:*",
         "@pierre/diffs": "^1.1.17",

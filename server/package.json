@@ -11,6 +11,7 @@
   "dependencies": {
     "@glib-code/shared": "workspace:*",
     "@hono/zod-validator": "^0.4.3",
+    "@mariozechner/pi-ai": "^0.72.1",
     "@mariozechner/pi-coding-agent": "^0.72.1",
     "gittrix": "^0.1.7",
     "hono": "^4.7.7",
