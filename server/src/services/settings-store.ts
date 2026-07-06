@@ -23,7 +23,7 @@ export type ProvidersState = {
 };
 
 const DEFAULT_SETTINGS: Settings = {
-  themePreset: "catppuccin-mocha",
+  themePreset: "minimal-dark",
   timestampFormat: "24-hour",
   durableProvider: "local",
   ephemeralProvider: "local",

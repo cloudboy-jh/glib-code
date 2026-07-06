@@ -234,16 +234,16 @@ const emit = defineEmits<{
 
 const overlayRef = ref<HTMLElement | null>(null);
 
-const steps: FirstLaunchStep[] = computed(() => {
+const steps = computed<FirstLaunchStep[]>(() => {
   const base: FirstLaunchStep[] = ["welcome"];
   if (props.needsFsPermissionRationale) base.push("permissions");
   base.push("signin");
   return base;
-}).value;
+});
 
-const totalSteps = computed(() => steps.length);
+const totalSteps = computed(() => steps.value.length);
 const currentStepIndex = computed(() => {
-  const idx = steps.indexOf(props.step);
+  const idx = steps.value.indexOf(props.step);
   return idx === -1 ? 1 : idx + 1;
 });
 
