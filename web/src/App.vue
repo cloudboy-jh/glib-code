@@ -734,7 +734,7 @@ const activeSessionIdByProject = reactive<Record<string, string>>({});
 const draftBySessionId = reactive<Record<string, string>>({});
 
 const settings = reactive({
-  themePreset: 'catppuccin-mocha' as ThemePreset,
+  themePreset: 'minimal-dark' as ThemePreset,
   defaultProvider: 'codex',
   defaultModel: 'gpt-5.3-codex',
   durableProvider: 'local' as 'local' | 'github',
@@ -1138,6 +1138,7 @@ const {
   downloadUpdate,
   installUpdate,
   dismissUpdate,
+  openExternal,
   seedDemo: seedFirstLaunchDemo,
 } = useFirstLaunch();
 
@@ -1819,10 +1820,10 @@ async function connectGitHub() {
   authState.githubError = '';
   authState.githubSigningIn = true;
   try {
-    const started = await apiPost<{ device_code: string; user_code: string; verification_uri: string; interval?: number }>('/auth/github/device/start', {});
+    const started = await apiPost<{ device_code: string; user_code: string; verification_uri: string; verification_uri_complete?: string; interval?: number }>('/auth/github/device/start', {});
     authState.githubUserCode = started.user_code;
     authState.githubVerificationUri = started.verification_uri;
-    window.open(started.verification_uri, '_blank', 'noopener,noreferrer');
+    await openExternal(started.verification_uri_complete || started.verification_uri);
     const intervalMs = Math.max(1000, (started.interval ?? 5) * 1000);
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, intervalMs));

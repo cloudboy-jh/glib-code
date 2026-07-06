@@ -14,8 +14,14 @@ function authPath() {
   return join(getConfigDir(), "auth", "github.json");
 }
 
+// GitHub OAuth *device flow* client IDs are public identifiers, not secrets —
+// there is no client secret in the device-code grant. It is safe to ship this
+// baked into the app. Override at runtime with GITHUB_OAUTH_CLIENT_ID if needed.
+// TODO: replace with glib-code's real GitHub OAuth App client id (Ov23... / Iv1...).
+const DEFAULT_GITHUB_OAUTH_CLIENT_ID = "Ov23liTj3XXPD26521p5";
+
 function clientId() {
-  return process.env.GITHUB_OAUTH_CLIENT_ID || process.env.GH_OAUTH_CLIENT_ID || "";
+  return process.env.GITHUB_OAUTH_CLIENT_ID || process.env.GH_OAUTH_CLIENT_ID || DEFAULT_GITHUB_OAUTH_CLIENT_ID;
 }
 
 async function readState(): Promise<GitHubAuthState> {
@@ -79,6 +85,7 @@ export async function startGitHubDeviceFlow() {
     device_code?: string;
     user_code?: string;
     verification_uri?: string;
+    verification_uri_complete?: string;
     expires_in?: number;
     interval?: number;
     error?: string;

@@ -295,6 +295,16 @@ async function createWindow() {
     },
   });
 
+  // Route any window.open() / target=_blank from the renderer to the OS browser
+  // instead of spawning a blank Electron BrowserWindow. Denying the popup keeps
+  // external links (auth flows, docs) opening in the user's real browser.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+
   win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[desktop] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
   });
@@ -382,6 +392,9 @@ if (!gotInstanceLock) {
       serverProc = spawn(getBunCommand(), ["run", join(serverDir, "server.js"), `--port=${apiPort}`], {
         cwd: serverDir,
         stdio: "inherit",
+        // Forward the parent env so runtime overrides (GitHub OAuth client id,
+        // Cloudflare creds, gh token, etc.) reach the spawned Bun server.
+        env: process.env,
       });
 
       await waitForUrl(healthUrl);
