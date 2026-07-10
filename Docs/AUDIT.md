@@ -1,7 +1,7 @@
 # glib-code audit (grounded)
 
 Last updated: 2026-07-10  
-Scope: tree at `main` (`7d58e16` vicinity), first-party source only (excludes `node_modules`, `dist`, `dist-app`).  
+Scope: tree at `main` after rebasing onto `ca27081` (audit landed as follow-up docs commit). First-party source only (excludes `node_modules`, `dist`, `dist-app`).  
 Method: inventory + layout + tests + CI/docs cross-check. Not a vibe/scorecard pass.
 
 ## Product thesis (still sound)
@@ -20,10 +20,10 @@ That loop is the asset. Everything else is packaging, decomposition, and proof.
 | Markdown | ~22 |
 | App code lines (ts/vue/js/css, non-empty) | ~19k; crude comment density ~5–6% |
 | First-party `*.test.ts` | 19 (server-heavy; some web vitest) |
-| Package versions | 1.0.0 across workspaces |
-| Tags | `v1.0.0` present (plus older `v0.1.x`) |
+| Package versions | 1.0.1 at audit push time (`desktop/package.json`; tags `v1.0.0`, `v1.0.1`) |
+| Tags | `v1.0.0` + `v1.0.1` (plus older `v0.1.x`) |
 
-Prior “17,464 LOC / 217 files / 91 TS / 7% comments / v1.0.1” style stats are approximate tourism, not a ledger. Do not re-paste them.
+Prior “17,464 LOC / 217 files / 91 TS / 7% comments” style stats are approximate tourism, not a ledger. Do not re-paste them. Version claims in casual reviews go stale quickly — check tags + package.json.
 
 Exact-content “dupes” found: iconset @2x aliases, tray icons, logo copied into `web/public`. Not logic duplication. Ignore as a size crisis.
 
@@ -53,8 +53,9 @@ Exact-content “dupes” found: iconset @2x aliases, tray icons, logo copied in
 
 4. **Ship docs disagree with ship machinery.**  
    - `Docs/RELEASE.md`: Mac DMG + Windows ZIP, no Linux, manual host builds, “no signing/notarization.”  
-   - Live workflow: windows/mac/linux package jobs; notarize hooks commented as optional secrets.  
-   - README promises three download names at 1.0.0 — verify against actual GH Release assets.  
+   - Live workflow: windows/mac/linux package jobs; notarize hooks still optional secrets.  
+   - Recent main also has ad-hoc Mac signing work for Gatekeeper “damaged DMG” friction — track that vs full notarization honestly.  
+   - README download names / badges — verify against actual GH Release assets for the current tag.  
    Stale/ship-drift docs erase trust faster than missing CONTRIBUTING.md.
 
 5. **Stale doc graph.**  
@@ -94,7 +95,7 @@ Lead with decomposition + CI + boundary proof. Do not spend a sprint on comment 
 
 ## How this supersedes the generic review
 
-Discard external scorecards that invent paths (`server/src/sessions/*`), wrong versions (`v1.0.1`), and high-prio “dupes.” Keep only what survives contact with the tree. This file is the current audit artifact; update it when the ranked table moves.
+Discard external scorecards that invent paths (`server/src/sessions/*`) and high-prio “dupes.” Keep only what survives contact with the tree. This file is the current audit artifact; update it when the ranked table moves.
 
 ## Key paths for the next pass
 
